@@ -27,76 +27,101 @@ class DashboardStatisticsGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 900;
-        final isMedium =
-            constraints.maxWidth >= 600 && constraints.maxWidth < 900;
-        final gridCols = isWide ? 4 : (isMedium ? 2 : 1);
+        // ปรับการคำนวณจำนวนคอลัมน์ให้รองรับหน้าจอขนาดเล็กมากขึ้น
+        int gridCols;
+        double aspectRatio;
+        
+        if (constraints.maxWidth >= 1200) {
+          gridCols = 4;
+          aspectRatio = 2.4;
+        } else if (constraints.maxWidth >= 900) {
+          gridCols = 4;
+          aspectRatio = 2.2;
+        } else if (constraints.maxWidth >= 700) {
+          gridCols = 2;
+          aspectRatio = 2.0;
+        } else if (constraints.maxWidth >= 500) {
+          gridCols = 2;
+          aspectRatio = 1.8;
+        } else {
+          gridCols = 1;
+          aspectRatio = 1.6;
+        }
 
-        return GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: gridCols,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          childAspectRatio: 2.2,
-          children: [
-            StaggeredCard(
-              delay: 0,
-              child: ModernStatCard(
-                title: 'ต่ำกว่า 1 ล้านบาท',
-                value: numFmt.format(getShopCountByStatus(shops, 'safe')),
-                subtitle: 'ร้านค้า',
-                icon: Icons.check_circle_rounded,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF10B981), Color(0xFF059669)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: constraints.maxWidth,
+              maxWidth: constraints.maxWidth < 800 ? 800 : constraints.maxWidth,
+            ),
+            child: GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: gridCols,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: aspectRatio,
+              children: [
+                StaggeredCard(
+                  delay: 0,
+                  child: ModernStatCard(
+                    title: 'ต่ำกว่า 1 ล้านบาท',
+                    value: numFmt.format(getShopCountByStatus(shops, 'safe')),
+                    subtitle: 'ร้านค้า',
+                    icon: Icons.check_circle_rounded,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF10B981), Color(0xFF059669)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    isSelected: selectedFilter == 'safe',
+                    onTap: () => onFilterTap('safe'),
+                  ),
                 ),
-                isSelected: selectedFilter == 'safe',
-                onTap: () => onFilterTap('safe'),
-              ),
-            ),
-            StaggeredCard(
-              delay: 150,
-              child: ModernStatCard(
-                title: '1-1.8 ล้านบาท',
-                value: numFmt.format(getShopCountByStatus(shops, 'warning')),
-                subtitle: 'ร้านค้า',
-                icon: Icons.warning_rounded,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                StaggeredCard(
+                  delay: 150,
+                  child: ModernStatCard(
+                    title: '1-1.8 ล้านบาท',
+                    value: numFmt.format(getShopCountByStatus(shops, 'warning')),
+                    subtitle: 'ร้านค้า',
+                    icon: Icons.warning_rounded,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    isSelected: selectedFilter == 'warning',
+                    onTap: () => onFilterTap('warning'),
+                  ),
                 ),
-                isSelected: selectedFilter == 'warning',
-                onTap: () => onFilterTap('warning'),
-              ),
-            ),
-            StaggeredCard(
-              delay: 300,
-              child: ModernStatCard(
-                title: 'เกิน 1.8 ล้านบาท',
-                value: numFmt.format(getShopCountByStatus(shops, 'exceeded')),
-                subtitle: 'ร้านค้า',
-                icon: Icons.error_rounded,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                StaggeredCard(
+                  delay: 300,
+                  child: ModernStatCard(
+                    title: 'เกิน 1.8 ล้านบาท',
+                    value: numFmt.format(getShopCountByStatus(shops, 'exceeded')),
+                    subtitle: 'ร้านค้า',
+                    icon: Icons.error_rounded,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    isSelected: selectedFilter == 'exceeded',
+                    onTap: () => onFilterTap('exceeded'),
+                  ),
                 ),
-                isSelected: selectedFilter == 'exceeded',
-                onTap: () => onFilterTap('exceeded'),
-              ),
+                StaggeredCard(
+                  delay: 450,
+                  child: EnhancedDocumentCard(
+                    documentCounts: getDocumentCounts(shops) as Map<String, int>,
+                    numFmt: numFmt,
+                    shops: shops,
+                  ),
+                ),
+              ],
             ),
-            StaggeredCard(
-              delay: 450,
-              child: EnhancedDocumentCard(
-                documentCounts: getDocumentCounts(shops) as Map<String, int>,
-                numFmt: numFmt,
-                shops: shops,
-              ),
-            ),
-          ],
+          ),
         );
       },
     );
@@ -161,91 +186,111 @@ class _ModernStatCardState extends State<ModernStatCard>
               ),
             ],
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ฝั่งข้อความ
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 200),
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: _isHovered ? 14 : 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      child: Text(
-                        widget.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TweenAnimationBuilder<double>(
-                      duration: const Duration(milliseconds: 1000),
-                      curve: Curves.easeOutCubic,
-                      tween: Tween(
-                        begin: 0,
-                        end:
-                            double.tryParse(widget.value.replaceAll(',', '')) ??
-                            0,
-                      ),
-                      builder: (context, value, child) {
-                        final formatter = NumberFormat.decimalPattern('th_TH');
-                        return AnimatedDefaultTextStyle(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // คำนวณขนาดฟอนต์ตามขนาด container
+              final isCompact = constraints.maxWidth < 200;
+              final titleFontSize = isCompact ? (_isHovered ? 12.0 : 11.0) : (_isHovered ? 14.0 : 13.0);
+              final valueFontSize = isCompact ? (_isHovered ? 24.0 : 22.0) : (_isHovered ? 30.0 : 28.0);
+              final iconSize = isCompact ? 40.0 : (_isHovered ? 52.0 : 50.0);
+              
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ฝั่งข้อความ
+                  Expanded(
+                    flex: 3,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        AnimatedDefaultTextStyle(
                           duration: const Duration(milliseconds: 200),
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: _isHovered ? 30 : 28,
-                            fontWeight: FontWeight.w700,
-                            height: 1.2,
+                            fontSize: titleFontSize,
+                            fontWeight: FontWeight.w500,
                           ),
-                          child: Text(formatter.format(value)),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 4),
-                    AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 200),
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(_isHovered ? 1.0 : 0.9),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      child: Text(widget.subtitle),
-                    ),
-                  ],
-                ),
-              ),
-
-              // ฝั่งไอคอน
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeInOut,
-                    padding: EdgeInsets.all(_isHovered ? 12 : 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(_isHovered ? 0.25 : 0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: AnimatedRotation(
-                      duration: const Duration(milliseconds: 200),
-                      turns: _isHovered ? 0.05 : 0,
-                      child: Icon(
-                        widget.icon,
-                        color: Colors.white,
-                        size: _isHovered ? 52 : 50,
-                      ),
+                          child: Text(
+                            widget.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        SizedBox(height: isCompact ? 8 : 12),
+                        TweenAnimationBuilder<double>(
+                          duration: const Duration(milliseconds: 1000),
+                          curve: Curves.easeOutCubic,
+                          tween: Tween(
+                            begin: 0,
+                            end: double.tryParse(widget.value.replaceAll(',', '')) ?? 0,
+                          ),
+                          builder: (context, value, child) {
+                            final formatter = NumberFormat.decimalPattern('th_TH');
+                            return Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: AnimatedDefaultTextStyle(
+                                  duration: const Duration(milliseconds: 200),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: valueFontSize,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.2,
+                                  ),
+                                  child: Text(formatter.format(value)),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        SizedBox(height: isCompact ? 2 : 4),
+                        AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 200),
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(_isHovered ? 1.0 : 0.9),
+                            fontSize: isCompact ? 10.0 : 12.0,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          child: Text(widget.subtitle),
+                        ),
+                      ],
                     ),
                   ),
+
+                  // ฝั่งไอคอน
+                  if (!isCompact) ...[
+                    const SizedBox(width: 8),
+                    Flexible(
+                      flex: 1,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeInOut,
+                            padding: EdgeInsets.all(isCompact ? 6 : (_isHovered ? 12 : 10)),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(_isHovered ? 0.25 : 0.2),
+                              borderRadius: BorderRadius.circular(isCompact ? 8 : 12),
+                            ),
+                            child: AnimatedRotation(
+                              duration: const Duration(milliseconds: 200),
+                              turns: _isHovered ? 0.05 : 0,
+                              child: Icon(
+                                widget.icon,
+                                color: Colors.white,
+                                size: iconSize,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
-              ),
-            ],
+              );
+            }
           ),
         ),
       ),
@@ -296,9 +341,7 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(
-                0xFF3B82F6,
-              ).withOpacity(_isHovered ? 0.4 : 0.3),
+              color: const Color(0xFF3B82F6).withOpacity(_isHovered ? 0.4 : 0.3),
               blurRadius: _isHovered ? 16 : 12,
               offset: Offset(0, _isHovered ? 6 : 4),
             ),
@@ -328,9 +371,7 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
                       const SizedBox(height: 8),
                       LayoutBuilder(
                         builder: (context, constraints) {
-                          final fontSize = constraints.maxWidth < 120
-                              ? 22.0
-                              : 28.0;
+                          final fontSize = constraints.maxWidth < 120 ? 22.0 : 28.0;
                           return TweenAnimationBuilder<double>(
                             duration: const Duration(milliseconds: 1000),
                             curve: Curves.easeOutCubic,
@@ -387,173 +428,204 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
             ),
 
             const SizedBox(height: 12),
-            // Details - Improved layout
-            Row(
-              children: [
-                // รายรับ
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Color.fromARGB(255, 211, 245, 18),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'รายรับ',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        widget.numFmt.format(depositDocs),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // เส้นคั่นตรงกลาง
-                Container(width: 1, height: 40, color: Colors.white24),
-                // รายจ่าย
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFEF4444),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'รายจ่าย',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        widget.numFmt.format(withdrawDocs),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(width: 1, height: 40, color: Colors.white24),
-                Expanded(
-                  child: BlocBuilder<ImageApprovalBloc, ImageApprovalState>(
-                    builder: (context, approvalState) {
-                      // คำนวณจำนวนไฟล์ที่อนุมัติแล้วทั้งหมด
-                      int approvedFilesCount = 0;
-                      for (final shop in widget.shops) {
-                        final shopId = shop.shopid ?? '';
-                        approvedFilesCount += approvalState.getApprovedCount(
-                          shopId,
-                        );
-                      }
-
-                      // คำนวณจำนวนไฟล์ทั้งหมด
-                      int totalFilesCount = 0;
-                      for (final shop in widget.shops) {
-                        final count = shop.imageCount;
-                        if (count is int) {
-                          totalFilesCount += count;
-                        } else if (count is num) {
-                          totalFilesCount += count.toInt();
-                        }
-                      }
-
-                      return Column(
+            // Details - Improved responsive layout
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isCompact = constraints.maxWidth < 300;
+                final textSize = isCompact ? 12.0 : 14.0;
+                final valueSize = isCompact ? 14.0 : 18.0;
+                
+                return Row(
+                  children: [
+                    // รายรับ
+                    Expanded(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Container(
-                                width: 8,
-                                height: 8,
+                                width: isCompact ? 6 : 8,
+                                height: isCompact ? 6 : 8,
                                 decoration: const BoxDecoration(
-                                  color: Color(0xFF10B981),
+                                  color: Color.fromARGB(255, 211, 245, 18),
                                   shape: BoxShape.circle,
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                              const Text(
-                                'จัดการแล้ว',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w400,
+                              SizedBox(width: isCompact ? 4 : 6),
+                              Flexible(
+                                child: Text(
+                                  'รายรับ',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: textSize,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 2),
-                          TweenAnimationBuilder<int>(
-                            duration: const Duration(milliseconds: 800),
-                            curve: Curves.easeOutCubic,
-                            tween: IntTween(begin: 0, end: approvedFilesCount),
-                            builder: (context, value, child) {
-                              return Column(
-                                children: [
-                                  Text(
-                                    '${widget.numFmt.format(value)}/${widget.numFmt.format(totalFilesCount)}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                 /* const Text(
-                                    'ไฟล์',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w400,
-                                    ),
-                                  ),*/
-                                ],
-                              );
-                            },
+                          SizedBox(height: isCompact ? 2 : 4),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              widget.numFmt.format(depositDocs),
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: valueSize,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ],
-                      );
-                    },
-                  ),
-                ),
-              ],
+                      ),
+                    ),
+
+                    // เส้นคั่นตรงกลาง
+                    Container(width: 1, height: isCompact ? 30 : 40, color: Colors.white24),
+                    
+                    // รายจ่าย
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: isCompact ? 6 : 8,
+                                height: isCompact ? 6 : 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFEF4444),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              SizedBox(width: isCompact ? 4 : 6),
+                              Flexible(
+                                child: Text(
+                                  'รายจ่าย',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: textSize,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: isCompact ? 2 : 4),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              widget.numFmt.format(withdrawDocs),
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: valueSize,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    Container(width: 1, height: isCompact ? 30 : 40, color: Colors.white24),
+                    
+                    // จัดการแล้ว
+                    Expanded(
+                      child: BlocBuilder<ImageApprovalBloc, ImageApprovalState>(
+                        builder: (context, approvalState) {
+                          // คำนวณจำนวนไฟล์ที่อนุมัติแล้วทั้งหมด
+                          int approvedFilesCount = 0;
+                          for (final shop in widget.shops) {
+                            final shopId = shop.shopid ?? '';
+                            approvedFilesCount += approvalState.getApprovedCount(shopId);
+                          }
+                          
+                          // คำนวณจำนวนไฟล์ทั้งหมด
+                          int totalFilesCount = 0;
+                          for (final shop in widget.shops) {
+                            final count = shop.imageCount;
+                            if (count is int) {
+                              totalFilesCount += count;
+                            } else if (count is num) {
+                              totalFilesCount += count.toInt();
+                            }
+                          }
+                          
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: isCompact ? 6 : 8,
+                                    height: isCompact ? 6 : 8,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF10B981),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  SizedBox(width: isCompact ? 4 : 6),
+                                  Flexible(
+                                    child: Text(
+                                      'จัดการแล้ว',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: isCompact ? 10.0 : 12.0,
+                                        fontWeight: FontWeight.w400,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: isCompact ? 1 : 2),
+                              TweenAnimationBuilder<int>(
+                                duration: const Duration(milliseconds: 800),
+                                curve: Curves.easeOutCubic,
+                                tween: IntTween(begin: 0, end: approvedFilesCount),
+                                builder: (context, value, child) {
+                                  return Column(
+                                    children: [
+                                      FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          '${widget.numFmt.format(value)}/${widget.numFmt.format(totalFilesCount)}',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: isCompact ? 12.0 : 16.0,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        'ไฟล์',
+                                        style: TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: isCompact ? 8.0 : 10.0,
+                                          fontWeight: FontWeight.w400,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 8),
           ],
