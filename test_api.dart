@@ -1,4 +1,3 @@
-import 'dart:developer';
 import 'lib/services/api_service.dart';
 
 void main() async {

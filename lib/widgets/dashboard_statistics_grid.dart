@@ -13,7 +13,7 @@ class DashboardStatisticsGrid extends StatelessWidget {
   final NumberFormat numFmt;
 
   const DashboardStatisticsGrid({
-    Key? key,
+    super.key,
     required this.shops,
     required this.selectedFilter,
     required this.selectedDate,
@@ -21,106 +21,145 @@ class DashboardStatisticsGrid extends StatelessWidget {
     required this.getShopCountByStatus,
     required this.getDocumentCounts,
     required this.numFmt,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
+    // เพิ่ม error handling
+    if (shops.isEmpty) {
+      return Container(
+        height: 200,
+        child: const Center(
+          child: Text(
+            'ไม่มีข้อมูลสาขา',
+            style: TextStyle(fontSize: 16, color: Colors.grey),
+          ),
+        ),
+      );
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         // ปรับการคำนวณจำนวนคอลัมน์ให้รองรับหน้าจอขนาดเล็กมากขึ้น
         int gridCols;
         double aspectRatio;
-        
+        double spacing;
+
         if (constraints.maxWidth >= 1200) {
           gridCols = 4;
-          aspectRatio = 2.4;
+          aspectRatio = 2.2;
+          spacing = 16;
         } else if (constraints.maxWidth >= 900) {
           gridCols = 4;
-          aspectRatio = 2.2;
-        } else if (constraints.maxWidth >= 700) {
-          gridCols = 2;
           aspectRatio = 2.0;
-        } else if (constraints.maxWidth >= 500) {
+          spacing = 12;
+        } else if (constraints.maxWidth >= 600) {
           gridCols = 2;
           aspectRatio = 1.8;
+          spacing = 12;
+        } else if (constraints.maxWidth >= 400) {
+          gridCols = 2;
+          aspectRatio = 1.6;
+          spacing = 8;
         } else {
           gridCols = 1;
-          aspectRatio = 1.6;
+          aspectRatio = 1.4;
+          spacing = 8;
         }
 
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: constraints.maxWidth,
-              maxWidth: constraints.maxWidth < 800 ? 800 : constraints.maxWidth,
+        // Widget สำหรับสร้าง grid items
+        List<Widget> gridItems = [
+          StaggeredCard(
+            delay: 0,
+            child: ModernStatCard(
+              title: 'กำไรต่ำกว่า 1 ล้านบาท',
+              value: numFmt.format(getShopCountByStatus(shops, 'safe')),
+              subtitle: 'สาขา',
+              icon: Icons.check_circle_rounded,
+              gradient: const LinearGradient(
+                colors: [Color(0xFF10B981), Color(0xFF059669)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              isSelected: selectedFilter == 'safe',
+              onTap: () => onFilterTap('safe'),
             ),
-            child: GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: gridCols,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: aspectRatio,
-              children: [
-                StaggeredCard(
-                  delay: 0,
-                  child: ModernStatCard(
-                    title: 'ต่ำกว่า 1 ล้านบาท',
-                    value: numFmt.format(getShopCountByStatus(shops, 'safe')),
-                    subtitle: 'ร้านค้า',
-                    icon: Icons.check_circle_rounded,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF10B981), Color(0xFF059669)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    isSelected: selectedFilter == 'safe',
-                    onTap: () => onFilterTap('safe'),
-                  ),
-                ),
-                StaggeredCard(
-                  delay: 150,
-                  child: ModernStatCard(
-                    title: '1-1.8 ล้านบาท',
-                    value: numFmt.format(getShopCountByStatus(shops, 'warning')),
-                    subtitle: 'ร้านค้า',
-                    icon: Icons.warning_rounded,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    isSelected: selectedFilter == 'warning',
-                    onTap: () => onFilterTap('warning'),
-                  ),
-                ),
-                StaggeredCard(
-                  delay: 300,
-                  child: ModernStatCard(
-                    title: 'เกิน 1.8 ล้านบาท',
-                    value: numFmt.format(getShopCountByStatus(shops, 'exceeded')),
-                    subtitle: 'ร้านค้า',
-                    icon: Icons.error_rounded,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    isSelected: selectedFilter == 'exceeded',
-                    onTap: () => onFilterTap('exceeded'),
-                  ),
-                ),
-                StaggeredCard(
-                  delay: 450,
-                  child: EnhancedDocumentCard(
-                    documentCounts: getDocumentCounts(shops) as Map<String, int>,
-                    numFmt: numFmt,
-                    shops: shops,
-                  ),
-                ),
-              ],
+          ),
+          StaggeredCard(
+            delay: 150,
+            child: ModernStatCard(
+              title: 'กำไร 1-1.8 ล้านบาท',
+              value: numFmt.format(getShopCountByStatus(shops, 'warning')),
+              subtitle: 'สาขา',
+              icon: Icons.warning_rounded,
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              isSelected: selectedFilter == 'warning',
+              onTap: () => onFilterTap('warning'),
             ),
+          ),
+          StaggeredCard(
+            delay: 300,
+            child: ModernStatCard(
+              title: 'กำไรเกิน 1.8 ล้านบาท',
+              value: numFmt.format(getShopCountByStatus(shops, 'exceeded')),
+              subtitle: 'สาขา',
+              icon: Icons.error_rounded,
+              gradient: const LinearGradient(
+                colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              isSelected: selectedFilter == 'exceeded',
+              onTap: () => onFilterTap('exceeded'),
+            ),
+          ),
+          StaggeredCard(
+            delay: 450,
+            child: EnhancedDocumentCard(
+              documentCounts: getDocumentCounts(shops) as Map<String, int>,
+              numFmt: numFmt,
+              shops: shops,
+            ),
+          ),
+        ];
+
+        // สำหรับหน้าจอเล็ก ใช้ SingleChildScrollView
+        if (constraints.maxWidth < 600) {
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: gridItems
+                    .map(
+                      (item) => Container(
+                        width: constraints.maxWidth * 0.85,
+                        margin: EdgeInsets.only(right: spacing),
+                        child: item,
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          );
+        }
+
+        // สำหรับหน้าจอใหญ่ ใช้ GridView
+        return Padding(
+          padding: EdgeInsets.all(spacing),
+          child: GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: gridCols,
+            mainAxisSpacing: spacing,
+            crossAxisSpacing: spacing,
+            childAspectRatio: aspectRatio,
+            children: gridItems,
           ),
         );
       },
@@ -130,7 +169,7 @@ class DashboardStatisticsGrid extends StatelessWidget {
 
 class ModernStatCard extends StatefulWidget {
   const ModernStatCard({
-    Key? key,
+    super.key,
     required this.title,
     required this.value,
     required this.subtitle,
@@ -138,7 +177,7 @@ class ModernStatCard extends StatefulWidget {
     required this.gradient,
     this.isSelected = false,
     this.onTap,
-  }) : super(key: key);
+  });
 
   final String title;
   final String value;
@@ -174,12 +213,15 @@ class _ModernStatCardState extends State<ModernStatCard>
             gradient: widget.gradient,
             borderRadius: BorderRadius.circular(16),
             border: widget.isSelected
-                ? Border.all(color: Colors.white.withOpacity(0.8), width: 2)
+                ? Border.all(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    width: 2,
+                  )
                 : null,
             boxShadow: [
               BoxShadow(
-                color: widget.gradient.colors.first.withOpacity(
-                  (_isHovered || widget.isSelected) ? 0.5 : 0.3,
+                color: widget.gradient.colors.first.withValues(
+                  alpha: (_isHovered || widget.isSelected) ? 0.5 : 0.3,
                 ),
                 blurRadius: (_isHovered || widget.isSelected) ? 20 : 12,
                 offset: Offset(0, (_isHovered || widget.isSelected) ? 8 : 4),
@@ -190,10 +232,14 @@ class _ModernStatCardState extends State<ModernStatCard>
             builder: (context, constraints) {
               // คำนวณขนาดฟอนต์ตามขนาด container
               final isCompact = constraints.maxWidth < 200;
-              final titleFontSize = isCompact ? (_isHovered ? 12.0 : 11.0) : (_isHovered ? 14.0 : 13.0);
-              final valueFontSize = isCompact ? (_isHovered ? 24.0 : 22.0) : (_isHovered ? 30.0 : 28.0);
+              final titleFontSize = isCompact
+                  ? (_isHovered ? 12.0 : 11.0)
+                  : (_isHovered ? 14.0 : 13.0);
+              final valueFontSize = isCompact
+                  ? (_isHovered ? 24.0 : 22.0)
+                  : (_isHovered ? 30.0 : 28.0);
               final iconSize = isCompact ? 40.0 : (_isHovered ? 52.0 : 50.0);
-              
+
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -223,10 +269,16 @@ class _ModernStatCardState extends State<ModernStatCard>
                           curve: Curves.easeOutCubic,
                           tween: Tween(
                             begin: 0,
-                            end: double.tryParse(widget.value.replaceAll(',', '')) ?? 0,
+                            end:
+                                double.tryParse(
+                                  widget.value.replaceAll(',', ''),
+                                ) ??
+                                0,
                           ),
                           builder: (context, value, child) {
-                            final formatter = NumberFormat.decimalPattern('th_TH');
+                            final formatter = NumberFormat.decimalPattern(
+                              'th_TH',
+                            );
                             return Flexible(
                               child: FittedBox(
                                 fit: BoxFit.scaleDown,
@@ -248,7 +300,9 @@ class _ModernStatCardState extends State<ModernStatCard>
                         AnimatedDefaultTextStyle(
                           duration: const Duration(milliseconds: 200),
                           style: TextStyle(
-                            color: Colors.white.withOpacity(_isHovered ? 1.0 : 0.9),
+                            color: Colors.white.withValues(
+                              alpha: _isHovered ? 1.0 : 0.9,
+                            ),
                             fontSize: isCompact ? 10.0 : 12.0,
                             fontWeight: FontWeight.w500,
                           ),
@@ -269,10 +323,16 @@ class _ModernStatCardState extends State<ModernStatCard>
                           AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             curve: Curves.easeInOut,
-                            padding: EdgeInsets.all(isCompact ? 6 : (_isHovered ? 12 : 10)),
+                            padding: EdgeInsets.all(
+                              isCompact ? 6 : (_isHovered ? 12 : 10),
+                            ),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(_isHovered ? 0.25 : 0.2),
-                              borderRadius: BorderRadius.circular(isCompact ? 8 : 12),
+                              color: Colors.white.withValues(
+                                alpha: _isHovered ? 0.25 : 0.2,
+                              ),
+                              borderRadius: BorderRadius.circular(
+                                isCompact ? 8 : 12,
+                              ),
                             ),
                             child: AnimatedRotation(
                               duration: const Duration(milliseconds: 200),
@@ -290,7 +350,7 @@ class _ModernStatCardState extends State<ModernStatCard>
                   ],
                 ],
               );
-            }
+            },
           ),
         ),
       ),
@@ -300,11 +360,11 @@ class _ModernStatCardState extends State<ModernStatCard>
 
 class EnhancedDocumentCard extends StatefulWidget {
   const EnhancedDocumentCard({
-    Key? key,
+    super.key,
     required this.documentCounts,
     required this.numFmt,
     required this.shops,
-  }) : super(key: key);
+  });
 
   final Map<String, int> documentCounts;
   final NumberFormat numFmt;
@@ -331,7 +391,7 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
         transform: Matrix4.identity()..scale(_isHovered ? 1.02 : 1.0),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
@@ -341,296 +401,322 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF3B82F6).withOpacity(_isHovered ? 0.4 : 0.3),
+              color: const Color(
+                0xFF3B82F6,
+              ).withValues(alpha: _isHovered ? 0.4 : 0.3),
               blurRadius: _isHovered ? 16 : 12,
               offset: Offset(0, _isHovered ? 6 : 4),
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 250;
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'เอกสารทั้งหมด',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final fontSize = constraints.maxWidth < 120 ? 22.0 : 28.0;
-                          return TweenAnimationBuilder<double>(
-                            duration: const Duration(milliseconds: 1000),
-                            curve: Curves.easeOutCubic,
-                            tween: Tween(begin: 0, end: totalDocs.toDouble()),
-                            builder: (context, value, child) {
-                              return FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  widget.numFmt.format(value.toInt()),
+                // Header
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AnimatedDefaultTextStyle(
+                            duration: const Duration(milliseconds: 200),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: isCompact
+                                  ? (_isHovered ? 13.0 : 12.0)
+                                  : (_isHovered ? 15.0 : 14.0),
+                              fontWeight: FontWeight.w500,
+                            ),
+                            child: Text(
+                              'เอกสารทั้งหมด',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: TweenAnimationBuilder<double>(
+                              duration: const Duration(milliseconds: 1000),
+                              curve: Curves.easeOutCubic,
+                              tween: Tween(begin: 0, end: totalDocs.toDouble()),
+                              builder: (context, value, child) {
+                                return AnimatedDefaultTextStyle(
+                                  duration: const Duration(milliseconds: 200),
                                   style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: fontSize,
+                                    fontSize: isCompact
+                                        ? (_isHovered ? 22.0 : 20.0)
+                                        : (_isHovered ? 28.0 : 24.0),
                                     fontWeight: FontWeight.w700,
                                     height: 1.2,
                                   ),
-                                ),
-                              );
-                            },
-                          );
-                        },
+                                  child: Text(
+                                    widget.numFmt.format(value.toInt()),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          AnimatedDefaultTextStyle(
+                            duration: const Duration(milliseconds: 200),
+                            style: TextStyle(
+                              color: Colors.white.withValues(
+                                alpha: _isHovered ? 1.0 : 0.9,
+                              ),
+                              fontSize: isCompact ? 10.0 : 12.0,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            child: Text('ฉบับ'),
+                          ),
+                        ],
                       ),
-                      const Text(
-                        'ฉบับ',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                    ),
+                    // Icon
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeInOut,
+                      padding: EdgeInsets.all(
+                        isCompact ? 6 : (_isHovered ? 12 : 8),
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(
+                          alpha: _isHovered ? 0.25 : 0.2,
                         ),
+                        borderRadius: BorderRadius.circular(isCompact ? 8 : 12),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Icon
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeInOut,
-                  padding: EdgeInsets.all(_isHovered ? 10 : 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(_isHovered ? 0.25 : 0.2),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: AnimatedRotation(
-                    duration: const Duration(milliseconds: 200),
-                    turns: _isHovered ? 0.05 : 0,
-                    child: Icon(
-                      Icons.folder_rounded,
-                      color: Colors.white,
-                      size: _isHovered ? 52 : 50,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-            // Details - Improved responsive layout
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final isCompact = constraints.maxWidth < 300;
-                final textSize = isCompact ? 12.0 : 14.0;
-                final valueSize = isCompact ? 14.0 : 18.0;
-                
-                return Row(
-                  children: [
-                    // รายรับ
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: isCompact ? 6 : 8,
-                                height: isCompact ? 6 : 8,
-                                decoration: const BoxDecoration(
-                                  color: Color.fromARGB(255, 211, 245, 18),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              SizedBox(width: isCompact ? 4 : 6),
-                              Flexible(
-                                child: Text(
-                                  'รายรับ',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: textSize,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: isCompact ? 2 : 4),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              widget.numFmt.format(depositDocs),
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: valueSize,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // เส้นคั่นตรงกลาง
-                    Container(width: 1, height: isCompact ? 30 : 40, color: Colors.white24),
-                    
-                    // รายจ่าย
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: isCompact ? 6 : 8,
-                                height: isCompact ? 6 : 8,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFEF4444),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              SizedBox(width: isCompact ? 4 : 6),
-                              Flexible(
-                                child: Text(
-                                  'รายจ่าย',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: textSize,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: isCompact ? 2 : 4),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              widget.numFmt.format(withdrawDocs),
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: valueSize,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    Container(width: 1, height: isCompact ? 30 : 40, color: Colors.white24),
-                    
-                    // จัดการแล้ว
-                    Expanded(
-                      child: BlocBuilder<ImageApprovalBloc, ImageApprovalState>(
-                        builder: (context, approvalState) {
-                          // คำนวณจำนวนไฟล์ที่อนุมัติแล้วทั้งหมด
-                          int approvedFilesCount = 0;
-                          for (final shop in widget.shops) {
-                            final shopId = shop.shopid ?? '';
-                            approvedFilesCount += approvalState.getApprovedCount(shopId);
-                          }
-                          
-                          // คำนวณจำนวนไฟล์ทั้งหมด
-                          int totalFilesCount = 0;
-                          for (final shop in widget.shops) {
-                            final count = shop.imageCount;
-                            if (count is int) {
-                              totalFilesCount += count;
-                            } else if (count is num) {
-                              totalFilesCount += count.toInt();
-                            }
-                          }
-                          
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    width: isCompact ? 6 : 8,
-                                    height: isCompact ? 6 : 8,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFF10B981),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  SizedBox(width: isCompact ? 4 : 6),
-                                  Flexible(
-                                    child: Text(
-                                      'จัดการแล้ว',
-                                      style: TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: isCompact ? 10.0 : 12.0,
-                                        fontWeight: FontWeight.w400,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: isCompact ? 1 : 2),
-                              TweenAnimationBuilder<int>(
-                                duration: const Duration(milliseconds: 800),
-                                curve: Curves.easeOutCubic,
-                                tween: IntTween(begin: 0, end: approvedFilesCount),
-                                builder: (context, value, child) {
-                                  return Column(
-                                    children: [
-                                      FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        child: Text(
-                                          '${widget.numFmt.format(value)}/${widget.numFmt.format(totalFilesCount)}',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: isCompact ? 12.0 : 16.0,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                      Text(
-                                        'ไฟล์',
-                                        style: TextStyle(
-                                          color: Colors.white70,
-                                          fontSize: isCompact ? 8.0 : 10.0,
-                                          fontWeight: FontWeight.w400,
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                },
-                              ),
-                            ],
-                          );
-                        },
+                      child: AnimatedRotation(
+                        duration: const Duration(milliseconds: 200),
+                        turns: _isHovered ? 0.05 : 0,
+                        child: Icon(
+                          Icons.folder_rounded,
+                          color: Colors.white,
+                          size: isCompact ? 36.0 : (_isHovered ? 52.0 : 48.0),
+                        ),
                       ),
                     ),
                   ],
-                );
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
+                ),
+
+                const Spacer(),
+
+                // Details
+                if (!isCompact) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      // รายรับ
+                      Expanded(
+                        child: _buildDetailItem(
+                          'รายรับ',
+                          widget.numFmt.format(depositDocs),
+                          const Color.fromARGB(255, 211, 245, 18),
+                          isCompact,
+                          _isHovered,
+                        ),
+                      ),
+                      // เส้นคั่น
+                      Container(width: 1, height: 30, color: Colors.white24),
+                      // รายจ่าย
+                      Expanded(
+                        child: _buildDetailItem(
+                          'รายจ่าย',
+                          widget.numFmt.format(withdrawDocs),
+                          const Color(0xFFEF4444),
+                          isCompact,
+                          _isHovered,
+                        ),
+                      ),
+                      // เส้นคั่น
+                      Container(width: 1, height: 30, color: Colors.white24),
+                      // จัดการแล้ว
+                      Expanded(
+                        child:
+                            BlocBuilder<ImageApprovalBloc, ImageApprovalState>(
+                              builder: (context, approvalState) {
+                                int approvedFilesCount = 0;
+                                int totalFilesCount = 0;
+
+                                for (final shop in widget.shops) {
+                                  final shopId = shop.shopid ?? '';
+                                  approvedFilesCount += approvalState
+                                      .getApprovedCount(shopId);
+
+                                  final count = shop.imageCount;
+                                  if (count is int) {
+                                    totalFilesCount += count;
+                                  } else if (count is num) {
+                                    totalFilesCount += count.toInt();
+                                  }
+                                }
+
+                                return _buildFileProgressItem(
+                                  approvedFilesCount,
+                                  totalFilesCount,
+                                  isCompact,
+                                  _isHovered,
+                                );
+                              },
+                            ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            );
+          },
         ),
       ),
+    );
+  }
+
+  Widget _buildDetailItem(
+    String label,
+    String value,
+    Color color,
+    bool isCompact,
+    bool isHovered,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: isCompact ? 6 : 8,
+              height: isCompact ? 6 : 8,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            SizedBox(width: isCompact ? 4 : 6),
+            Flexible(
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: isCompact
+                      ? (isHovered ? 11.0 : 10.0)
+                      : (isHovered ? 13.0 : 12.0),
+                  fontWeight: FontWeight.w400,
+                ),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: isCompact ? 2 : 4),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 200),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: isCompact
+                  ? (isHovered ? 14.0 : 12.0)
+                  : (isHovered ? 18.0 : 16.0),
+              fontWeight: FontWeight.w600,
+            ),
+            child: Text(value),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFileProgressItem(
+    int approved,
+    int total,
+    bool isCompact,
+    bool isHovered,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: isCompact ? 6 : 8,
+              height: isCompact ? 6 : 8,
+              decoration: const BoxDecoration(
+                color: Color(0xFF10B981),
+                shape: BoxShape.circle,
+              ),
+            ),
+            SizedBox(width: isCompact ? 4 : 6),
+            Flexible(
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: isCompact
+                      ? (isHovered ? 9.0 : 8.0)
+                      : (isHovered ? 11.0 : 10.0),
+                  fontWeight: FontWeight.w400,
+                ),
+                child: Text(
+                  'จัดการแล้ว',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: isCompact ? 1 : 2),
+        TweenAnimationBuilder<int>(
+          duration: const Duration(milliseconds: 800),
+          curve: Curves.easeOutCubic,
+          tween: IntTween(begin: 0, end: approved),
+          builder: (context, value, child) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 200),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: isCompact
+                          ? (isHovered ? 12.0 : 10.0)
+                          : (isHovered ? 16.0 : 14.0),
+                      fontWeight: FontWeight.w600,
+                    ),
+                    child: Text(
+                      '${widget.numFmt.format(value)}/${widget.numFmt.format(total)}',
+                    ),
+                  ),
+                ),
+                AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 200),
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: isCompact
+                        ? (isHovered ? 7.0 : 6.0)
+                        : (isHovered ? 9.0 : 8.0),
+                    fontWeight: FontWeight.w400,
+                  ),
+                  child: Text('ไฟล์'),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
 }
@@ -639,8 +725,7 @@ class StaggeredCard extends StatefulWidget {
   final Widget child;
   final int delay;
 
-  const StaggeredCard({Key? key, required this.child, required this.delay})
-    : super(key: key);
+  const StaggeredCard({super.key, required this.child, required this.delay});
 
   @override
   State<StaggeredCard> createState() => _StaggeredCardState();

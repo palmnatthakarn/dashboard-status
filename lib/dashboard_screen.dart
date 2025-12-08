@@ -50,6 +50,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         body: SafeArea(
           child: BlocBuilder<DashboardBloc, DashboardState>(
             builder: (context, state) {
+              // Debug: แสดง state ปัจจุบัน
+              print('📊 Current Dashboard State: ${state.runtimeType}');
+
+              if (state is DashboardInitial) {
+                // แสดง loading เมื่ออยู่ใน initial state
+                return const DashboardLoadingWidget();
+              }
+
               if (state is DashboardLoading) {
                 return const DashboardLoadingWidget();
               }
@@ -59,81 +67,85 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   onRefresh: () async {
                     context.read<DashboardBloc>().add(FetchDashboardData());
                   },
-                  child: SingleChildScrollView(
+                  child: CustomScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Statistics Cards
-                          DashboardStatisticsGrid(
-                            shops: state.shops,
-                            selectedFilter: state.selectedFilter,
-                            selectedDate: state.selectedDate,
-                            onFilterTap: (filter) {
-                              context.read<DashboardBloc>().add(
-                                UpdateFilter(
-                                  state.selectedFilter == filter
-                                      ? 'all'
-                                      : filter,
-                                ),
-                              );
-                            },
-                            getShopCountByStatus: (shops, status) =>
-                                DashboardHelper.getShopCountByStatus(
-                                  shops,
-                                  status,
-                                  state.selectedDate,
-                                ),
-                            getDocumentCounts: (shops) =>
-                                DashboardHelper.getDocumentCounts(shops),
-                            numFmt: _numFmt,
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Statistics Cards
+                              DashboardStatisticsGrid(
+                                shops: state.shops,
+                                selectedFilter: state.selectedFilter,
+                                selectedDate: state.selectedDate,
+                                onFilterTap: (filter) {
+                                  context.read<DashboardBloc>().add(
+                                    UpdateFilter(
+                                      state.selectedFilter == filter
+                                          ? 'all'
+                                          : filter,
+                                    ),
+                                  );
+                                },
+                                getShopCountByStatus: (shops, status) =>
+                                    DashboardHelper.getShopCountByStatus(
+                                      shops,
+                                      status,
+                                      state.selectedDate,
+                                    ),
+                                getDocumentCounts: (shops) =>
+                                    DashboardHelper.getDocumentCounts(shops),
+                                numFmt: _numFmt,
+                              ),
+
+                              const SizedBox(height: 24),
+
+                              // Filters Section
+                              DashboardFilterSection(
+                                searchQuery: state.searchQuery,
+                                selectedFilter: state.selectedFilter,
+                                shops: state.shops,
+                                onSearchChanged: (query) {
+                                  context.read<DashboardBloc>().add(
+                                    UpdateSearchQuery(query),
+                                  );
+                                },
+                                onFilterChanged: (filter) {
+                                  context.read<DashboardBloc>().add(
+                                    UpdateFilter(filter),
+                                  );
+                                },
+                                getShopCountByStatus: (status) =>
+                                    DashboardHelper.getShopCountByStatus(
+                                      state.shops,
+                                      status,
+                                      state.selectedDate,
+                                    ),
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              // Data Table
+                              ShopDataTable(
+                                shops: state.filteredShops,
+                                selectedDate: state.selectedDate,
+                                getIncomeForPeriod:
+                                    DashboardHelper.getIncomeForPeriod,
+                                moneyFormat: _moneyTh,
+                                onDateChanged: (DateTime? date) {
+                                  context.read<DashboardBloc>().add(
+                                    UpdateSelectedDate(date),
+                                  );
+                                },
+                              ),
+                            ],
                           ),
-
-                          const SizedBox(height: 24),
-
-                          // Filters Section
-                          DashboardFilterSection(
-                            searchQuery: state.searchQuery,
-                            selectedFilter: state.selectedFilter,
-                            shops: state.shops,
-                            onSearchChanged: (query) {
-                              context.read<DashboardBloc>().add(
-                                UpdateSearchQuery(query),
-                              );
-                            },
-                            onFilterChanged: (filter) {
-                              context.read<DashboardBloc>().add(
-                                UpdateFilter(filter),
-                              );
-                            },
-                            getShopCountByStatus: (status) =>
-                                DashboardHelper.getShopCountByStatus(
-                                  state.shops,
-                                  status,
-                                  state.selectedDate,
-                                ),
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          // Data Table
-                          ShopDataTable(
-                            shops: state.filteredShops,
-                            selectedDate: state.selectedDate,
-                            getIncomeForPeriod:
-                                DashboardHelper.getIncomeForPeriod,
-                            moneyFormat: _moneyTh,
-                            onDateChanged: (DateTime? date) {
-                              context.read<DashboardBloc>().add(
-                                UpdateSelectedDate(date),
-                              );
-                            },
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 );
               }

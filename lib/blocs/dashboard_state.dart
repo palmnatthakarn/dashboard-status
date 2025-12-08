@@ -1,5 +1,5 @@
-import '../models/doc_details.dart';
-import '../models/daily_images.dart';
+import '../models/models_old/doc_details.dart';
+import '../models/models_old/daily_images.dart';
 
 abstract class DashboardState {}
 
@@ -43,9 +43,9 @@ class DashboardLoaded extends DashboardState {
     int? docsuccess,
     int? docwarning,
     int? docerror,
-    int? success_rate,
-    int? warning_rate,
-    int? error_rate,
+    int? successRate,
+    int? warningRate,
+    int? errorRate,
     int? totalshop,
     List<DocDetails>? shops,
     List<DocDetails>? filteredShops,
@@ -58,9 +58,9 @@ class DashboardLoaded extends DashboardState {
       docsuccess: docsuccess ?? this.docsuccess,
       docwarning: docwarning ?? this.docwarning,
       docerror: docerror ?? this.docerror,
-      success_rate: success_rate ?? this.success_rate,
-      warning_rate: warning_rate ?? this.warning_rate,
-      error_rate: error_rate ?? this.error_rate,
+      success_rate: successRate ?? this.success_rate,
+      warning_rate: warningRate ?? this.warning_rate,
+      error_rate: errorRate ?? this.error_rate,
       totalshop: totalshop ?? this.totalshop,
       shops: shops ?? this.shops,
       filteredShops: filteredShops ?? this.filteredShops,
