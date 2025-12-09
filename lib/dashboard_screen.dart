@@ -37,8 +37,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         appBar: AppBar(
           elevation: 0,
           backgroundColor: Colors.white,
+          leading: MediaQuery.of(context).size.width < 800
+              ? Builder(
+                  builder: (context) => IconButton(
+                    icon: const Icon(Icons.menu, color: Color(0xFF1E293B)),
+                    onPressed: () => Scaffold.of(context).openDrawer(),
+                  ),
+                )
+              : null,
           title: const Text(
-            'ระบบติดตามสถานะภาษีมูลค่าเพิ่ม (VAT)',
+            '',
             style: TextStyle(
               color: Color(0xFF1E293B),
               fontSize: 20,

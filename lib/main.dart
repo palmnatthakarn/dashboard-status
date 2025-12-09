@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dashboard_screen.dart';
+import 'layouts/main_layout.dart';
 
 void main() {
   runApp(const MyApp());
@@ -13,7 +13,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Monitor',
       //theme: AppTheme.lightTheme,
-      home: DashboardScreen(),
+      home: const MainLayout(),
       debugShowCheckedModeBanner: false,
     );
   }
