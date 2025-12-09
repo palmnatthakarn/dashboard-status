@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'blocs/dashboard_bloc_exports.dart';
-import 'widgets/shop_data_table.dart';
-import 'widgets/dashboard_filter_section.dart';
-import 'widgets/dashboard_statistics_grid.dart';
-import 'widgets/dashboard_loading_widgets.dart';
+import 'conponents/shop_data_table.dart';
+import 'conponents/dashboard_filter_section.dart';
+import 'conponents/dashboard_statistics_grid.dart';
+import 'conponents/dashboard_loading_widgets.dart';
 import 'utils/dashboard_helper.dart';
 
 class DashboardScreen extends StatefulWidget {
