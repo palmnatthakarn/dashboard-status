@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:developer';
 import 'package:http/http.dart' as http;
-import '../models/models_old/dashboard_summary.dart';
-import '../models/models_old/shops_response.dart';
-import '../models/models_old/daily_images.dart';
-import '../models/models_old/daily_transaction.dart';
+import '../models/dashboard_summary.dart';
+import '../models/shops_response.dart';
+import '../models/daily_images.dart';
+import '../models/daily_transaction.dart';
 
 class ApiService {
   static const String baseUrl = 'http://localhost:3000/api';

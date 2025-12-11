@@ -1,5 +1,5 @@
-import 'lib/services/journal_service.dart';
-import 'lib/models/journal.dart';
+import 'package:moniter/services/journal_service.dart';
+import 'package:moniter/models/journal.dart';
 
 void main() async {
   print('📊 Journal Usage Examples\n');

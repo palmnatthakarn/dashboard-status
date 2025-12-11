@@ -1,6 +1,6 @@
 import 'dart:developer';
 import 'package:intl/intl.dart';
-import '../models/models_old/doc_details.dart';
+import '../models/doc_details.dart';
 import '../models/journal.dart';
 import 'journal_service.dart';
 

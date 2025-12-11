@@ -1,5 +1,5 @@
-import '../models/models_old/doc_details.dart';
-import '../models/models_old/daily_images.dart';
+import '../models/doc_details.dart';
+import '../models/daily_images.dart';
 
 abstract class DashboardState {}
 

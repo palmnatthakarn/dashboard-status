@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../blocs/dashboard_bloc_exports.dart';
+import '../blocs/bloc_exports.dart';
 
 class DashboardStatisticsGrid extends StatelessWidget {
   final List shops;

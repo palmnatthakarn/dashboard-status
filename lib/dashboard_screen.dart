@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import 'blocs/dashboard_bloc_exports.dart';
-import 'conponents/shop_data_table.dart';
-import 'conponents/dashboard_filter_section.dart';
-import 'conponents/dashboard_statistics_grid.dart';
-import 'conponents/dashboard_loading_widgets.dart';
-import 'utils/dashboard_helper.dart';
+import '../blocs/bloc_exports.dart';
+import '../components/shop_data_table.dart';
+import '../components/dashboard_filter_section.dart';
+import '../components/dashboard_statistics_grid.dart';
+import '../components/dashboard_loading_widgets.dart';
+import '../utils/dashboard_helper.dart';
 
 class DashboardScreen extends StatefulWidget {
   DashboardScreen({super.key});

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../conponents/app_sidebar.dart';
+import 'package:moniter/pages/report_page.dart';
+import '../components/app_sidebar.dart';
 import '../dashboard_screen.dart';
 import '../pages/kpi_page.dart';
 import '../pages/documents_page.dart';
@@ -90,6 +91,7 @@ class _MainLayoutState extends State<MainLayout> {
     DashboardScreen(),
     const KpiPage(),
     const DocumentsPage(),
+    const ReportPage(),
     const SettingsPage(),
   ];
 
@@ -120,10 +122,30 @@ class _MainLayoutState extends State<MainLayout> {
       case ScreenType.mobile:
         return _pages[_selectedIndex];
       case ScreenType.tablet:
-        return _buildTabletLayout();
       case ScreenType.desktop:
       case ScreenType.largeDesktop:
-        return _buildDesktopLayout(screenType);
+        return Row(
+          children: [
+            Flexible(
+              flex: 0,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: _isSidebarExpanded ? 280 : 85,
+                  minWidth: _isSidebarExpanded ? 280 : 85,
+                ),
+                child: AppSidebar(
+                  selectedIndex: _selectedIndex,
+                  onItemSelected: _onItemSelected,
+                  isCollapsed: !_isSidebarExpanded,
+                  onToggleCollapse: _toggleSidebar,
+                ),
+              ),
+            ),
+            Expanded(
+              child: _pages[_selectedIndex],
+            ),
+          ],
+        );
     }
   }
 
@@ -138,40 +160,6 @@ class _MainLayoutState extends State<MainLayout> {
       );
     }
     return null;
-  }
-
-  Widget _buildTabletLayout() {
-    return Row(
-      children: [
-        // Sidebar with collapse support
-        AppSidebar(
-          selectedIndex: _selectedIndex,
-          onItemSelected: _onItemSelected,
-          isCollapsed: !_isSidebarExpanded,
-          onToggleCollapse: _toggleSidebar,
-        ),
-        // Main content
-        Expanded(
-          child: _pages[_selectedIndex],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDesktopLayout(ScreenType screenType) {
-    return Row(
-      children: [
-        AppSidebar(
-          selectedIndex: _selectedIndex,
-          onItemSelected: _onItemSelected,
-          isCollapsed: !_isSidebarExpanded,
-          onToggleCollapse: _toggleSidebar,
-        ),
-        Expanded(
-          child: _pages[_selectedIndex],
-        ),
-      ],
-    );
   }
 }
 

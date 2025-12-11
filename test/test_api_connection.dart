@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'lib/models/journal.dart';
+import 'package:moniter/models/journal.dart';
 
 void main() async {
   print('🔍 Testing API connection...');

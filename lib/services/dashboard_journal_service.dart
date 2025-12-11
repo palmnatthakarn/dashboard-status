@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:developer';
 import 'package:http/http.dart' as http;
 import '../models/journal.dart';
-import '../models/models_old/dashboard_summary.dart';
-import '../models/models_old/daily_images.dart';
+import '../models/dashboard_summary.dart';
+import '../models/daily_images.dart';
 import 'journal_service.dart';
 
 /// Service สำหรับ Dashboard ที่ใช้ Journal แทน DocDetails

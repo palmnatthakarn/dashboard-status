@@ -1,7 +1,7 @@
 import 'dart:developer';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../models/models_old/doc_details.dart';
+import '../models/doc_details.dart';
 import '../services/api_service.dart';
 import '../services/dashboard_service.dart';
 import 'dashboard_event.dart';
