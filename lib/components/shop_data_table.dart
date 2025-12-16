@@ -3,6 +3,7 @@ import 'package:data_table_2/data_table_2.dart';
 import 'package:intl/intl.dart';
 import '../models/doc_details.dart';
 import '../widgets/shop/shop_widgets.dart';
+import './common/custom_pagination.dart';
 
 class ShopDataTable extends StatefulWidget {
   final List<dynamic> shops;
@@ -24,10 +25,15 @@ class ShopDataTable extends StatefulWidget {
   State<ShopDataTable> createState() => _ShopDataTableState();
 }
 
-class _ShopDataTableState extends State<ShopDataTable> with TickerProviderStateMixin {
+class _ShopDataTableState extends State<ShopDataTable>
+    with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+
+  // Pagination state
+  int _currentPage = 1;
+  int _rowsPerPage = 8;
 
   @override
   void initState() {
@@ -47,12 +53,13 @@ class _ShopDataTableState extends State<ShopDataTable> with TickerProviderStateM
         curve: const Interval(0.0, 0.6, curve: Curves.easeOutCubic),
       ),
     );
-    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
-      ),
-    );
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
+          ),
+        );
   }
 
   @override
@@ -153,20 +160,50 @@ class _ShopDataTableState extends State<ShopDataTable> with TickerProviderStateM
   }
 
   Widget _buildDataTable(BranchDataSource dataSource) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: PaginatedDataTable2(
-        columnSpacing: 12,
-        horizontalMargin: 16,
-        minWidth: 900,
-        headingRowHeight: 56,
-        dataRowHeight: 72,
-        rowsPerPage: 8,
-        headingRowColor: WidgetStateProperty.all(const Color(0xFFF9FAFB)),
-        showCheckboxColumn: false,
-        columns: _buildColumns(),
-        source: dataSource,
-      ),
+    // Calculate pagination
+    final totalRows = dataSource.rowCount;
+    final totalPages = totalRows == 0 ? 1 : (totalRows / _rowsPerPage).ceil();
+    final validPage = _currentPage.clamp(1, totalPages);
+
+    // Get current page rows
+    final start = (validPage - 1) * _rowsPerPage;
+    final end = (start + _rowsPerPage).clamp(0, totalRows);
+    final currentPageRows = List.generate(
+      end - start,
+      (index) => dataSource.getRow(start + index),
+    ).whereType<DataRow>().toList();
+
+    return Column(
+      children: [
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: DataTable2(
+              columnSpacing: 12,
+              horizontalMargin: 16,
+              minWidth: 1100,
+              headingRowHeight: 56,
+              dataRowHeight: 72,
+              headingRowColor: WidgetStateProperty.all(const Color(0xFFF9FAFB)),
+              showCheckboxColumn: false,
+              columns: _buildColumns(),
+              rows: currentPageRows,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        CustomPagination(
+          currentPage: _currentPage,
+          totalItems: totalRows,
+          rowsPerPage: _rowsPerPage,
+          rowsPerPageOptions: const [8, 16, 24],
+          onPageChanged: (page) => setState(() => _currentPage = page),
+          onRowsPerPageChanged: (rows) => setState(() {
+            _rowsPerPage = rows;
+            _currentPage = 1;
+          }),
+        ),
+      ],
     );
   }
 
@@ -178,15 +215,21 @@ class _ShopDataTableState extends State<ShopDataTable> with TickerProviderStateM
     );
 
     return const [
-      DataColumn2(label: Text('สถานะ', style: headerStyle), size: ColumnSize.S, fixedWidth: 100),
-      DataColumn2(label: Text('ชื่อสาขา', style: headerStyle), size: ColumnSize.L),
-      DataColumn2(label: Text('รหัสสาขา', style: headerStyle), size: ColumnSize.M),
-      DataColumn2(label: Text('รายวัน', style: headerStyle), size: ColumnSize.M, numeric: true),
-      DataColumn2(label: Text('รายเดือน', style: headerStyle), size: ColumnSize.M, numeric: true),
-      DataColumn2(label: Text('รายปี', style: headerStyle), size: ColumnSize.M, numeric: true),
-      DataColumn2(label: Text('Journal', style: headerStyle), size: ColumnSize.M),
-      DataColumn2(label: Text('อัปโหลด', style: headerStyle), size: ColumnSize.M),
-      DataColumn2(label: Text('ผู้รับผิดชอบ', style: headerStyle), size: ColumnSize.L),
+      DataColumn2(label: Text('สถานะ', style: headerStyle), fixedWidth: 60),
+      DataColumn2(
+        label: Text('ชื่อสาขา', style: headerStyle),
+        size: ColumnSize.L  ,
+      ),
+      DataColumn2(label: Text('รหัสสาขา', style: headerStyle),size: ColumnSize.M,),
+      DataColumn2(label: Text('รายวัน', style: headerStyle), size: ColumnSize.S,),
+      DataColumn2(label: Text('รายเดือน', style: headerStyle),size: ColumnSize.S,),
+      DataColumn2(label: Text('รายปี', style: headerStyle), size: ColumnSize.S,),
+      DataColumn2(label: Text('Journal', style: headerStyle), size: ColumnSize.S,),
+      DataColumn2(label: Text('บิล', style: headerStyle), size: ColumnSize.S,),
+      DataColumn2(
+        label: Text('ผู้รับผิดชอบ', style: headerStyle),
+        size: ColumnSize.S,
+      ),
     ];
   }
 

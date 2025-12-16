@@ -6,7 +6,11 @@ class BranchDetailDialog extends StatelessWidget {
   final String shopId;
   final List<DocDetails> shops;
 
-  const BranchDetailDialog({super.key, required this.shopId, required this.shops});
+  const BranchDetailDialog({
+    super.key,
+    required this.shopId,
+    required this.shops,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -17,31 +21,22 @@ class BranchDetailDialog extends StatelessWidget {
         width: 700,
         height: 600,
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFFFFFFF), Color(0xFFFAFBFC)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF3B82F6).withOpacity(0.08),
-              blurRadius: 32,
-              offset: const Offset(0, 16),
-            ),
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 30,
+              offset: const Offset(0, 10),
             ),
           ],
-          border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(24),
           child: Column(
             children: [
               _buildHeader(context),
+              const Divider(height: 1),
               Expanded(child: _buildContent()),
             ],
           ),
@@ -51,31 +46,21 @@ class BranchDetailDialog extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [const Color(0xFF3B82F6).withOpacity(0.05), Colors.white.withOpacity(0.8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4)),
-              ],
+              color: const Color(0xFF3B82F6).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.store_rounded, color: Colors.white, size: 24),
+            child: const Icon(
+              Icons.store_rounded,
+              color: Color(0xFF3B82F6),
+              size: 24,
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -84,47 +69,72 @@ class BranchDetailDialog extends StatelessWidget {
               children: [
                 Text(
                   'ข้อมูลสาขา: $shopId',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1F293B),
+                  ),
                 ),
                 const SizedBox(height: 4),
                 const Text(
                   'รายละเอียดและสถิติของสาขา',
-                  style: TextStyle(fontSize: 14, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                  style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
                 ),
               ],
             ),
           ),
-          _buildCloseButton(context),
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.close_rounded, color: Color(0xFF9CA3AF)),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildCloseButton(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => Navigator.of(context).pop(),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.8),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))],
-          ),
-          child: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF64748B)),
-        ),
-      ),
-    );
-  }
-
   Widget _buildContent() {
+    // Calculate financial summaries
+    final totalIncome = shops.fold(0.0, (sum, s) => sum + s.totalDeposit);
+    final totalWithdraw = shops.fold(0.0, (sum, s) => sum + s.totalWithdraw);
+    final netIncome = totalIncome - totalWithdraw;
+
+    // Calculate daily total from transactions
+    double dailyTotal = 0.0;
+    if (shops.isNotEmpty) {
+      final now = DateTime.now();
+      final todayStr =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      for (final shop in shops) {
+        if (shop.daily != null) {
+          for (final tx in shop.daily!) {
+            if (tx.timestamp != null && tx.timestamp!.startsWith(todayStr)) {
+              dailyTotal += tx.deposit ?? 0;
+            }
+          }
+        }
+      }
+    }
+
+    // Calculate monthly total
+    double monthlyTotal = 0.0;
+    final now = DateTime.now();
+    final monthStr = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    for (final shop in shops) {
+      if (shop.monthlySummary != null) {
+        for (final entry in shop.monthlySummary!.entries) {
+          if (entry.key.startsWith(monthStr)) {
+            monthlyTotal += entry.value.deposit ?? 0;
+          }
+        }
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Row 1: Basic info
           Row(
             children: [
               Expanded(
@@ -146,10 +156,48 @@ class BranchDetailDialog extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          // Row 2: Financial summary
+          Row(
+            children: [
+              Expanded(
+                child: _SummaryCard(
+                  title: 'รายวัน',
+                  value: _formatAmount(dailyTotal),
+                  color: const Color(0xFF06B6D4),
+                  icon: Icons.today_rounded,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _SummaryCard(
+                  title: 'รายเดือน',
+                  value: _formatAmount(monthlyTotal),
+                  color: const Color(0xFF8B5CF6),
+                  icon: Icons.calendar_month_rounded,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _SummaryCard(
+                  title: 'รายได้รวม',
+                  value: _formatAmount(netIncome),
+                  color: netIncome >= 0
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFFEF4444),
+                  icon: Icons.account_balance_wallet_rounded,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
           const Text(
             'รายการล่าสุด',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF1E293B)),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1F2937),
+            ),
           ),
           const SizedBox(height: 16),
           Expanded(child: _buildShopList()),
@@ -159,52 +207,67 @@ class BranchDetailDialog extends StatelessWidget {
     );
   }
 
+  String _formatAmount(double amount) {
+    if (amount >= 1000000) return '${(amount / 1000000).toStringAsFixed(2)}M';
+    if (amount >= 1000) return '${(amount / 1000).toStringAsFixed(2)}K';
+    return amount.toStringAsFixed(2);
+  }
+
   Widget _buildShopList() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.7),
-        border: Border.all(color: const Color(0xFFE2E8F0).withOpacity(0.5)),
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFE5E7EB)),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: ListView.builder(
-        itemCount: shops.length > 10 ? 10 : shops.length,
-        itemBuilder: (context, index) {
-          final shop = shops[index];
-          return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: index.isEven ? Colors.white.withOpacity(0.5) : Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: ListView.separated(
+          itemCount: shops.length > 10 ? 10 : shops.length,
+          separatorBuilder: (context, index) =>
+              const Divider(height: 1, color: Color(0xFFF3F4F6)),
+          itemBuilder: (context, index) {
+            final shop = shops[index];
+            return ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 8,
+              ),
               leading: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   '${index + 1}',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
+                  style: const TextStyle(
+                    color: Color(0xFF6B7280),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
                 ),
               ),
               title: Text(
                 'Shop: ${shop.shopid ?? "N/A"}',
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: Color(0xFF374151),
+                ),
               ),
               subtitle: Text(
                 'Updated: ${shop.updatedAt ?? "N/A"}',
-                style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
               ),
-              trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF64748B), size: 20),
-            ),
-          );
-        },
+              trailing: const Icon(
+                Icons.chevron_right_rounded,
+                color: Color(0xFF9CA3AF),
+                size: 20,
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -213,16 +276,9 @@ class BranchDetailDialog extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xFF64748B).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            'และอีก ${shops.length - 10} รายการ',
-            style: const TextStyle(color: Color(0xFF64748B), fontStyle: FontStyle.italic, fontWeight: FontWeight.w500),
-          ),
+        child: Text(
+          'และอีก ${shops.length - 10} รายการ',
+          style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12),
         ),
       ),
     );
@@ -256,21 +312,28 @@ class _SummaryCard extends StatelessWidget {
   final Color color;
   final IconData icon;
 
-  const _SummaryCard({required this.title, required this.value, required this.color, required this.icon});
+  const _SummaryCard({
+    required this.title,
+    required this.value,
+    required this.color,
+    required this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color.withOpacity(0.1), color.withOpacity(0.05)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3)),
-        boxShadow: [BoxShadow(color: color.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))],
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,18 +341,35 @@ class _SummaryCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10)),
-                child: Icon(icon, color: Colors.white, size: 20),
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: color, size: 16),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
-                child: Text(title, style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.w600)),
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF6B7280),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          Text(value, style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.w800)),
+          Text(
+            value,
+            style: TextStyle(
+              color: const Color(0xFF1F2937),
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );

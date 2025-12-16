@@ -32,10 +32,46 @@ class AppSidebar extends StatefulWidget {
       icon: Icons.folder_outlined,
       selectedIcon: Icons.folder_rounded,
     ),
-     SidebarMenuItem(
+    SidebarMenuItem(
       title: 'Reports',
       icon: Icons.article_outlined,
       selectedIcon: Icons.article_rounded,
+    ),
+    SidebarMenuItem(
+      title: 'งบการเงิน',
+      icon: Icons.monetization_on_outlined,
+      selectedIcon: Icons.monetization_on_rounded,
+      isSubItem: true,
+    ),
+    SidebarMenuItem(
+      title: 'ภาษี',
+      icon: Icons.receipt_long_outlined,
+      selectedIcon: Icons.receipt_long_rounded,
+      isSubItem: true,
+    ),
+    SidebarMenuItem(
+      title: 'ลูกหนี้และการขาย',
+      icon: Icons.monetization_on_outlined,
+      selectedIcon: Icons.monetization_on_rounded,
+      isSubItem: true,
+    ),
+    SidebarMenuItem(
+      title: 'เจ้าหนี้และการซื้อ',
+      icon: Icons.monetization_on_outlined,
+      selectedIcon: Icons.monetization_on_rounded,
+      isSubItem: true,
+    ),
+    SidebarMenuItem(
+      title: 'สินค้าคงคลัง',
+      icon: Icons.inventory_outlined,
+      selectedIcon: Icons.inventory_rounded,
+      isSubItem: true,
+    ),
+    SidebarMenuItem(
+      title: 'สมุดรายวัน',
+      icon: Icons.calendar_today_outlined,
+      selectedIcon: Icons.calendar_today_rounded,
+      isSubItem: true,
     ),
     SidebarMenuItem(
       title: 'Settings',
@@ -50,6 +86,7 @@ class AppSidebar extends StatefulWidget {
 
 class _AppSidebarState extends State<AppSidebar> {
   int? _hoveredIndex;
+  bool _isReportsExpanded = false;
 
   @override
   Widget build(BuildContext context) {
@@ -85,12 +122,20 @@ class _AppSidebarState extends State<AppSidebar> {
                 itemCount: AppSidebar.menuItems.length,
                 itemBuilder: (context, index) {
                   final item = AppSidebar.menuItems[index];
+
+                  // Hide sub-items if Reports is collapsed
+                  if (item.isSubItem && !_isReportsExpanded) {
+                    return const SizedBox.shrink();
+                  }
+
                   return _buildMenuItem(
                     icon: item.icon,
                     selectedIcon: item.selectedIcon,
                     label: item.title,
                     index: index,
                     badge: item.badge,
+                    isSubItem: item.isSubItem,
+                    isReportsItem: item.title == 'Reports',
                   );
                 },
               ),
@@ -123,34 +168,39 @@ class _AppSidebarState extends State<AppSidebar> {
   Widget _buildCollapsedHeader() {
     return Column(
       children: [
-        Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-            ),
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF6366F1).withOpacity(0.35),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: widget.onToggleCollapse,
+            child: Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color.fromARGB(255, 86, 94, 247),
+                    Color.fromARGB(255, 50, 53, 245),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6366F1).withOpacity(0.35),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: const Icon(
-            Icons.dashboard_customize_rounded,
-            color: Colors.white,
-            size: 26,
+              child: const Icon(
+                Icons.dashboard_customize_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
           ),
         ),
-        if (widget.onToggleCollapse != null) ...[
-          const SizedBox(height: 16),
-          _buildToggleButton(),
-        ],
       ],
     );
   }
@@ -165,9 +215,12 @@ class _AppSidebarState extends State<AppSidebar> {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-                  colors: [Color.fromARGB(255, 86, 94, 247), Color.fromARGB(255, 50, 53, 245)],
+              colors: [
+                Color.fromARGB(255, 86, 94, 247),
+                Color.fromARGB(255, 50, 53, 245),
+              ],
             ),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
                 color: const Color.fromARGB(255, 65, 74, 242).withOpacity(0.35),
@@ -189,7 +242,10 @@ class _AppSidebarState extends State<AppSidebar> {
             children: [
               ShaderMask(
                 shaderCallback: (bounds) => const LinearGradient(
-                  colors: [Color.fromARGB(255, 65, 74, 242), Color.fromARGB(255, 50, 53, 245)],
+                  colors: [
+                    Color.fromARGB(255, 65, 74, 242),
+                    Color.fromARGB(255, 50, 53, 245),
+                  ],
                 ).createShader(bounds),
                 child: const Text(
                   'Account SAH',
@@ -202,7 +258,7 @@ class _AppSidebarState extends State<AppSidebar> {
                 ),
               ),
               Text(
-                'Dashboard',
+                'NameUser@gmail.com',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
@@ -251,31 +307,44 @@ class _AppSidebarState extends State<AppSidebar> {
     required String label,
     required int index,
     String? badge,
+    bool isSubItem = false,
+    bool isReportsItem = false,
   }) {
     final isSelected = widget.selectedIndex == index;
     final isHovered = _hoveredIndex == index;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: EdgeInsets.only(
+        bottom: 4,
+        left: isSubItem && !widget.isCollapsed ? 12 : 0,
+      ),
       child: MouseRegion(
         onEnter: (_) => setState(() => _hoveredIndex = index),
         onExit: (_) => setState(() => _hoveredIndex = null),
         cursor: SystemMouseCursors.click,
         child: GestureDetector(
-          onTap: () => widget.onItemSelected(index),
+          onTap: () {
+            if (isReportsItem) {
+              setState(() => _isReportsExpanded = !_isReportsExpanded);
+            }
+            widget.onItemSelected(index);
+          },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeOutCubic,
             padding: EdgeInsets.symmetric(
-              horizontal: widget.isCollapsed ? 0 : 14,
-              vertical: widget.isCollapsed ? 14 : 12,
+              horizontal: widget.isCollapsed ? 0 : 10,
+              vertical: widget.isCollapsed ? 10 : 10,
             ),
             decoration: BoxDecoration(
               gradient: isSelected
                   ? const LinearGradient(
                       begin: Alignment.centerLeft,
                       end: Alignment.centerRight,
-                  colors: [Color.fromARGB(255, 65, 74, 242), Color.fromARGB(255, 104, 107, 248)],
+                      colors: [
+                        Color.fromARGB(255, 65, 74, 242),
+                        Color.fromARGB(255, 104, 107, 248),
+                      ],
                     )
                   : isHovered
                   ? LinearGradient(
@@ -308,6 +377,8 @@ class _AppSidebarState extends State<AppSidebar> {
                     isSelected,
                     isHovered,
                     badge,
+                    isSubItem,
+                    isReportsItem,
                   ),
           ),
         ),
@@ -322,35 +393,46 @@ class _AppSidebarState extends State<AppSidebar> {
     bool isSelected,
     bool isHovered,
   ) {
-    return Tooltip(
-      message: label,
-      preferBelow: false,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-        ),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      textStyle: const TextStyle(
-        color: Colors.white,
-        fontSize: 13,
-        fontWeight: FontWeight.w500,
-      ),
-      child: Center(
-        child: AnimatedScale(
-          scale: isHovered && !isSelected ? 1.15 : 1.0,
-          duration: const Duration(milliseconds: 150),
-          child: Icon(
-            isSelected ? selectedIcon : icon,
-            color: isSelected
-                ? Colors.white
-                : isHovered
-                ? const Color(0xFF6366F1)
-                : Colors.grey.shade600,
-            size: 24,
+    return Column(
+      children: [
+        Container(
+          width: 25,
+          height: 25,
+          child: Tooltip(
+            message: label,
+            preferBelow: false,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [
+                  Color.fromARGB(255, 202, 203, 245),
+                  Color.fromARGB(255, 255, 255, 255),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            textStyle: const TextStyle(
+              color: Color.fromARGB(255, 92, 91, 91),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+            child: Center(
+              child: AnimatedScale(
+                scale: isHovered && !isSelected ? 1.15 : 1.0,
+                duration: const Duration(milliseconds: 150),
+                child: Icon(
+                  isSelected ? selectedIcon : icon,
+                  color: isSelected
+                      ? Colors.white
+                      : isHovered
+                      ? const Color(0xFF6366F1)
+                      : Colors.grey.shade600,
+                  size: 24,
+                ),
+              ),
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -361,28 +443,36 @@ class _AppSidebarState extends State<AppSidebar> {
     bool isSelected,
     bool isHovered,
     String? badge,
+    bool isSubItem,
+    bool isReportsItem,
   ) {
     return Row(
       children: [
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? Colors.white.withOpacity(0.2)
-                : isHovered
-                ? const Color(0xFF6366F1).withOpacity(0.1)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(
-            isSelected ? selectedIcon : icon,
-            color: isSelected
-                ? Colors.white
-                : isHovered
-                ? const Color(0xFF6366F1)
-                : Colors.grey.shade600,
-            size: 22,
+        if (isSubItem)
+          const SizedBox(
+            width: 8,
+          ), // Additional spacing/visual cue for sub-items
+        Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? Colors.white.withOpacity(0.2)
+                  : isHovered
+                  ? const Color(0xFF6366F1).withOpacity(0.1)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              isSelected ? selectedIcon : icon,
+              color: isSelected
+                  ? Colors.white
+                  : isHovered
+                  ? const Color(0xFF6366F1)
+                  : Colors.grey.shade600,
+              size: isSubItem ? 18 : 22,
+            ),
           ),
         ),
         const SizedBox(width: 12),
@@ -390,7 +480,7 @@ class _AppSidebarState extends State<AppSidebar> {
           child: Text(
             label,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: isSubItem ? 13 : 14,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
               color: isSelected
                   ? Colors.white
@@ -402,7 +492,17 @@ class _AppSidebarState extends State<AppSidebar> {
           ),
         ),
         if (badge != null) _buildBadge(badge),
-       /* if (isSelected)
+        if (isReportsItem) ...[
+          const SizedBox(width: 8),
+          Icon(
+            _isReportsExpanded
+                ? Icons.keyboard_arrow_up_rounded
+                : Icons.keyboard_arrow_down_rounded,
+            size: 18,
+            color: isSelected ? Colors.white : Colors.grey.shade500,
+          ),
+        ],
+        /* if (isSelected)
           Container(
             width: 6,
             height: 6,
@@ -414,7 +514,6 @@ class _AppSidebarState extends State<AppSidebar> {
       ],
     );
   }
-
 
   Widget _buildBadge(String badge) {
     return Container(
@@ -654,11 +753,13 @@ class SidebarMenuItem {
   final IconData icon;
   final IconData selectedIcon;
   final String? badge;
+  final bool isSubItem;
 
   const SidebarMenuItem({
     required this.title,
     required this.icon,
     required this.selectedIcon,
     this.badge,
+    this.isSubItem = false,
   });
 }

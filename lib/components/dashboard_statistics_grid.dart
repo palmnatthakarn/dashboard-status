@@ -391,14 +391,14 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
         transform: Matrix4.identity()..scale(_isHovered ? 1.02 : 1.0),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
               color: const Color(

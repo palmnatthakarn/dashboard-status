@@ -24,8 +24,11 @@ class JournalPage extends StatefulWidget {
 class _JournalPageState extends State<JournalPage> {
   // Formatters
   final _numFmt = NumberFormat('#,##0.00');
-  final _compactFmt = NumberFormat.compactCurrency(symbol: '', decimalDigits: 2);
-  
+  final _compactFmt = NumberFormat.compactCurrency(
+    symbol: '',
+    decimalDigits: 2,
+  );
+
   // Controllers
   final _searchController = TextEditingController();
 
@@ -55,23 +58,41 @@ class _JournalPageState extends State<JournalPage> {
   DateTimeRange? _getDateRange(String filter) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    
+
     return switch (filter) {
-      'TODAY' => DateTimeRange(start: today, end: today.add(const Duration(days: 1))),
-      '7DAYS' => DateTimeRange(start: today.subtract(const Duration(days: 6)), end: today.add(const Duration(days: 1))),
-      'MONTH' => DateTimeRange(start: DateTime(now.year, now.month, 1), end: today.add(const Duration(days: 1))),
+      'TODAY' => DateTimeRange(
+        start: today,
+        end: today.add(const Duration(days: 1)),
+      ),
+      '7DAYS' => DateTimeRange(
+        start: today.subtract(const Duration(days: 6)),
+        end: today.add(const Duration(days: 1)),
+      ),
+      'MONTH' => DateTimeRange(
+        start: DateTime(now.year, now.month, 1),
+        end: today.add(const Duration(days: 1)),
+      ),
       'QUARTER' => () {
         final quarterMonth = ((now.month - 1) ~/ 3) * 3 + 1;
-        return DateTimeRange(start: DateTime(now.year, quarterMonth, 1), end: today.add(const Duration(days: 1)));
+        return DateTimeRange(
+          start: DateTime(now.year, quarterMonth, 1),
+          end: today.add(const Duration(days: 1)),
+        );
       }(),
       '3QUARTERS' => () {
         final currentQuarter = (now.month - 1) ~/ 3;
         final startQuarter = (currentQuarter - 2).clamp(0, 3);
         final startMonth = startQuarter * 3 + 1;
         final startYear = currentQuarter < 2 ? now.year - 1 : now.year;
-        return DateTimeRange(start: DateTime(startYear, startMonth, 1), end: today.add(const Duration(days: 1)));
+        return DateTimeRange(
+          start: DateTime(startYear, startMonth, 1),
+          end: today.add(const Duration(days: 1)),
+        );
       }(),
-      'YEAR' => DateTimeRange(start: DateTime(now.year, 1, 1), end: today.add(const Duration(days: 1))),
+      'YEAR' => DateTimeRange(
+        start: DateTime(now.year, 1, 1),
+        end: today.add(const Duration(days: 1)),
+      ),
       _ => null,
     };
   }
@@ -96,7 +117,8 @@ class _JournalPageState extends State<JournalPage> {
     double total = 0.0;
     for (final j in list) {
       final accountClass = _getAccountClass(j.accountType);
-      if (accountClass == AccountClass.expenses || accountClass == AccountClass.liabilities) {
+      if (accountClass == AccountClass.expenses ||
+          accountClass == AccountClass.liabilities) {
         total += (j.debit ?? 0) - (j.credit ?? 0);
       }
     }
@@ -105,13 +127,14 @@ class _JournalPageState extends State<JournalPage> {
 
   double _calcTotalDebit(Iterable<Journal> list) =>
       list.fold(0.0, (p, e) => p + (e.debit ?? 0));
-      
+
   double _calcTotalCredit(Iterable<Journal> list) =>
       list.fold(0.0, (p, e) => p + (e.credit ?? 0));
 
   // Filtered & sorted data
   List<Journal> get _filtered {
-    final cacheKey = '$_search|$_typeFilter|$_dateFilter|$_sortColumnIndex|$_sortAscending';
+    final cacheKey =
+        '$_search|$_typeFilter|$_dateFilter|$_sortColumnIndex|$_sortAscending';
     if (_cachedFiltered != null && _lastCacheKey == cacheKey) {
       return _cachedFiltered!;
     }
@@ -122,8 +145,10 @@ class _JournalPageState extends State<JournalPage> {
       if (dateRange == null) return true;
       final date = j.dateTime;
       if (date == null) return false;
-      return date.isAfter(dateRange.start.subtract(const Duration(seconds: 1))) && 
-             date.isBefore(dateRange.end);
+      return date.isAfter(
+            dateRange.start.subtract(const Duration(seconds: 1)),
+          ) &&
+          date.isBefore(dateRange.end);
     });
 
     // Filter by type
@@ -131,10 +156,11 @@ class _JournalPageState extends State<JournalPage> {
       if (_typeFilter == 'ALL') return true;
       final accountClass = _getAccountClass(j.accountType);
       return switch (_typeFilter) {
-        'INCOME' => accountClass == AccountClass.income,
-        'EXPENSES' => accountClass == AccountClass.expenses,
         'ASSETS' => accountClass == AccountClass.assets,
         'LIABILITIES' => accountClass == AccountClass.liabilities,
+        'EQUITY' => accountClass == AccountClass.equity,
+        'INCOME' => accountClass == AccountClass.income,
+        'EXPENSES' => accountClass == AccountClass.expenses,
         _ => true,
       };
     });
@@ -142,9 +168,11 @@ class _JournalPageState extends State<JournalPage> {
     // Filter by search
     final q = _search.trim().toLowerCase();
     if (q.isNotEmpty) {
-      res = res.where((j) =>
-          (j.docNo ?? '').toLowerCase().contains(q) ||
-          (j.accountName ?? '').toLowerCase().contains(q));
+      res = res.where(
+        (j) =>
+            (j.docNo ?? '').toLowerCase().contains(q) ||
+            (j.accountName ?? '').toLowerCase().contains(q),
+      );
     }
 
     final list = res.toList();
@@ -154,7 +182,9 @@ class _JournalPageState extends State<JournalPage> {
       _sortList(list);
       if (!_sortAscending) {
         final reversed = list.reversed.toList();
-        list..clear()..addAll(reversed);
+        list
+          ..clear()
+          ..addAll(reversed);
       }
     }
 
@@ -167,13 +197,20 @@ class _JournalPageState extends State<JournalPage> {
     int compare<T extends Comparable>(T a, T b) => a.compareTo(b);
     switch (_sortColumnIndex) {
       case 0:
-        list.sort((a, b) => (a.dateTime ?? DateTime(1900)).compareTo(b.dateTime ?? DateTime(1900)));
+        list.sort(
+          (a, b) => (a.dateTime ?? DateTime(1900)).compareTo(
+            b.dateTime ?? DateTime(1900),
+          ),
+        );
       case 1:
         list.sort((a, b) => compare(a.docNo ?? '', b.docNo ?? ''));
       case 2:
         list.sort((a, b) => compare(a.accountName ?? '', b.accountName ?? ''));
       case 3:
-        list.sort((a, b) => compare(_typeDisplay(a.accountType), _typeDisplay(b.accountType)));
+        list.sort(
+          (a, b) =>
+              compare(_typeDisplay(a.accountType), _typeDisplay(b.accountType)),
+        );
       case 4:
         list.sort((a, b) => compare(a.debit ?? 0.0, b.debit ?? 0.0));
       case 5:
@@ -210,15 +247,15 @@ class _JournalPageState extends State<JournalPage> {
         children: [
           // KPI Section - Responsive
           _buildKpiSection(income, expenses, profit, isWideScreen),
-          
+
           // Toolbar - Simplified
           _buildSimpleToolbar(isWideScreen),
-          
+
           const SizedBox(height: 12),
-          
+
           // Main Content
           Expanded(child: _buildMainContent(filtered)),
-          
+
           // Summary Bar
           JournalSummaryBar(
             totalDebit: _numFmt.format(totalDebit),
@@ -232,11 +269,27 @@ class _JournalPageState extends State<JournalPage> {
   }
 
   Widget _buildFab() {
-    return FloatingActionButton.extended(
-      onPressed: _handleReset,
-      backgroundColor: const Color(0xFF3B82F6),
-      icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-      label: const Text('รีเซ็ต', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+    return Container(
+      decoration: BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF3B82F6).withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: FloatingActionButton.extended(
+        onPressed: _handleReset,
+        backgroundColor: const Color(0xFF3B82F6),
+        elevation: 0,
+        highlightElevation: 0,
+        icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+        label: const Text(
+          'รีเซ็ต',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
+      ),
     );
   }
 
@@ -251,10 +304,9 @@ class _JournalPageState extends State<JournalPage> {
               Expanded(child: _buildSearchField()),
               const SizedBox(width: 12),
               _buildViewToggle(),
-              
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           // Type Filter Chips + Date Dropdown
           Row(
             children: [
@@ -265,10 +317,31 @@ class _JournalPageState extends State<JournalPage> {
                     scrollDirection: Axis.horizontal,
                     children: [
                       _buildFilterChip('ALL', 'ทั้งหมด', Icons.apps_rounded),
-                      _buildFilterChip('INCOME', 'รายได้', Icons.trending_up_rounded),
-                      _buildFilterChip('EXPENSES', 'รายจ่าย', Icons.trending_down_rounded),
-                      _buildFilterChip('ASSETS', 'สินทรัพย์', Icons.account_balance_rounded),
-                      _buildFilterChip('LIABILITIES', 'หนี้สิน', Icons.credit_card_rounded),
+                      _buildFilterChip(
+                        'ASSETS',
+                        '1 สินทรัพย์',
+                        Icons.account_balance_rounded,
+                      ),
+                      _buildFilterChip(
+                        'LIABILITIES',
+                        '2 หนี้สิน',
+                        Icons.credit_card_rounded,
+                      ),
+                      _buildFilterChip(
+                        'EQUITY',
+                        '3 ทุน',
+                        Icons.pie_chart_rounded,
+                      ),
+                      _buildFilterChip(
+                        'INCOME',
+                        '4 รายได้',
+                        Icons.trending_up_rounded,
+                      ),
+                      _buildFilterChip(
+                        'EXPENSES',
+                        '5 ค่าใช้จ่าย',
+                        Icons.trending_down_rounded,
+                      ),
                     ],
                   ),
                 ),
@@ -287,31 +360,52 @@ class _JournalPageState extends State<JournalPage> {
       height: 48,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: TextField(
         controller: _searchController,
-        onChanged: (v) => setState(() { _search = v; _clearCache(); }),
-        style: const TextStyle(fontSize: 14),
+        onChanged: (v) => setState(() {
+          _search = v;
+          _clearCache();
+        }),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
         decoration: InputDecoration(
-          prefixIcon: const Icon(Icons.search_rounded, size: 20, color: Color(0xFF9CA3AF)),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            size: 22,
+            color: Color(0xFF6B7280),
+          ),
           suffixIcon: _search.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF9CA3AF)),
+                  icon: const Icon(
+                    Icons.clear_rounded,
+                    size: 18,
+                    color: Color(0xFF9CA3AF),
+                  ),
                   onPressed: () {
                     _searchController.clear();
-                    setState(() { _search = ''; _clearCache(); });
+                    setState(() {
+                      _search = '';
+                      _clearCache();
+                    });
                   },
                 )
               : null,
           hintText: 'ค้นหาเลขที่เอกสาร, รายการ...',
           hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
       ),
     );
@@ -321,13 +415,29 @@ class _JournalPageState extends State<JournalPage> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
+      padding: const EdgeInsets.all(4),
       child: Row(
         children: [
-          _buildToggleButton(Icons.table_chart_rounded, !_isChartView, () => setState(() => _isChartView = false)),
-          _buildToggleButton(Icons.bar_chart_rounded, _isChartView, () => setState(() => _isChartView = true)),
+          _buildToggleButton(
+            Icons.table_chart_rounded,
+            !_isChartView,
+            () => setState(() => _isChartView = false),
+          ),
+          _buildToggleButton(
+            Icons.bar_chart_rounded,
+            _isChartView,
+            () => setState(() => _isChartView = true),
+          ),
         ],
       ),
     );
@@ -336,70 +446,135 @@ class _JournalPageState extends State<JournalPage> {
   Widget _buildToggleButton(IconData icon, bool isActive, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF3B82F6) : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
+          color: isActive ? const Color(0xFFEFF6FF) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(icon, size: 20, color: isActive ? Colors.white : const Color(0xFF6B7280)),
+        child: Icon(
+          icon,
+          size: 20,
+          color: isActive ? const Color(0xFF3B82F6) : const Color(0xFF6B7280),
+        ),
       ),
     );
   }
 
   Widget _buildFilterChip(String value, String label, IconData icon) {
     final isSelected = _typeFilter == value;
+    final color = switch (value) {
+      'INCOME' => const Color(0xFF10B981),
+      'EXPENSES' => const Color(0xFFEF4444),
+      'ASSETS' => const Color(0xFF3B82F6),
+      'LIABILITIES' => const Color(0xFFF59E0B),
+      'EQUITY' => const Color(0xFF8B5CF6),
+      _ => const Color(0xFF6B7280),
+    };
+
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        selected: isSelected,
-        onSelected: (_) => setState(() { _typeFilter = value; _clearCache(); }),
-        avatar: Icon(icon, size: 16, color: isSelected ? Colors.white : const Color(0xFF6B7280)),
-        label: Text(label),
-        labelStyle: TextStyle(
-          color: isSelected ? Colors.white : const Color(0xFF374151),
-          fontWeight: FontWeight.w500,
-          fontSize: 13,
+      child: InkWell(
+        onTap: () => setState(() {
+          _typeFilter = value;
+          _clearCache();
+        }),
+        borderRadius: BorderRadius.circular(30),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? color : Colors.white,
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(
+              color: isSelected ? color : const Color(0xFFE5E7EB),
+              width: 1,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: color.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : [],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: isSelected ? Colors.white : color),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : const Color(0xFF374151),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
         ),
-        backgroundColor: Colors.white,
-        selectedColor: const Color(0xFF3B82F6),
-        checkmarkColor: Colors.white,
-        side: BorderSide(color: isSelected ? Colors.transparent : const Color(0xFFE5E7EB)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       ),
     );
   }
 
   Widget _buildDateFilterDropdown() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(30),
         border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: _dateFilter,
           isDense: true,
-          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: Color(0xFF6B7280)),
-          style: const TextStyle(color: Color(0xFF374151), fontSize: 13, fontWeight: FontWeight.w500),
-          items: _dateFilters.map((e) => DropdownMenuItem(
-            value: e[0],
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.calendar_today_rounded, size: 16, color: Color(0xFF818CF8)),
-                const SizedBox(width: 8),
-                Text(e[1]),
-              ],
-            ),
-          )).toList(),
+          icon: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 20,
+            color: Color(0xFF6B7280),
+          ),
+          style: const TextStyle(
+            color: Color(0xFF374151),
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+          items: _dateFilters.map((e) {
+            return DropdownMenuItem(
+              value: e[0],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.calendar_today_rounded,
+                    size: 16,
+                    color: _dateFilter == e[0]
+                        ? const Color(0xFF3B82F6)
+                        : const Color(0xFF9CA3AF),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(e[1]),
+                ],
+              ),
+            );
+          }).toList(),
           onChanged: (v) {
             if (v != null) {
-              setState(() { _dateFilter = v; _clearCache(); });
+              setState(() {
+                _dateFilter = v;
+                _clearCache();
+              });
             }
           },
         ),
@@ -412,31 +587,94 @@ class _JournalPageState extends State<JournalPage> {
       elevation: 0,
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_rounded),
-        onPressed: () => Navigator.pop(context),
-        tooltip: 'กลับ',
+      leading: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+              size: 20,
+              color: Color(0xFF6B7280),
+            ),
+            padding: EdgeInsets.zero,
+            onPressed: () => Navigator.pop(context),
+            tooltip: 'กลับ',
+          ),
+        ),
       ),
+      titleSpacing: 0,
       title: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF2563EB)]),
-              borderRadius: BorderRadius.circular(10),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF3B82F6).withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 20),
+            child: const Icon(
+              Icons.account_balance_wallet_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Journal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                Text(
-                  'สาขา: ${widget.branchSync} • $itemCount รายการ',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-                  overflow: TextOverflow.ellipsis,
+                const Text(
+                  'Journal',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF111827),
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF10B981).withOpacity(0.4),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'สาขา: ${widget.branchSync} • $itemCount รายการ',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF6B7280),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -444,125 +682,316 @@ class _JournalPageState extends State<JournalPage> {
         ],
       ),
       actions: [
-        // Quick export button
-        IconButton(
-          icon: const Icon(Icons.file_download_outlined, color: Color(0xFF6B7280)),
-          onPressed: () => _showExportOptions(),
-          tooltip: 'ส่งออกข้อมูล',
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Builder(
+              builder: (context) {
+                return IconButton(
+                  icon: const Icon(
+                    Icons.file_download_outlined,
+                    color: Color(0xFF374151),
+                    size: 22,
+                  ),
+                  onPressed: () {
+                    final RenderBox button =
+                        context.findRenderObject() as RenderBox;
+                    final RenderBox overlay =
+                        Navigator.of(
+                              context,
+                            ).overlay!.context.findRenderObject()
+                            as RenderBox;
+                    final RelativeRect position = RelativeRect.fromRect(
+                      Rect.fromPoints(
+                        button.localToGlobal(Offset.zero, ancestor: overlay),
+                        button.localToGlobal(
+                          button.size.bottomRight(Offset.zero),
+                          ancestor: overlay,
+                        ),
+                      ),
+                      Offset.zero & overlay.size,
+                    );
+                    _showExportOptions(position);
+                  },
+                  tooltip: 'ส่งออกข้อมูล',
+                );
+              },
+            ),
+          ),
         ),
         const SizedBox(width: 8),
       ],
     );
   }
 
-  void _showExportOptions() {
-    showModalBottomSheet(
+  void _showExportOptions(RelativeRect position) {
+    showMenu(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('ส่งออกข้อมูล', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: const Icon(Icons.table_chart, color: Color(0xFF10B981)),
-              title: const Text('Excel (.xlsx)'),
-              subtitle: const Text('ส่งออกเป็นไฟล์ Excel'),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: const Icon(Icons.picture_as_pdf, color: Color(0xFFEF4444)),
-              title: const Text('PDF'),
-              subtitle: const Text('ส่งออกเป็นไฟล์ PDF'),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: const Icon(Icons.code, color: Color(0xFF3B82F6)),
-              title: const Text('CSV'),
-              subtitle: const Text('ส่งออกเป็นไฟล์ CSV'),
-              onTap: () => Navigator.pop(context),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildKpiSection(double income, double expenses, double profit, bool isWideScreen) {
-    final cards = [
-      _buildKpiCard('รายได้', income, Icons.trending_up_rounded, const Color(0xFF10B981)),
-      _buildKpiCard('รายจ่าย', expenses, Icons.trending_down_rounded, const Color(0xFFEF4444)),
-      _buildKpiCard('กำไรสุทธิ', profit, profit >= 0 ? Icons.emoji_events_rounded : Icons.warning_rounded, 
-          profit >= 0 ? const Color(0xFF3B82F6) : const Color(0xFFF59E0B), isPrimary: true),
-    ];
-
-    return Container(
-      margin: const EdgeInsets.all(16),
-      child: isWideScreen
-          ? Row(children: cards.map((c) => Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: c))).toList())
-          : Column(children: [
-              Row(children: [Expanded(child: cards[0]), const SizedBox(width: 12), Expanded(child: cards[1])]),
-              const SizedBox(height: 12),
-              cards[2],
-            ]),
-    );
-  }
-
-  Widget _buildKpiCard(String label, double value, IconData icon, Color color, {bool isPrimary = false}) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: isPrimary
-            ? LinearGradient(colors: [color, color.withOpacity(0.8)])
-            : null,
-        color: isPrimary ? null : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: isPrimary ? color.withOpacity(0.3) : Colors.black.withOpacity(0.05),
-            blurRadius: isPrimary ? 12 : 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: isPrimary ? Colors.white.withOpacity(0.2) : color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, size: 24, color: isPrimary ? Colors.white : color),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      position: position,
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: Colors.white,
+      items: <PopupMenuEntry<dynamic>>[
+        PopupMenuItem(
+          enabled: false,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
               children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isPrimary ? Colors.white.withOpacity(0.9) : const Color(0xFF6B7280),
-                    fontWeight: FontWeight.w500,
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.file_download_rounded,
+                    color: Color(0xFF374151),
+                    size: 20,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  _compactFmt.format(value),
+                const SizedBox(width: 12),
+                const Text(
+                  'ส่งออกข้อมูล',
                   style: TextStyle(
-                    fontSize: isPrimary ? 22 : 18,
-                    fontWeight: FontWeight.w800,
-                    color: isPrimary ? Colors.white : color,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF111827),
                   ),
                 ),
               ],
+            ),
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          onTap: () {
+            // Excel Export Action
+          },
+          child: _buildExportMenuItem(
+            icon: Icons.table_chart_rounded,
+            color: const Color(0xFF10B981),
+            title: 'Excel (.xlsx)',
+            subtitle: 'เหมาะสำหรับนำไปคำนวณต่อ',
+          ),
+        ),
+        PopupMenuItem(
+          onTap: () {
+            // PDF Export Action
+          },
+          child: _buildExportMenuItem(
+            icon: Icons.picture_as_pdf_rounded,
+            color: const Color(0xFFEF4444),
+            title: 'PDF Document',
+            subtitle: 'เอกสารสำหรับการพิมพ์',
+          ),
+        ),
+        PopupMenuItem(
+          onTap: () {
+            // CSV Export Action
+          },
+          child: _buildExportMenuItem(
+            icon: Icons.code_rounded,
+            color: const Color(0xFF3B82F6),
+            title: 'CSV File',
+            subtitle: 'ไฟล์ข้อมูลดิบ',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExportMenuItem({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: Color(0xFF1F2937),
+                ),
+              ),
+              Text(
+                subtitle,
+                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildKpiSection(
+    double income,
+    double expenses,
+    double profit,
+    bool isWideScreen,
+  ) {
+    final cards = [
+      _buildKpiCard(
+        'รายได้',
+        income,
+        Icons.trending_up_rounded,
+        const Color(0xFF10B981),
+      ),
+      _buildKpiCard(
+        'รายจ่าย',
+        expenses,
+        Icons.trending_down_rounded,
+        const Color(0xFFEF4444),
+      ),
+      _buildKpiCard(
+        'กำไรสุทธิ',
+        profit,
+        profit >= 0 ? Icons.emoji_events_rounded : Icons.warning_rounded,
+        profit >= 0 ? const Color(0xFF3B82F6) : const Color(0xFFF59E0B),
+        isPrimary: true,
+      ),
+    ];
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      child: isWideScreen
+          ? Row(
+              children: cards
+                  .map(
+                    (c) => Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: c,
+                      ),
+                    ),
+                  )
+                  .toList(),
+            )
+          : Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: cards[0]),
+                    const SizedBox(width: 12),
+                    Expanded(child: cards[1]),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                cards[2],
+              ],
+            ),
+    );
+  }
+
+  Widget _buildKpiCard(
+    String label,
+    double value,
+    IconData icon,
+    Color color, {
+    bool isPrimary = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isPrimary
+            ? color
+            : Colors.white, // Solid color for primary, white for others
+        borderRadius: BorderRadius.circular(20),
+        border: isPrimary
+            ? null
+            : Border.all(color: const Color(0xFFE5E7EB), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: isPrimary
+                ? color.withOpacity(0.3)
+                : Colors.black.withOpacity(0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isPrimary
+                      ? Colors.white.withOpacity(0.2)
+                      : color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: isPrimary ? Colors.white : color,
+                ),
+              ),
+              if (isPrimary)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Tooltip(
+                    message: 'กำไร = รายได้ - รายจ่าย',
+                    child: Icon(
+                      Icons.info_outline_rounded,
+                      size: 14,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: isPrimary
+                  ? Colors.white.withOpacity(0.9)
+                  : const Color(0xFF6B7280),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _compactFmt.format(value),
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: isPrimary ? Colors.white : const Color(0xFF1F2937),
+              letterSpacing: -0.5,
             ),
           ),
         ],
@@ -576,8 +1005,15 @@ class _JournalPageState extends State<JournalPage> {
       padding: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: filtered.isEmpty
           ? const JournalEmptyState(
@@ -585,28 +1021,28 @@ class _JournalPageState extends State<JournalPage> {
               subtitle: 'ลองเปลี่ยนตัวกรองหรือเคลียร์คำค้นหา',
             )
           : _isChartView
-              ? JournalChart(
-                  rows: filtered,
-                  typeColor: _typeColor,
-                  typeDisplay: _typeDisplay,
-                  numFmt: _numFmt,
-                )
-              : ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: JournalTable(
-                    rows: filtered,
-                    typeColor: _typeColor,
-                    typeDisplay: _typeDisplay,
-                    numFmt: _numFmt,
-                    sortColumnIndex: _sortColumnIndex,
-                    sortAscending: _sortAscending,
-                    onSort: (i, asc) => setState(() {
-                      _sortColumnIndex = i;
-                      _sortAscending = asc;
-                      _clearCache();
-                    }),
-                  ),
-                ),
+          ? JournalChart(
+              rows: filtered,
+              typeColor: _typeColor,
+              typeDisplay: _typeDisplay,
+              numFmt: _numFmt,
+            )
+          : ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: JournalTable(
+                rows: filtered,
+                typeColor: _typeColor,
+                typeDisplay: _typeDisplay,
+                numFmt: _numFmt,
+                sortColumnIndex: _sortColumnIndex,
+                sortAscending: _sortAscending,
+                onSort: (i, asc) => setState(() {
+                  _sortColumnIndex = i;
+                  _sortAscending = asc;
+                  _clearCache();
+                }),
+              ),
+            ),
     );
   }
 

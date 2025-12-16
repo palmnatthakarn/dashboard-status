@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:moniter/pages/report_page.dart';
 import '../components/app_sidebar.dart';
 import '../dashboard_screen.dart';
-import '../pages/kpi_page.dart';
+import '../pages/kpi/kpi_page.dart';
 import '../pages/documents_page.dart';
 import '../pages/settings_page.dart';
 
@@ -91,7 +91,10 @@ class _MainLayoutState extends State<MainLayout> {
     DashboardScreen(),
     const KpiPage(),
     const DocumentsPage(),
-    const ReportPage(),
+    const ReportPage(title: 'รายงานภาพรวม'),
+    const ReportPage(title: 'รายงานการเงิน'),
+    const ReportPage(title: 'รายงานภาษี'),
+    const ReportPage(title: 'รายงานรายวัน'),
     const SettingsPage(),
   ];
 
@@ -110,7 +113,7 @@ class _MainLayoutState extends State<MainLayout> {
   @override
   Widget build(BuildContext context) {
     final screenType = ResponsiveHelper.getScreenType(context);
-    
+
     return Scaffold(
       body: _buildBody(screenType),
       drawer: _buildDrawer(screenType),
@@ -141,9 +144,7 @@ class _MainLayoutState extends State<MainLayout> {
                 ),
               ),
             ),
-            Expanded(
-              child: _pages[_selectedIndex],
-            ),
+            Expanded(child: _pages[_selectedIndex]),
           ],
         );
     }
@@ -181,7 +182,7 @@ class ResponsiveBuilder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenType = ResponsiveHelper.getScreenType(context);
-    
+
     switch (screenType) {
       case ScreenType.mobile:
         return mobile;
@@ -211,7 +212,7 @@ class ResponsiveValue<T> {
 
   T getValue(BuildContext context) {
     final screenType = ResponsiveHelper.getScreenType(context);
-    
+
     switch (screenType) {
       case ScreenType.mobile:
         return mobile;

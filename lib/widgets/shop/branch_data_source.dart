@@ -8,6 +8,7 @@ import '../../models/doc_details.dart';
 import '../../services/journal_service.dart';
 import '../../pages/journal_page.dart';
 import 'branch_detail_dialog.dart';
+import 'image_gallery_dialog.dart';
 
 class BranchDataSource extends DataTableSource {
   final Map<String, List<DocDetails>> branchData;
@@ -51,12 +52,48 @@ class BranchDataSource extends DataTableSource {
       cells: [
         DataCell(_buildStatusIndicator(shops.length)),
         DataCell(_buildBranchNameCell(shopId, shopName, shops)),
-        DataCell(_buildBranchCodeCell(shopId)),
-        DataCell(_buildAmountChip(dailyAmount, const Color(0xFF06B6D4), Icons.today_rounded)),
-        DataCell(_buildAmountChip(monthlyAmount, const Color(0xFF8B5CF6), Icons.calendar_month_rounded)),
-        DataCell(_buildAmountChip(yearlyAmount, _getYearlyColor(yearlyAmount), Icons.date_range_rounded)),
+        DataCell(
+          InkWell(
+            onTap: () => _showBranchDetail(shopId, shops),
+            borderRadius: BorderRadius.circular(6),
+            child: _buildBranchCodeCell(shopId),
+          ),
+        ),
+        DataCell(
+          InkWell(
+            onTap: () => _showBranchDetail(shopId, shops),
+            borderRadius: BorderRadius.circular(6),
+            child: _buildAmountChip(
+              dailyAmount,
+              const Color(0xFF06B6D4),
+              Icons.today_rounded,
+            ),
+          ),
+        ),
+        DataCell(
+          InkWell(
+            onTap: () => _showBranchDetail(shopId, shops),
+            borderRadius: BorderRadius.circular(6),
+            child: _buildAmountChip(
+              monthlyAmount,
+              const Color(0xFF8B5CF6),
+              Icons.calendar_month_rounded,
+            ),
+          ),
+        ),
+        DataCell(
+          InkWell(
+            onTap: () => _showBranchDetail(shopId, shops),
+            borderRadius: BorderRadius.circular(6),
+            child: _buildAmountChip(
+              yearlyAmount,
+              _getYearlyColor(yearlyAmount),
+              Icons.date_range_rounded,
+            ),
+          ),
+        ),
         DataCell(_buildJournalCell(shopId, shops, totalIncome)),
-        DataCell(_buildUploadCell(shops.length)),
+        DataCell(_buildUploadCell(shops)),
         DataCell(_buildResponsibleCell()),
       ],
     );
@@ -84,27 +121,31 @@ class BranchDataSource extends DataTableSource {
     } else {
       statusColor = const Color(0xFFEF4444);
       statusIcon = Icons.error;
-      status = 'น้อย';
+      status = 'มาก';
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
+      /*decoration: BoxDecoration(
         color: statusColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(6),
-      ),
+      ),*/
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(statusIcon, color: statusColor, size: 14),
-          const SizedBox(width: 6),
-          Text(status, style: TextStyle(color: statusColor, fontWeight: FontWeight.w600, fontSize: 12)),
+          Icon(statusIcon, color: statusColor, size: 20),
+          //const SizedBox(width: 6),
+          //Text(status, style: TextStyle(color: statusColor, fontWeight: FontWeight.w600, fontSize: 12)),
         ],
       ),
     );
   }
 
-  Widget _buildBranchNameCell(String shopId, String shopName, List<DocDetails> shops) {
+  Widget _buildBranchNameCell(
+    String shopId,
+    String shopName,
+    List<DocDetails> shops,
+  ) {
     return InkWell(
       onTap: () {
         HapticFeedback.lightImpact();
@@ -114,11 +155,15 @@ class BranchDataSource extends DataTableSource {
         children: [
           Container(
             padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
+            /*decoration: BoxDecoration(
               color: const Color(0xFF3B82F6),
               borderRadius: BorderRadius.circular(6),
+            ),*/
+            child: const Icon(
+              Icons.store_rounded,
+              size: 14,
+              color: Colors.white,
             ),
-            child: const Icon(Icons.store_rounded, size: 14, color: Colors.white),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -128,14 +173,22 @@ class BranchDataSource extends DataTableSource {
               children: [
                 Text(
                   shopName.isEmpty ? shopId : shopName,
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF111827), fontSize: 14),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF111827),
+                    fontSize: 14,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   '${shops.length} รายการ',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF), fontWeight: FontWeight.w400),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF9CA3AF),
+                    fontWeight: FontWeight.w400,
+                  ),
                 ),
               ],
             ),
@@ -148,13 +201,18 @@ class BranchDataSource extends DataTableSource {
   Widget _buildBranchCodeCell(String shopId) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
+      /*decoration: BoxDecoration(
         color: const Color(0xFFF3F4F6),
         borderRadius: BorderRadius.circular(6),
-      ),
+      ),*/
       child: Text(
         shopId,
-        style: const TextStyle(fontFamily: 'monospace', color: Color(0xFF6B7280), fontWeight: FontWeight.w500, fontSize: 12),
+        style: const TextStyle(
+          fontFamily: 'monospace',
+          color: Color(0xFF6B7280),
+          fontWeight: FontWeight.w500,
+          fontSize: 12,
+        ),
       ),
     );
   }
@@ -162,68 +220,117 @@ class BranchDataSource extends DataTableSource {
   Widget _buildAmountChip(double amount, Color color, IconData icon) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
+      /* decoration: BoxDecoration(
         color: color.withOpacity(0.08),
         borderRadius: BorderRadius.circular(6),
-      ),
+      ),*/
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 6),
-          Text(_formatAmount(amount), style: TextStyle(fontWeight: FontWeight.w600, color: color, fontSize: 12)),
+          //Icon(icon, size: 12, color: color),
+          //const SizedBox(width: 6),
+          Text(
+            _formatAmount(amount),
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: color,
+              fontSize: 12,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildJournalCell(String shopId, List<DocDetails> shops, double totalIncome) {
+  Widget _buildJournalCell(
+    String shopId,
+    List<DocDetails> shops,
+    double totalIncome,
+  ) {
+    final isPositive = totalIncome >= 0;
+    final primaryColor = isPositive
+        ? const Color(0xFF10B981)
+        : const Color(0xFFEF4444);
+
     return InkWell(
       onTap: () {
         HapticFeedback.mediumImpact();
-        _showJournalDialog(shopId, shops);
+        _showJournalDialogForBranch(shopId, shops);
       },
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: totalIncome >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+          color: primaryColor,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Column(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.account_balance_wallet, size: 14, color: Colors.white),
-                SizedBox(width: 6),
-                Text('Journal', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white)),
-              ],
+            Icon(
+              Icons.account_balance_wallet_rounded,
+              size: 14,
+              color: Colors.white.withOpacity(0.9),
             ),
-            const SizedBox(height: 2),
-            Text(_formatAmount(totalIncome), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+            const SizedBox(width: 6),
+            Text(
+              _formatAmount(totalIncome),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildUploadCell(int count) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFF10B981).withOpacity(0.1),
-        borderRadius: BorderRadius.circular(6),
+  Widget _buildUploadCell(List<DocDetails> shops) {
+    // Calculate total images from dailyImages
+    int imageCount = 0;
+    for (final shop in shops) {
+      if (shop.dailyImages != null) {
+        imageCount += shop.dailyImages!
+            .where((img) => img.imageUrl?.isNotEmpty == true)
+            .length;
+      }
+    }
+
+    final hasImages = imageCount > 0;
+    final color = hasImages ? const Color(0xFF10B981) : const Color(0xFF9CA3AF);
+
+    return InkWell(
+      onTap: () => _showImageGallery(shops),
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+           // Icon(Icons.image_rounded, size: 14, color: color),
+           // const SizedBox(width: 6),
+            Text(
+              '$imageCount รูป',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.cloud_upload, size: 14, color: Color(0xFF10B981)),
-          const SizedBox(width: 6),
-          Text('$count ไฟล์', style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.w600, fontSize: 12)),
-        ],
+    );
+  }
+
+  void _showImageGallery(List<DocDetails> shops) {
+    showDialog(
+      context: context,
+      builder: (context) => ImageGalleryDialog(
+        title: 'บิลสาขา ${shops.first.shopid}',
+        shops: shops,
       ),
     );
   }
@@ -231,16 +338,23 @@ class BranchDataSource extends DataTableSource {
   Widget _buildResponsibleCell() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
+      /*decoration: BoxDecoration(
         color: const Color(0xFF6366F1).withOpacity(0.1),
         borderRadius: BorderRadius.circular(6),
-      ),
+      ),*/
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.smart_toy, size: 14, color: Color(0xFF6366F1)),
-          SizedBox(width: 6),
-          Text('ระบบอัตโนมัติ', style: TextStyle(color: Color(0xFF6366F1), fontWeight: FontWeight.w600, fontSize: 12)),
+          //Icon(Icons.smart_toy, size: 14, color: Color(0xFF6366F1)),
+          //SizedBox(width: 6),
+          Text(
+            'สมชาย ใจดี',
+            style: TextStyle(
+              color: Color(0xFF6366F1),
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
         ],
       ),
     );
@@ -258,7 +372,8 @@ class BranchDataSource extends DataTableSource {
     for (final shop in shops) {
       if (shop.daily != null) {
         for (final dailyTransaction in shop.daily!) {
-          if (dailyTransaction.timestamp != null && dailyTransaction.timestamp!.startsWith(targetDate)) {
+          if (dailyTransaction.timestamp != null &&
+              dailyTransaction.timestamp!.startsWith(targetDate)) {
             total += dailyTransaction.deposit ?? 0.0;
           }
         }
@@ -312,20 +427,10 @@ class BranchDataSource extends DataTableSource {
     );
   }
 
-  void _showJournalDialog(String shopId, List<DocDetails> shops) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('ข้อมูลสาขา: $shopId'),
-        content: Text('มีข้อมูล ${shops.length} รายการ'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('ปิด')),
-        ],
-      ),
-    );
-  }
-
-  void _showJournalDialogForBranch(String shopId, List<DocDetails> shops) async {
+  void _showJournalDialogForBranch(
+    String shopId,
+    List<DocDetails> shops,
+  ) async {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -333,11 +438,19 @@ class BranchDataSource extends DataTableSource {
     );
 
     try {
-      final journalResponse = await JournalService.getAllJournals(shopId: shopId, limit: 1000);
+      final journalResponse = await JournalService.getAllJournals(
+        shopId: shopId,
+        limit: 1000,
+      );
       if (context.mounted) Navigator.of(context).pop();
       if (context.mounted) {
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (context) => JournalPage(branchSync: shopId, journals: journalResponse.journals ?? [])),
+          MaterialPageRoute(
+            builder: (context) => JournalPage(
+              branchSync: shopId,
+              journals: journalResponse.journals ?? [],
+            ),
+          ),
         );
       }
     } catch (e) {
@@ -348,7 +461,12 @@ class BranchDataSource extends DataTableSource {
           builder: (context) => AlertDialog(
             title: const Text('เกิดข้อผิดพลาด'),
             content: Text('ไม่สามารถโหลดข้อมูล Journal ได้\n${e.toString()}'),
-            actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('ปิด'))],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('ปิด'),
+              ),
+            ],
           ),
         );
       }

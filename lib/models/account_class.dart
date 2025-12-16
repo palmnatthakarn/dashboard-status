@@ -6,6 +6,7 @@ enum AccountClass {
   expenses,
   assets,
   liabilities,
+  equity,
   unknown;
 
   static AccountClass fromString(String? type) {
@@ -24,6 +25,10 @@ enum AccountClass {
       case 'LIABILITIES':
       case 'หนี้สิน':
         return AccountClass.liabilities;
+      case 'EQUITY':
+      case 'ทุน':
+      case 'ส่วนของผู้ถือหุ้น':
+        return AccountClass.equity;
       default:
         return AccountClass.unknown;
     }
@@ -39,6 +44,8 @@ enum AccountClass {
         return 'สินทรัพย์';
       case AccountClass.liabilities:
         return 'หนี้สิน';
+      case AccountClass.equity:
+        return 'ทุน';
       case AccountClass.unknown:
         return '-';
     }
@@ -53,6 +60,8 @@ enum AccountClass {
         return const Color(0xFFEF4444);
       case AccountClass.assets:
         return const Color(0xFF3B82F6);
+      case AccountClass.equity:
+        return const Color(0xFF8B5CF6);
       case AccountClass.unknown:
         return const Color(0xFF64748B);
     }
