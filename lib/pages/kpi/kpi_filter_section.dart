@@ -50,7 +50,7 @@ class KpiFilterSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+       // color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -69,7 +69,7 @@ class KpiFilterSection extends StatelessWidget {
               children: [
                 // 1. Search Field (Expanded)
                 Expanded(
-                  flex: 2,
+                  flex: 3,
                   child: Container(
                     height: 48,
                     padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -175,7 +175,7 @@ class KpiFilterSection extends StatelessWidget {
                   children: [
                     _buildCompactDateSelector(
                       context,
-                      'วันที่รับเอกสาร',
+                      'วันที่รับเอกสาร (ไม่ใช่วันที่ตามเอกสาร)',
                       documentReceiveStartDate,
                       onStartDateChanged,
                     ),

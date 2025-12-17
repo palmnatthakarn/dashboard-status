@@ -309,8 +309,8 @@ class BranchDataSource extends DataTableSource {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-           // Icon(Icons.image_rounded, size: 14, color: color),
-           // const SizedBox(width: 6),
+            // Icon(Icons.image_rounded, size: 14, color: color),
+            // const SizedBox(width: 6),
             Text(
               '$imageCount รูป',
               style: TextStyle(

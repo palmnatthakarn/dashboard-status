@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:moniter/pages/daily_journal_page.dart';
+
 import 'package:moniter/pages/report_page.dart';
+import 'package:moniter/pages/tax_page.dart';
+import '../pages/financial_statements_page.dart';
 import '../components/app_sidebar.dart';
 import '../dashboard_screen.dart';
 import '../pages/kpi/kpi_page.dart';
@@ -92,9 +96,10 @@ class _MainLayoutState extends State<MainLayout> {
     const KpiPage(),
     const DocumentsPage(),
     const ReportPage(title: 'รายงานภาพรวม'),
-    const ReportPage(title: 'รายงานการเงิน'),
-    const ReportPage(title: 'รายงานภาษี'),
-    const ReportPage(title: 'รายงานรายวัน'),
+    const FinancialStatementsPage(),
+    const TaxPage(),
+
+    const DailyJournalPage(),
     const SettingsPage(),
   ];
 

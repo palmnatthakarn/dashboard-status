@@ -49,24 +49,7 @@ class AppSidebar extends StatefulWidget {
       selectedIcon: Icons.receipt_long_rounded,
       isSubItem: true,
     ),
-    SidebarMenuItem(
-      title: 'ลูกหนี้และการขาย',
-      icon: Icons.monetization_on_outlined,
-      selectedIcon: Icons.monetization_on_rounded,
-      isSubItem: true,
-    ),
-    SidebarMenuItem(
-      title: 'เจ้าหนี้และการซื้อ',
-      icon: Icons.monetization_on_outlined,
-      selectedIcon: Icons.monetization_on_rounded,
-      isSubItem: true,
-    ),
-    SidebarMenuItem(
-      title: 'สินค้าคงคลัง',
-      icon: Icons.inventory_outlined,
-      selectedIcon: Icons.inventory_rounded,
-      isSubItem: true,
-    ),
+
     SidebarMenuItem(
       title: 'สมุดรายวัน',
       icon: Icons.calendar_today_outlined,
@@ -326,6 +309,7 @@ class _AppSidebarState extends State<AppSidebar> {
           onTap: () {
             if (isReportsItem) {
               setState(() => _isReportsExpanded = !_isReportsExpanded);
+              return;
             }
             widget.onItemSelected(index);
           },
