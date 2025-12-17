@@ -20,7 +20,8 @@ class StatCard extends StatefulWidget {
   State<StatCard> createState() => _StatCardState();
 }
 
-class _StatCardState extends State<StatCard> with SingleTickerProviderStateMixin {
+class _StatCardState extends State<StatCard>
+    with SingleTickerProviderStateMixin {
   bool _hovering = false;
 
   @override
@@ -43,18 +44,18 @@ class _StatCardState extends State<StatCard> with SingleTickerProviderStateMixin
             decoration: BoxDecoration(
               gradient: widget.gradient,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.black.withOpacity(0.04)),
+              border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
               boxShadow: _hovering
                   ? [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.12),
+                        color: Colors.black.withValues(alpha: 0.12),
                         blurRadius: 16,
                         offset: const Offset(0, 6),
                       ),
                     ]
                   : [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
+                        color: Colors.black.withValues(alpha: 0.06),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -71,7 +72,9 @@ class _StatCardState extends State<StatCard> with SingleTickerProviderStateMixin
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(_hovering ? 0.15 : 0.06),
+                        color: Colors.black.withValues(
+                          alpha: _hovering ? 0.15 : 0.06,
+                        ),
                         blurRadius: _hovering ? 12 : 8,
                         offset: const Offset(0, 2),
                       ),
@@ -108,7 +111,9 @@ class _StatCardState extends State<StatCard> with SingleTickerProviderStateMixin
                         ),
                         child: Text(
                           widget.value,
-                          key: ValueKey(widget.value), // trigger animation เมื่อค่าเปลี่ยน
+                          key: ValueKey(
+                            widget.value,
+                          ), // trigger animation เมื่อค่าเปลี่ยน
                           style: const TextStyle(
                             color: Color(0xFF0F172A),
                             fontSize: 20,

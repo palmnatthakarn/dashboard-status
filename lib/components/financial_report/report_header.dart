@@ -9,13 +9,13 @@ class ReportHeader extends StatelessWidget {
   final Function(String) onExport;
 
   const ReportHeader({
-    Key? key,
+    super.key,
     required this.selectedReportType,
     required this.startDate,
     required this.endDate,
     required this.onFullScreen,
     required this.onExport,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -89,9 +89,9 @@ class ReportHeader extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: color.withOpacity(0.2)),
+            border: Border.all(color: color.withValues(alpha: 0.2)),
           ),
           child: Row(
             children: [

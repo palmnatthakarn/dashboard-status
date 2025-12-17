@@ -57,7 +57,7 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
         imageid: 'mock_$i',
         category: category,
         subcategory: 'รายละเอียดบิลใบที่ ${i + 1}',
-        description: '${i.toString().padLeft(2, '0')}',
+        description: i.toString().padLeft(2, '0'),
         uploadedAt: DateTime.now()
             .subtract(Duration(minutes: i * 10))
             .toIso8601String(),
@@ -92,7 +92,7 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 30,
               offset: const Offset(0, 10),
             ),
@@ -176,7 +176,7 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF3B82F6).withOpacity(0.1),
+              color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
@@ -249,7 +249,7 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -287,7 +287,7 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
                     ),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? const Color(0xFF3B82F6).withOpacity(0.1)
+                          ? const Color(0xFF3B82F6).withValues(alpha: 0.1)
                           : const Color(0xFFF3F4F6),
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -347,7 +347,7 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
           border: Border.all(color: const Color(0xFFE5E7EB)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -512,7 +512,7 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
                 onPressed: () => Navigator.of(context).pop(),
                 icon: const Icon(Icons.close_rounded, color: Colors.black54),
                 style: IconButton.styleFrom(
-                  backgroundColor: Colors.white.withOpacity(0.8),
+                  backgroundColor: Colors.white.withValues(alpha: 0.8),
                 ),
               ),
             ),

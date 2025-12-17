@@ -72,22 +72,22 @@ class _JournalTableState extends State<JournalTable> {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: DataTable2(
-              columnSpacing: 24,
-              horizontalMargin: 20,
-              headingRowHeight: 56,
-              dataRowHeight: 64,
+              columnSpacing: 16,
+              horizontalMargin: 16,
+              headingRowHeight: 44,
+              dataRowHeight: 52,
               minWidth: 900,
               sortColumnIndex: widget.sortColumnIndex,
               sortAscending: widget.sortAscending,
               headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
               headingTextStyle: const TextStyle(
                 fontWeight: FontWeight.w700,
-                fontSize: 13,
+                fontSize: 11,
                 color: Color(0xFF374151),
                 letterSpacing: 0.3,
               ),
               dataTextStyle: const TextStyle(
-                fontSize: 13,
+                fontSize: 11,
                 color: Color(0xFF1F2937),
               ),
               dividerThickness: 0,
@@ -193,15 +193,11 @@ class _JournalTableState extends State<JournalTable> {
           ? MainAxisAlignment.end
           : MainAxisAlignment.start,
       children: [
-        Icon(icon, size: 14, color: const Color(0xFF6B7280)),
-        const SizedBox(width: 6),
+        Icon(icon, size: 12, color: const Color(0xFF6B7280)),
+        const SizedBox(width: 4),
         Text(
           text,
-          style: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
-            color: Color(0xFF374151),
-          ),
+          style: const TextStyle(fontSize: 11, color: Color(0xFF374151)),
         ),
       ],
     );
@@ -214,11 +210,7 @@ class _JournalTableState extends State<JournalTable> {
     return DataCell(
       Text(
         date,
-        style: const TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 12,
-          color: Color(0xFF374151),
-        ),
+        style: const TextStyle(fontSize: 11, color: Color(0xFF374151)),
       ),
     );
   }
@@ -229,7 +221,7 @@ class _JournalTableState extends State<JournalTable> {
         message: name ?? '-',
         child: Text(
           name ?? '-',
-          style: const TextStyle(fontSize: 13, color: Color(0xFF1F2937)),
+          style: const TextStyle(fontSize: 11, color: Color(0xFF1F2937)),
           overflow: TextOverflow.ellipsis,
           maxLines: 2,
         ),
@@ -241,18 +233,18 @@ class _JournalTableState extends State<JournalTable> {
     final color = widget.typeColor(accountType);
     return DataCell(
       Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.3), width: 1),
+          border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
         ),
         child: Text(
           widget.typeDisplay(accountType),
           style: TextStyle(
             color: color,
             fontWeight: FontWeight.w700,
-            fontSize: 12,
+            fontSize: 10,
           ),
         ),
       ),
@@ -269,8 +261,8 @@ class _JournalTableState extends State<JournalTable> {
         child: amount > 0
             ? Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
+                  horizontal: 10,
+                  vertical: 4,
                 ),
                 decoration: BoxDecoration(
                   color: bgColor,
@@ -281,18 +273,11 @@ class _JournalTableState extends State<JournalTable> {
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     color: color,
-                    fontSize: 13,
+                    fontSize: 11,
                   ),
                 ),
               )
-            : Text(
-                '-',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[400],
-                  fontSize: 13,
-                ),
-              ),
+            : Text('-', style: TextStyle(fontSize: 11)),
       ),
     );
   }

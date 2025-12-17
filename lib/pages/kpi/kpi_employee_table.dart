@@ -38,7 +38,7 @@ class KpiEmployeeTable extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10),
         ],
       ),
       child: Column(
@@ -250,7 +250,7 @@ class KpiEmployeeTable extends StatelessWidget {
                         radius: 16 * fontScale,
                         backgroundColor: _getAvatarColor(
                           employee.name,
-                        ).withOpacity(0.1),
+                        ).withValues(alpha: 0.1),
                         child: Text(
                           employee.name.substring(0, 1),
                           style: TextStyle(
@@ -394,7 +394,7 @@ class KpiEmployeeTable extends StatelessWidget {
                                 Row(
                                   children: [
                                     Text(
-                                      '${data.employee}',
+                                      data.employee,
                                       style: TextStyle(
                                         fontSize: 12 * fontScale,
                                         color: Colors.grey[500],
@@ -527,7 +527,7 @@ class KpiEmployeeTable extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 /* decoration: value > 0
                     ? BoxDecoration(
-                        color: displayColor.withOpacity(0.1),
+                        color: displayColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       )
                     : null,*/
@@ -598,7 +598,7 @@ class KpiEmployeeTable extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: bg.withOpacity(0.5)),
+        border: Border.all(color: bg.withValues(alpha: 0.5)),
       ),
       child: Text(
         text,
@@ -641,7 +641,7 @@ class KpiEmployeeTable extends StatelessWidget {
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 4,
                   ),
                 ]

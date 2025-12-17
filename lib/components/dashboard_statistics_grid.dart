@@ -27,7 +27,7 @@ class DashboardStatisticsGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     // เพิ่ม error handling
     if (shops.isEmpty) {
-      return Container(
+      return SizedBox(
         height: 200,
         child: const Center(
           child: Text(
@@ -208,10 +208,10 @@ class _ModernStatCardState extends State<ModernStatCard>
           curve: Curves.easeInOut,
           transform: Matrix4.identity()
             ..scale((_isHovered || widget.isSelected) ? 1.02 : 1.0),
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             gradient: widget.gradient,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             border: widget.isSelected
                 ? Border.all(
                     color: Colors.white.withValues(alpha: 0.8),
@@ -223,8 +223,8 @@ class _ModernStatCardState extends State<ModernStatCard>
                 color: widget.gradient.colors.first.withValues(
                   alpha: (_isHovered || widget.isSelected) ? 0.5 : 0.3,
                 ),
-                blurRadius: (_isHovered || widget.isSelected) ? 20 : 12,
-                offset: Offset(0, (_isHovered || widget.isSelected) ? 8 : 4),
+                blurRadius: (_isHovered || widget.isSelected) ? 14 : 8,
+                offset: Offset(0, (_isHovered || widget.isSelected) ? 6 : 3),
               ),
             ],
           ),
@@ -233,15 +233,15 @@ class _ModernStatCardState extends State<ModernStatCard>
               // คำนวณขนาดฟอนต์ตามขนาด container
               final isCompact = constraints.maxWidth < 200;
               final titleFontSize = isCompact
-                  ? (_isHovered ? 12.0 : 11.0)
-                  : (_isHovered ? 14.0 : 13.0);
+                  ? (_isHovered ? 10.0 : 9.0)
+                  : (_isHovered ? 11.0 : 10.0);
               final valueFontSize = isCompact
-                  ? (_isHovered ? 24.0 : 22.0)
-                  : (_isHovered ? 30.0 : 28.0);
-              final iconSize = isCompact ? 40.0 : (_isHovered ? 52.0 : 50.0);
+                  ? (_isHovered ? 18.0 : 16.0)
+                  : (_isHovered ? 22.0 : 20.0);
+              final iconSize = isCompact ? 32.0 : (_isHovered ? 40.0 : 36.0);
 
               return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // ฝั่งข้อความ
                   Expanded(
@@ -263,7 +263,7 @@ class _ModernStatCardState extends State<ModernStatCard>
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        SizedBox(height: isCompact ? 8 : 12),
+                        SizedBox(height: isCompact ? 4 : 8),
                         TweenAnimationBuilder<double>(
                           duration: const Duration(milliseconds: 1000),
                           curve: Curves.easeOutCubic,
@@ -303,7 +303,7 @@ class _ModernStatCardState extends State<ModernStatCard>
                             color: Colors.white.withValues(
                               alpha: _isHovered ? 1.0 : 0.9,
                             ),
-                            fontSize: isCompact ? 10.0 : 12.0,
+                            fontSize: isCompact ? 9.0 : 10.0,
                             fontWeight: FontWeight.w500,
                           ),
                           child: Text(widget.subtitle),
@@ -324,14 +324,14 @@ class _ModernStatCardState extends State<ModernStatCard>
                             duration: const Duration(milliseconds: 200),
                             curve: Curves.easeInOut,
                             padding: EdgeInsets.all(
-                              isCompact ? 6 : (_isHovered ? 12 : 10),
+                              isCompact ? 4 : (_isHovered ? 8 : 6),
                             ),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(
                                 alpha: _isHovered ? 0.25 : 0.2,
                               ),
                               borderRadius: BorderRadius.circular(
-                                isCompact ? 8 : 12,
+                                isCompact ? 6 : 10,
                               ),
                             ),
                             child: AnimatedRotation(
@@ -414,7 +414,7 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
             final isCompact = constraints.maxWidth < 250;
 
             return Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisSize: MainAxisSize.max,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Header
@@ -430,8 +430,8 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: isCompact
-                                  ? (_isHovered ? 13.0 : 12.0)
-                                  : (_isHovered ? 15.0 : 14.0),
+                                  ? (_isHovered ? 11.0 : 10.0)
+                                  : (_isHovered ? 12.0 : 11.0),
                               fontWeight: FontWeight.w500,
                             ),
                             child: Text(
@@ -453,8 +453,8 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: isCompact
-                                        ? (_isHovered ? 22.0 : 20.0)
-                                        : (_isHovered ? 28.0 : 24.0),
+                                        ? (_isHovered ? 18.0 : 16.0)
+                                        : (_isHovered ? 22.0 : 20.0),
                                     fontWeight: FontWeight.w700,
                                     height: 1.2,
                                   ),
@@ -471,7 +471,7 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
                               color: Colors.white.withValues(
                                 alpha: _isHovered ? 1.0 : 0.9,
                               ),
-                              fontSize: isCompact ? 10.0 : 12.0,
+                              fontSize: isCompact ? 9.0 : 10.0,
                               fontWeight: FontWeight.w500,
                             ),
                             child: Text('ฉบับ'),
@@ -498,7 +498,7 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
                         child: Icon(
                           Icons.folder_rounded,
                           color: Colors.white,
-                          size: isCompact ? 36.0 : (_isHovered ? 52.0 : 48.0),
+                          size: isCompact ? 28.0 : (_isHovered ? 40.0 : 36.0),
                         ),
                       ),
                     ),
@@ -603,8 +603,8 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: isCompact
-                      ? (isHovered ? 11.0 : 10.0)
-                      : (isHovered ? 13.0 : 12.0),
+                      ? (isHovered ? 9.0 : 8.0)
+                      : (isHovered ? 10.0 : 9.0),
                   fontWeight: FontWeight.w400,
                 ),
                 child: Text(
@@ -624,8 +624,8 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
             style: TextStyle(
               color: Colors.white,
               fontSize: isCompact
-                  ? (isHovered ? 14.0 : 12.0)
-                  : (isHovered ? 18.0 : 16.0),
+                  ? (isHovered ? 12.0 : 10.0)
+                  : (isHovered ? 14.0 : 12.0),
               fontWeight: FontWeight.w600,
             ),
             child: Text(value),
@@ -663,8 +663,8 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: isCompact
-                      ? (isHovered ? 9.0 : 8.0)
-                      : (isHovered ? 11.0 : 10.0),
+                      ? (isHovered ? 8.0 : 7.0)
+                      : (isHovered ? 9.0 : 8.0),
                   fontWeight: FontWeight.w400,
                 ),
                 child: Text(
@@ -692,8 +692,8 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: isCompact
-                          ? (isHovered ? 12.0 : 10.0)
-                          : (isHovered ? 16.0 : 14.0),
+                          ? (isHovered ? 10.0 : 9.0)
+                          : (isHovered ? 12.0 : 11.0),
                       fontWeight: FontWeight.w600,
                     ),
                     child: Text(
@@ -706,8 +706,8 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: isCompact
-                        ? (isHovered ? 7.0 : 6.0)
-                        : (isHovered ? 9.0 : 8.0),
+                        ? (isHovered ? 6.0 : 5.0)
+                        : (isHovered ? 7.0 : 6.0),
                     fontWeight: FontWeight.w400,
                   ),
                   child: Text('ไฟล์'),

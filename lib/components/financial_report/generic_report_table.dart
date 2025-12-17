@@ -35,13 +35,13 @@ class GenericReportTable extends StatelessWidget {
                   context,
                 ).copyWith(dividerColor: Colors.grey.shade200),
                 child: DataTable(
-                  headingRowColor: MaterialStateProperty.all(
+                  headingRowColor: WidgetStateProperty.all(
                     const Color(0xFFF1F5F9), // Slate 100
                   ),
-                  dataRowColor: MaterialStateProperty.resolveWith<Color?>((
+                  dataRowColor: WidgetStateProperty.resolveWith<Color?>((
                     states,
                   ) {
-                    if (states.contains(MaterialState.hovered)) {
+                    if (states.contains(WidgetState.hovered)) {
                       return const Color(
                         0xFFF8FAFC,
                       ); // Very light slate on hover
@@ -108,9 +108,9 @@ class GenericReportTable extends StatelessWidget {
                         : const Color(0xFF475569);
 
                     return DataRow(
-                      color: MaterialStateProperty.resolveWith((states) {
-                        if (states.contains(MaterialState.hovered)) {
-                          return const Color(0xFFE2E8F0).withOpacity(0.4);
+                      color: WidgetStateProperty.resolveWith((states) {
+                        if (states.contains(WidgetState.hovered)) {
+                          return const Color(0xFFE2E8F0).withValues(alpha: 0.4);
                         }
                         return rowColor;
                       }),

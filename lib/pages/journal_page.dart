@@ -273,7 +273,7 @@ class _JournalPageState extends State<JournalPage> {
       decoration: BoxDecoration(
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF3B82F6).withOpacity(0.3),
+            color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 8),
           ),
@@ -295,7 +295,7 @@ class _JournalPageState extends State<JournalPage> {
 
   Widget _buildSimpleToolbar(bool isWideScreen) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+      margin: const EdgeInsets.symmetric(horizontal: 12),
       child: Column(
         children: [
           // Search Row
@@ -312,7 +312,7 @@ class _JournalPageState extends State<JournalPage> {
             children: [
               Expanded(
                 child: SizedBox(
-                  height: 40,
+                  height: 32,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     children: [
@@ -357,14 +357,14 @@ class _JournalPageState extends State<JournalPage> {
 
   Widget _buildSearchField() {
     return Container(
-      height: 48,
+      height: 38,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -376,11 +376,11 @@ class _JournalPageState extends State<JournalPage> {
           _search = v;
           _clearCache();
         }),
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
         decoration: InputDecoration(
           prefixIcon: const Icon(
             Icons.search_rounded,
-            size: 22,
+            size: 18,
             color: Color(0xFF6B7280),
           ),
           suffixIcon: _search.isNotEmpty
@@ -400,7 +400,7 @@ class _JournalPageState extends State<JournalPage> {
                 )
               : null,
           hintText: 'ค้นหาเลขที่เอกสาร, รายการ...',
-          hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+          hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
@@ -415,11 +415,11 @@ class _JournalPageState extends State<JournalPage> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -448,14 +448,14 @@ class _JournalPageState extends State<JournalPage> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: isActive ? const Color(0xFFEFF6FF) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
           icon,
-          size: 20,
+          size: 16,
           color: isActive ? const Color(0xFF3B82F6) : const Color(0xFF6B7280),
         ),
       ),
@@ -483,7 +483,7 @@ class _JournalPageState extends State<JournalPage> {
         borderRadius: BorderRadius.circular(30),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: isSelected ? color : Colors.white,
             borderRadius: BorderRadius.circular(30),
@@ -494,7 +494,7 @@ class _JournalPageState extends State<JournalPage> {
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: color.withOpacity(0.3),
+                      color: color.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -504,14 +504,14 @@ class _JournalPageState extends State<JournalPage> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 16, color: isSelected ? Colors.white : color),
-              const SizedBox(width: 8),
+              Icon(icon, size: 14, color: isSelected ? Colors.white : color),
+              const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
                   color: isSelected ? Colors.white : const Color(0xFF374151),
                   fontWeight: FontWeight.w600,
-                  fontSize: 13,
+                  fontSize: 11,
                 ),
               ),
             ],
@@ -523,14 +523,14 @@ class _JournalPageState extends State<JournalPage> {
 
   Widget _buildDateFilterDropdown() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(30),
         border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -542,14 +542,10 @@ class _JournalPageState extends State<JournalPage> {
           isDense: true,
           icon: const Icon(
             Icons.keyboard_arrow_down_rounded,
-            size: 20,
+            size: 16,
             color: Color(0xFF6B7280),
           ),
-          style: const TextStyle(
-            color: Color(0xFF374151),
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
           items: _dateFilters.map((e) {
             return DropdownMenuItem(
               value: e[0],
@@ -621,7 +617,7 @@ class _JournalPageState extends State<JournalPage> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF3B82F6).withOpacity(0.3),
+                  color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
@@ -641,7 +637,7 @@ class _JournalPageState extends State<JournalPage> {
                 const Text(
                   'Journal',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: Color(0xFF111827),
                     letterSpacing: -0.5,
@@ -658,7 +654,7 @@ class _JournalPageState extends State<JournalPage> {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF10B981).withOpacity(0.4),
+                            color: const Color(0xFF10B981).withValues(alpha: 0.4),
                             blurRadius: 4,
                           ),
                         ],
@@ -668,7 +664,7 @@ class _JournalPageState extends State<JournalPage> {
                     Text(
                       'สาขา: ${widget.branchSync} • $itemCount รายการ',
                       style: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 11,
                         color: Color(0xFF6B7280),
                         fontWeight: FontWeight.w500,
                       ),
@@ -816,7 +812,7 @@ class _JournalPageState extends State<JournalPage> {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, color: color, size: 20),
@@ -875,7 +871,7 @@ class _JournalPageState extends State<JournalPage> {
     ];
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      margin: const EdgeInsets.fromLTRB(12, 12, 12, 12),
       child: isWideScreen
           ? Row(
               children: cards
@@ -913,87 +909,76 @@ class _JournalPageState extends State<JournalPage> {
     bool isPrimary = false,
   }) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: isPrimary
-            ? color
-            : Colors.white, // Solid color for primary, white for others
-        borderRadius: BorderRadius.circular(20),
+        color: isPrimary ? color : Colors.white,
+        borderRadius: BorderRadius.circular(12),
         border: isPrimary
             ? null
             : Border.all(color: const Color(0xFFE5E7EB), width: 1),
         boxShadow: [
           BoxShadow(
             color: isPrimary
-                ? color.withOpacity(0.3)
-                : Colors.black.withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
+                ? color.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: isPrimary
-                      ? Colors.white.withOpacity(0.2)
-                      : color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  size: 20,
-                  color: isPrimary ? Colors.white : color,
-                ),
-              ),
-              if (isPrimary)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Tooltip(
-                    message: 'กำไร = รายได้ - รายจ่าย',
-                    child: Icon(
-                      Icons.info_outline_rounded,
-                      size: 14,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
               color: isPrimary
-                  ? Colors.white.withOpacity(0.9)
-                  : const Color(0xFF6B7280),
-              fontWeight: FontWeight.w600,
+                  ? Colors.white.withValues(alpha: 0.2)
+                  : color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              size: 18,
+              color: isPrimary ? Colors.white : color,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            _compactFmt.format(value),
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: isPrimary ? Colors.white : const Color(0xFF1F2937),
-              letterSpacing: -0.5,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isPrimary
+                        ? Colors.white.withValues(alpha: 0.9)
+                        : const Color(0xFF6B7280),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Text(
+                  _compactFmt.format(value),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: isPrimary ? Colors.white : const Color(0xFF1F2937),
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ],
             ),
           ),
+          if (isPrimary)
+            Tooltip(
+              message: 'กำไร = รายได้ - รายจ่าย',
+              child: Icon(
+                Icons.info_outline_rounded,
+                size: 14,
+                color: Colors.white.withValues(alpha: 0.7),
+              ),
+            ),
         ],
       ),
     );
@@ -1001,7 +986,7 @@ class _JournalPageState extends State<JournalPage> {
 
   Widget _buildMainContent(List<Journal> filtered) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+      margin: const EdgeInsets.symmetric(horizontal: 12),
       padding: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1009,7 +994,7 @@ class _JournalPageState extends State<JournalPage> {
         border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),

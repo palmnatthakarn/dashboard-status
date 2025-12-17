@@ -32,7 +32,7 @@ class StockHelper {
     final quantity = formatQuantity(stock.quantityBalance);
     final unit = stock.unitName ?? '';
     
-    return '$productName (${quantity} ${unit})';
+    return '$productName ($quantity $unit)';
   }
 
   /// Get stock status based on quantity

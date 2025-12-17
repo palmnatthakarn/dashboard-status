@@ -504,9 +504,9 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
 
       // Status logic based on pending/completed
       String status = statuses[random.nextInt(statuses.length)];
-      if (pending == 0)
+      if (pending == 0) {
         status = 'completed';
-      else if (pending > assigned / 2)
+      } else if (pending > assigned / 2)
         status = 'pending';
 
       return KpiEmployee(

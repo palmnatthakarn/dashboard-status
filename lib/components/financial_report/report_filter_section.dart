@@ -11,7 +11,7 @@ class ReportFilterSection extends StatelessWidget {
   final VoidCallback onEndDateTap;
 
   const ReportFilterSection({
-    Key? key,
+    super.key,
     required this.reportTypes,
     required this.selectedReportType,
     required this.startDate,
@@ -19,73 +19,126 @@ class ReportFilterSection extends StatelessWidget {
     required this.onReportTypeChanged,
     required this.onStartDateTap,
     required this.onEndDateTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      /* decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),*/
-      child: Row(
-        children: [
-          Expanded(flex: 3, child: _buildCompactDropdown()),
-          Container(
-            height: 24,
-            width: 1,
-            color: Colors.grey.shade200,
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-          ),
-          Expanded(
-            flex: 1,
-            child: Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isSmallScreen = constraints.maxWidth < 800;
+
+        if (isSmallScreen) {
+          // For small screens, use Wrap to allow elements to flow
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 12,
               children: [
-                Expanded(
-                  child: _buildCompactDatePicker(
-                    label: 'จากวันที่',
-                    selectedDate: startDate,
-                    onTap: onStartDateTap,
+                SizedBox(
+                  width: constraints.maxWidth > 400
+                      ? constraints.maxWidth * 0.5
+                      : constraints.maxWidth - 32,
+                  child: _buildCompactDropdown(),
+                ),
+                SizedBox(
+                  width: constraints.maxWidth > 400
+                      ? constraints.maxWidth * 0.4
+                      : constraints.maxWidth - 32,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildCompactDatePicker(
+                          label: 'จากวันที่',
+                          selectedDate: startDate,
+                          onTap: onStartDateTap,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 16,
+                          color: Colors.grey.shade400,
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildCompactDatePicker(
+                          label: 'ถึงวันที่',
+                          selectedDate: endDate,
+                          onTap: onEndDateTap,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 16,
-                    color: Colors.grey.shade400,
-                  ),
-                ),
-                Expanded(
-                  child: _buildCompactDatePicker(
-                    label: 'ถึงวันที่',
-                    selectedDate: endDate,
-                    onTap: onEndDateTap,
-                  ),
+                _buildActionButton(
+                  icon: Icons.search_rounded,
+                  label: 'ค้นหา',
+                  color: const Color(0xFF3B82F6),
+                  textColor: Colors.white,
+                  onTap: () {},
                 ),
               ],
             ),
+          );
+        }
+
+        // For larger screens, use the original Row layout
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Expanded(flex: 3, child: _buildCompactDropdown()),
+              Container(
+                height: 24,
+                width: 1,
+                color: Colors.grey.shade200,
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+              ),
+              Expanded(
+                flex: 1,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildCompactDatePicker(
+                        label: 'จากวันที่',
+                        selectedDate: startDate,
+                        onTap: onStartDateTap,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 16,
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildCompactDatePicker(
+                        label: 'ถึงวันที่',
+                        selectedDate: endDate,
+                        onTap: onEndDateTap,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Container(width: 1, height: 24, color: const Color(0xFFE2E8F0)),
+              const SizedBox(width: 16),
+              _buildActionButton(
+                icon: Icons.search_rounded,
+                label: 'ค้นหา',
+                color: const Color(0xFF3B82F6),
+                textColor: Colors.white,
+                onTap: () {},
+              ),
+            ],
           ),
-          const SizedBox(width: 16),
-          Container(width: 1, height: 24, color: const Color(0xFFE2E8F0)),
-          const SizedBox(width: 16),
-          _buildActionButton(
-            icon: Icons.search_rounded,
-            label: 'ค้นหา',
-            color: const Color(0xFF3B82F6),
-            textColor: Colors.white,
-            onTap: () {}, // This could trigger a refresh if needed
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -97,7 +150,7 @@ class ReportFilterSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -218,7 +271,7 @@ class ReportFilterSection extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class ReportEmptyState extends StatelessWidget {
-  const ReportEmptyState({Key? key}) : super(key: key);
+  const ReportEmptyState({super.key});
 
   @override
   Widget build(BuildContext context) {

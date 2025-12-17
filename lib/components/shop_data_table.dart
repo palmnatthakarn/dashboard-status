@@ -120,15 +120,15 @@ class _ShopDataTableState extends State<ShopDataTable>
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF3B82F6).withOpacity(0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
+            color: const Color(0xFF3B82F6).withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 12,
             offset: const Offset(0, 2),
           ),
@@ -136,7 +136,7 @@ class _ShopDataTableState extends State<ShopDataTable>
         border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,9 +147,9 @@ class _ShopDataTableState extends State<ShopDataTable>
             ),
             const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
             ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 400, maxHeight: 450),
+              constraints: const BoxConstraints(minHeight: 300, maxHeight: 350),
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(12),
                 child: _buildDataTable(dataSource),
               ),
             ),
@@ -179,11 +179,11 @@ class _ShopDataTableState extends State<ShopDataTable>
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: DataTable2(
-              columnSpacing: 12,
-              horizontalMargin: 16,
-              minWidth: 1100,
-              headingRowHeight: 56,
-              dataRowHeight: 72,
+              columnSpacing: 8,
+              horizontalMargin: 12,
+              minWidth: 1000,
+              headingRowHeight: 44,
+              dataRowHeight: 52,
               headingRowColor: WidgetStateProperty.all(const Color(0xFFF9FAFB)),
               showCheckboxColumn: false,
               columns: _buildColumns(),
@@ -191,7 +191,7 @@ class _ShopDataTableState extends State<ShopDataTable>
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
         CustomPagination(
           currentPage: _currentPage,
           totalItems: totalRows,
@@ -211,21 +211,39 @@ class _ShopDataTableState extends State<ShopDataTable>
     const headerStyle = TextStyle(
       fontWeight: FontWeight.w600,
       color: Color(0xFF6B7280),
-      fontSize: 13,
+      fontSize: 11,
     );
 
     return const [
       DataColumn2(label: Text('สถานะ', style: headerStyle), fixedWidth: 60),
       DataColumn2(
         label: Text('ชื่อสาขา', style: headerStyle),
-        size: ColumnSize.L  ,
+        size: ColumnSize.L,
       ),
-      DataColumn2(label: Text('รหัสสาขา', style: headerStyle),size: ColumnSize.M,),
-      DataColumn2(label: Text('รายวัน', style: headerStyle), size: ColumnSize.S,),
-      DataColumn2(label: Text('รายเดือน', style: headerStyle),size: ColumnSize.S,),
-      DataColumn2(label: Text('รายปี', style: headerStyle), size: ColumnSize.S,),
-      DataColumn2(label: Text('Journal', style: headerStyle), size: ColumnSize.S,),
-      DataColumn2(label: Text('บิล', style: headerStyle), size: ColumnSize.S,),
+      DataColumn2(
+        label: Text('รหัสสาขา', style: headerStyle),
+        size: ColumnSize.M,
+      ),
+      DataColumn2(
+        label: Text('รายวัน', style: headerStyle),
+        size: ColumnSize.S,
+      ),
+      DataColumn2(
+        label: Text('รายเดือน', style: headerStyle),
+        size: ColumnSize.S,
+      ),
+      DataColumn2(
+        label: Text('รายปี', style: headerStyle),
+        size: ColumnSize.S,
+      ),
+      DataColumn2(
+        label: Text('Journal', style: headerStyle),
+        size: ColumnSize.S,
+      ),
+      DataColumn2(
+        label: Text('บิล', style: headerStyle),
+        size: ColumnSize.S,
+      ),
       DataColumn2(
         label: Text('ผู้รับผิดชอบ', style: headerStyle),
         size: ColumnSize.S,
@@ -234,7 +252,7 @@ class _ShopDataTableState extends State<ShopDataTable>
   }
 
   Widget _buildErrorState() {
-    return Container(
+    return SizedBox(
       height: 400,
       child: const Center(
         child: Column(

@@ -25,8 +25,9 @@ class JournalService {
     if (shopId != null) queryParams['branch_sync'] = shopId;
     if (startDate != null) queryParams['start_date'] = startDate;
     if (endDate != null) queryParams['end_date'] = endDate;
-    if (transactionType != null)
+    if (transactionType != null) {
       queryParams['transaction_type'] = transactionType;
+    }
     if (accountType != null) queryParams['account_type'] = accountType;
     if (status != null) queryParams['status'] = status;
 

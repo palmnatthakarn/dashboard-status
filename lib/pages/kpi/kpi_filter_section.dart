@@ -50,7 +50,7 @@ class KpiFilterSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-       // color: Colors.white,
+        // color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -62,188 +62,379 @@ class KpiFilterSection extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Main Toolbar
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: Row(
-              children: [
-                // 1. Search Field (Expanded)
-                Expanded(
-                  flex: 3,
-                  child: Container(
-                    height: 48,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.search_rounded,
-                          color: Color(0xFF94A3B8),
-                          size: 22,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextField(
-                            controller: searchController,
-                            decoration: InputDecoration(
-                              hintText: 'ค้นหาชื่อหรือรหัสพนักงาน...',
-                              hintStyle: TextStyle(
-                                color: Colors.grey[400],
-                                fontSize: 14,
-                              ),
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.zero,
-                              isDense: true,
-                            ),
-                          ),
-                        ),
-                        if (searchController.text.isNotEmpty)
-                          IconButton(
-                            icon: const Icon(Icons.clear_rounded, size: 18),
-                            color: const Color(0xFF94A3B8),
-                            onPressed: onClearSearch,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isSmallScreen = constraints.maxWidth < 900;
 
-                const SizedBox(width: 16),
-                Container(width: 1, height: 24, color: const Color(0xFFE2E8F0)),
-                const SizedBox(width: 16),
-
-                // 2. Branch Selector
-                SizedBox(
-                  width: 160,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
+                if (isSmallScreen) {
+                  // For small screens, use Wrap to allow elements to flow
+                  return Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
                     children: [
-                      Text(
-                        'สาขา',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[500],
-                          fontWeight: FontWeight.w500,
+                      // Search Field
+                      SizedBox(
+                        width: constraints.maxWidth > 500
+                            ? constraints.maxWidth * 0.5 - 12
+                            : constraints.maxWidth,
+                        child: Container(
+                          height: 48,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.search_rounded,
+                                color: Color(0xFF94A3B8),
+                                size: 22,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextField(
+                                  controller: searchController,
+                                  decoration: InputDecoration(
+                                    hintText: 'ค้นหาชื่อหรือรหัสพนักงาน...',
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey[400],
+                                      fontSize: 14,
+                                    ),
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.zero,
+                                    isDense: true,
+                                  ),
+                                ),
+                              ),
+                              if (searchController.text.isNotEmpty)
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.clear_rounded,
+                                    size: 18,
+                                  ),
+                                  color: const Color(0xFF94A3B8),
+                                  onPressed: onClearSearch,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                            ],
+                          ),
                         ),
                       ),
+                      // Branch Selector
                       SizedBox(
-                        height: 24,
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: selectedBranch,
-                            isExpanded: true,
-                            icon: const Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              size: 16,
+                        width: 160,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'สาขา',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[500],
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF334155),
+                            SizedBox(
+                              height: 24,
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: selectedBranch,
+                                  isExpanded: true,
+                                  icon: const Icon(
+                                    Icons.keyboard_arrow_down_rounded,
+                                    size: 16,
+                                  ),
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF334155),
+                                  ),
+                                  items:
+                                      [
+                                        'ทุกสาขา',
+                                        ...employees
+                                            .map((e) => e.branch)
+                                            .toSet(),
+                                      ].map((String value) {
+                                        return DropdownMenuItem<String>(
+                                          value: value,
+                                          child: Text(value),
+                                        );
+                                      }).toList(),
+                                  onChanged: (val) =>
+                                      val != null ? onBranchChanged(val) : null,
+                                ),
+                              ),
                             ),
-                            items:
-                                [
-                                  'ทุกสาขา',
-                                  ...employees.map((e) => e.branch).toSet(),
-                                ].map((String value) {
-                                  return DropdownMenuItem<String>(
-                                    value: value,
-                                    child: Text(value),
-                                  );
-                                }).toList(),
-                            onChanged: (val) =>
-                                val != null ? onBranchChanged(val) : null,
-                          ),
+                          ],
                         ),
+                      ),
+                      // Date Range
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildCompactDateSelector(
+                            context,
+                            'วันที่รับเอกสาร',
+                            documentReceiveStartDate,
+                            onStartDateChanged,
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 8),
+                            child: Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 14,
+                              color: Color(0xFFCBD5E1),
+                            ),
+                          ),
+                          _buildCompactDateSelector(
+                            context,
+                            'ถึงวันที่',
+                            documentReceiveEndDate,
+                            onEndDateChanged,
+                          ),
+                        ],
+                      ),
+                      // Action buttons
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            onPressed: onRefresh,
+                            icon: const Icon(Icons.refresh_rounded),
+                            color: const Color(0xFF64748B),
+                            tooltip: 'รีเฟรชข้อมูล',
+                          ),
+                          IconButton(
+                            onPressed: onToggleAdvancedFilter,
+                            icon: Icon(
+                              isAdvancedFilterExpanded
+                                  ? Icons.tune_rounded
+                                  : Icons.tune_outlined,
+                            ),
+                            color: isAdvancedFilterExpanded
+                                ? const Color(0xFF3B82F6)
+                                : const Color(0xFF64748B),
+                            tooltip: 'ตัวกรองเพิ่มเติม',
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: onSearch,
+                            icon: const Icon(Icons.search, size: 18),
+                            label: const Text('ค้นหา'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF3B82F6),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                ),
+                  );
+                }
 
-                const SizedBox(width: 16),
-                Container(width: 1, height: 24, color: const Color(0xFFE2E8F0)),
-                const SizedBox(width: 16),
-
-                // 3. Date Range Compact
-                Row(
+                // For larger screens, use Row layout
+                return Row(
                   children: [
-                    _buildCompactDateSelector(
-                      context,
-                      'วันที่รับเอกสาร (ไม่ใช่วันที่ตามเอกสาร)',
-                      documentReceiveStartDate,
-                      onStartDateChanged,
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Icon(
-                        Icons.arrow_forward_rounded,
-                        size: 14,
-                        color: Color(0xFFCBD5E1),
+                    // 1. Search Field (Expanded)
+                    Expanded(
+                      flex: 3,
+                      child: Container(
+                        height: 48,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.search_rounded,
+                              color: Color(0xFF94A3B8),
+                              size: 22,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextField(
+                                controller: searchController,
+                                decoration: InputDecoration(
+                                  hintText: 'ค้นหาชื่อหรือรหัสพนักงาน...',
+                                  hintStyle: TextStyle(
+                                    color: Colors.grey[400],
+                                    fontSize: 14,
+                                  ),
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.zero,
+                                  isDense: true,
+                                ),
+                              ),
+                            ),
+                            if (searchController.text.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(Icons.clear_rounded, size: 18),
+                                color: const Color(0xFF94A3B8),
+                                onPressed: onClearSearch,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                    _buildCompactDateSelector(
-                      context,
-                      'ถึงวันที่',
-                      documentReceiveEndDate,
-                      onEndDateChanged,
+
+                    const SizedBox(width: 16),
+                    Container(
+                      width: 1,
+                      height: 24,
+                      color: const Color(0xFFE2E8F0),
+                    ),
+                    const SizedBox(width: 16),
+
+                    // 2. Branch Selector
+                    SizedBox(
+                      width: 160,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'สาขา',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[500],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          SizedBox(
+                            height: 24,
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: selectedBranch,
+                                isExpanded: true,
+                                icon: const Icon(
+                                  Icons.keyboard_arrow_down_rounded,
+                                  size: 16,
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF334155),
+                                ),
+                                items:
+                                    [
+                                      'ทุกสาขา',
+                                      ...employees.map((e) => e.branch).toSet(),
+                                    ].map((String value) {
+                                      return DropdownMenuItem<String>(
+                                        value: value,
+                                        child: Text(value),
+                                      );
+                                    }).toList(),
+                                onChanged: (val) =>
+                                    val != null ? onBranchChanged(val) : null,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(width: 16),
+                    Container(
+                      width: 1,
+                      height: 24,
+                      color: const Color(0xFFE2E8F0),
+                    ),
+                    const SizedBox(width: 16),
+
+                    // 3. Date Range Compact
+                    Row(
+                      children: [
+                        _buildCompactDateSelector(
+                          context,
+                          'วันที่รับเอกสาร (ไม่ใช่วันที่ตามเอกสาร)',
+                          documentReceiveStartDate,
+                          onStartDateChanged,
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 14,
+                            color: Color(0xFFCBD5E1),
+                          ),
+                        ),
+                        _buildCompactDateSelector(
+                          context,
+                          'ถึงวันที่',
+                          documentReceiveEndDate,
+                          onEndDateChanged,
+                        ),
+                      ],
+                    ),
+
+                    const Spacer(),
+                    IconButton(
+                      onPressed: onRefresh,
+                      icon: const Icon(Icons.refresh_rounded),
+                      color: const Color(0xFF64748B),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                      ),
+                      tooltip: 'รีเฟรชข้อมูล',
+                    ),
+                    const SizedBox(width: 8),
+                    // 4. Tools and Toggle
+                    IconButton(
+                      onPressed: onToggleAdvancedFilter,
+                      icon: Icon(
+                        isAdvancedFilterExpanded
+                            ? Icons.tune_rounded
+                            : Icons.tune_outlined,
+                      ),
+                      color: isAdvancedFilterExpanded
+                          ? const Color(0xFF3B82F6)
+                          : const Color(0xFF64748B),
+                      style: IconButton.styleFrom(
+                        backgroundColor: isAdvancedFilterExpanded
+                            ? const Color(0xFFEFF6FF)
+                            : Colors.transparent,
+                      ),
+                      tooltip: 'ตัวกรองเพิ่มเติม',
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: onSearch,
+                      icon: const Icon(Icons.search, size: 18),
+                      label: const Text('ค้นหา'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF3B82F6),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                     ),
                   ],
-                ),
-
-                const Spacer(),
-                IconButton(
-                  onPressed: onRefresh,
-                  icon: const Icon(Icons.refresh_rounded),
-                  color: const Color(0xFF64748B),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                  ),
-                  tooltip: 'รีเฟรชข้อมูล',
-                ),
-                const SizedBox(width: 8),
-                // 4. Tools and Toggle
-                IconButton(
-                  onPressed: onToggleAdvancedFilter,
-                  icon: Icon(
-                    isAdvancedFilterExpanded
-                        ? Icons.tune_rounded
-                        : Icons.tune_outlined,
-                  ),
-                  color: isAdvancedFilterExpanded
-                      ? const Color(0xFF3B82F6)
-                      : const Color(0xFF64748B),
-                  style: IconButton.styleFrom(
-                    backgroundColor: isAdvancedFilterExpanded
-                        ? const Color(0xFFEFF6FF)
-                        : Colors.transparent,
-                  ),
-                  tooltip: 'ตัวกรองเพิ่มเติม',
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  onPressed: onSearch,
-                  icon: const Icon(Icons.search, size: 18),
-                  label: const Text('ค้นหา'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF3B82F6),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ],
+                );
+              },
             ),
           ),
 

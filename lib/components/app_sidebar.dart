@@ -76,7 +76,7 @@ class _AppSidebarState extends State<AppSidebar> {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeOutCubic,
-      width: widget.isCollapsed ? 80 : 260,
+      width: widget.isCollapsed ? 70 : 180,
       child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -86,8 +86,8 @@ class _AppSidebarState extends State<AppSidebar> {
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF64748B).withOpacity(0.08),
-              blurRadius: 24,
+              color: const Color(0xFF64748B).withValues(alpha: 0.08),
+              blurRadius: 16,
               offset: const Offset(4, 0),
             ),
           ],
@@ -99,8 +99,8 @@ class _AppSidebarState extends State<AppSidebar> {
             Expanded(
               child: ListView.builder(
                 padding: EdgeInsets.symmetric(
-                  horizontal: widget.isCollapsed ? 12 : 16,
-                  vertical: 8,
+                  horizontal: widget.isCollapsed ? 8 : 12,
+                  vertical: 6,
                 ),
                 itemCount: AppSidebar.menuItems.length,
                 itemBuilder: (context, index) {
@@ -133,8 +133,8 @@ class _AppSidebarState extends State<AppSidebar> {
   Widget _buildHeader() {
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: widget.isCollapsed ? 12 : 20,
-        vertical: 20,
+        horizontal: widget.isCollapsed ? 8 : 14,
+        vertical: 14,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -156,8 +156,8 @@ class _AppSidebarState extends State<AppSidebar> {
           child: GestureDetector(
             onTap: widget.onToggleCollapse,
             child: Container(
-              width: 46,
-              height: 46,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
@@ -167,10 +167,10 @@ class _AppSidebarState extends State<AppSidebar> {
                     Color.fromARGB(255, 50, 53, 245),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF6366F1).withOpacity(0.35),
+                    color: const Color(0xFF6366F1).withValues(alpha: 0.35),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -179,7 +179,7 @@ class _AppSidebarState extends State<AppSidebar> {
               child: const Icon(
                 Icons.dashboard_customize_rounded,
                 color: Colors.white,
-                size: 24,
+                size: 20,
               ),
             ),
           ),
@@ -192,8 +192,8 @@ class _AppSidebarState extends State<AppSidebar> {
     return Row(
       children: [
         Container(
-          width: 46,
-          height: 46,
+          width: 38,
+          height: 38,
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
@@ -203,10 +203,10 @@ class _AppSidebarState extends State<AppSidebar> {
                 Color.fromARGB(255, 50, 53, 245),
               ],
             ),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(10),
             boxShadow: [
               BoxShadow(
-                color: const Color.fromARGB(255, 65, 74, 242).withOpacity(0.35),
+                color: const Color.fromARGB(255, 65, 74, 242).withValues(alpha: 0.35),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -215,10 +215,10 @@ class _AppSidebarState extends State<AppSidebar> {
           child: const Icon(
             Icons.dashboard_customize_rounded,
             color: Colors.white,
-            size: 24,
+            size: 20,
           ),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -233,7 +233,7 @@ class _AppSidebarState extends State<AppSidebar> {
                 child: const Text(
                   'Account SAH',
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
                     letterSpacing: -0.5,
@@ -243,7 +243,7 @@ class _AppSidebarState extends State<AppSidebar> {
               Text(
                 'NameUser@gmail.com',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 10,
                   fontWeight: FontWeight.w500,
                   color: Colors.grey.shade500,
                   letterSpacing: 0.5,
@@ -264,10 +264,10 @@ class _AppSidebarState extends State<AppSidebar> {
         onTap: widget.onToggleCollapse,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             color: Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.grey.shade200),
           ),
           child: AnimatedRotation(
@@ -276,7 +276,7 @@ class _AppSidebarState extends State<AppSidebar> {
             child: Icon(
               Icons.chevron_left_rounded,
               color: Colors.grey.shade600,
-              size: 20,
+              size: 16,
             ),
           ),
         ),
@@ -298,7 +298,7 @@ class _AppSidebarState extends State<AppSidebar> {
 
     return Padding(
       padding: EdgeInsets.only(
-        bottom: 4,
+        bottom: 5,
         left: isSubItem && !widget.isCollapsed ? 12 : 0,
       ),
       child: MouseRegion(
@@ -317,8 +317,8 @@ class _AppSidebarState extends State<AppSidebar> {
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeOutCubic,
             padding: EdgeInsets.symmetric(
-              horizontal: widget.isCollapsed ? 0 : 10,
-              vertical: widget.isCollapsed ? 10 : 10,
+              horizontal: widget.isCollapsed ? 0 : 8,
+              vertical: widget.isCollapsed ? 8 : 8,
             ),
             decoration: BoxDecoration(
               gradient: isSelected
@@ -335,11 +335,11 @@ class _AppSidebarState extends State<AppSidebar> {
                       colors: [Colors.grey.shade100, Colors.grey.shade50],
                     )
                   : null,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               boxShadow: isSelected
                   ? [
                       BoxShadow(
-                        color: const Color(0xFF6366F1).withOpacity(0.3),
+                        color: const Color(0xFF6366F1).withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -379,9 +379,9 @@ class _AppSidebarState extends State<AppSidebar> {
   ) {
     return Column(
       children: [
-        Container(
-          width: 25,
-          height: 25,
+        SizedBox(
+          width: 22,
+          height: 22,
           child: Tooltip(
             message: label,
             preferBelow: false,
@@ -396,7 +396,7 @@ class _AppSidebarState extends State<AppSidebar> {
             ),
             textStyle: const TextStyle(
               color: Color.fromARGB(255, 92, 91, 91),
-              fontSize: 13,
+              fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
             child: Center(
@@ -410,7 +410,7 @@ class _AppSidebarState extends State<AppSidebar> {
                       : isHovered
                       ? const Color(0xFF6366F1)
                       : Colors.grey.shade600,
-                  size: 24,
+                  size: 20,
                 ),
               ),
             ),
@@ -439,14 +439,14 @@ class _AppSidebarState extends State<AppSidebar> {
         Container(
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: isSelected
-                  ? Colors.white.withOpacity(0.2)
+                  ? Colors.white.withValues(alpha: 0.2)
                   : isHovered
-                  ? const Color(0xFF6366F1).withOpacity(0.1)
+                  ? const Color(0xFF6366F1).withValues(alpha: 0.1)
                   : Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               isSelected ? selectedIcon : icon,
@@ -455,16 +455,16 @@ class _AppSidebarState extends State<AppSidebar> {
                   : isHovered
                   ? const Color(0xFF6366F1)
                   : Colors.grey.shade600,
-              size: isSubItem ? 18 : 22,
+              size: isSubItem ? 16 : 18,
             ),
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
             label,
             style: TextStyle(
-              fontSize: isSubItem ? 13 : 14,
+              fontSize: isSubItem ? 11 : 12,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
               color: isSelected
                   ? Colors.white
@@ -482,7 +482,7 @@ class _AppSidebarState extends State<AppSidebar> {
             _isReportsExpanded
                 ? Icons.keyboard_arrow_up_rounded
                 : Icons.keyboard_arrow_down_rounded,
-            size: 18,
+            size: 16,
             color: isSelected ? Colors.white : Colors.grey.shade500,
           ),
         ],
@@ -501,7 +501,7 @@ class _AppSidebarState extends State<AppSidebar> {
 
   Widget _buildBadge(String badge) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
@@ -509,7 +509,7 @@ class _AppSidebarState extends State<AppSidebar> {
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFEF4444).withOpacity(0.3),
+            color: const Color(0xFFEF4444).withValues(alpha: 0.3),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -519,7 +519,7 @@ class _AppSidebarState extends State<AppSidebar> {
         badge,
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -528,7 +528,7 @@ class _AppSidebarState extends State<AppSidebar> {
 
   Widget _buildBottomSection(BuildContext context) {
     return Container(
-      padding: EdgeInsets.all(widget.isCollapsed ? 12 : 16),
+      padding: EdgeInsets.all(widget.isCollapsed ? 10 : 12),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Colors.grey.shade100)),
@@ -545,20 +545,20 @@ class _AppSidebarState extends State<AppSidebar> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: EdgeInsets.symmetric(
-            horizontal: widget.isCollapsed ? 0 : 16,
-            vertical: 14,
+            horizontal: widget.isCollapsed ? 0 : 12,
+            vertical: 10,
           ),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                const Color(0xFF6366F1).withOpacity(0.1),
-                const Color(0xFF8B5CF6).withOpacity(0.05),
+                const Color(0xFF6366F1).withValues(alpha: 0.1),
+                const Color(0xFF8B5CF6).withValues(alpha: 0.05),
               ],
             ),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.2)),
+            border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.2)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -605,7 +605,7 @@ class _AppSidebarState extends State<AppSidebar> {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -620,8 +620,8 @@ class _AppSidebarState extends State<AppSidebar> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          const Color(0xFF6366F1).withOpacity(0.1),
-                          const Color(0xFF8B5CF6).withOpacity(0.1),
+                          const Color(0xFF6366F1).withValues(alpha: 0.1),
+                          const Color(0xFF8B5CF6).withValues(alpha: 0.1),
                         ],
                       ),
                       shape: BoxShape.circle,
@@ -690,7 +690,7 @@ class _AppSidebarState extends State<AppSidebar> {
                                 BoxShadow(
                                   color: const Color(
                                     0xFF6366F1,
-                                  ).withOpacity(0.3),
+                                  ).withValues(alpha: 0.3),
                                   blurRadius: 8,
                                   offset: const Offset(0, 4),
                                 ),

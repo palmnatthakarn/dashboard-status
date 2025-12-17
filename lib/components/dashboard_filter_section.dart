@@ -9,14 +9,14 @@ class DashboardFilterSection extends StatelessWidget {
   final Function(String) getShopCountByStatus;
 
   const DashboardFilterSection({
-    Key? key,
+    super.key,
     required this.searchQuery,
     required this.selectedFilter,
     required this.shops,
     required this.onSearchChanged,
     required this.onFilterChanged,
     required this.getShopCountByStatus,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -30,29 +30,29 @@ class DashboardFilterSection extends StatelessWidget {
             runSpacing: 12,
             children: [
               SizedBox(
-                width: 300,
+                width: 260,
                 child: TextField(
                   onChanged: onSearchChanged,
                   decoration: InputDecoration(
                     hintText: 'ค้นหาชื่อร้าน หรือ Shop ID',
                     hintStyle: TextStyle(
                       color: Colors.grey.shade400,
-                      fontSize: 14,
+                      fontSize: 12,
                     ),
                     prefixIcon: Icon(
                       Icons.search,
                       color: Colors.grey.shade400,
-                      size: 20,
+                      size: 18,
                     ),
                     filled: true,
                     fillColor: const Color(0xFFF1F5F9),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide.none,
                     ),
                     contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
+                      horizontal: 12,
+                      vertical: 8,
                     ),
                   ),
                 ),
@@ -95,13 +95,13 @@ class DashboardFilterSection extends StatelessWidget {
 
 class FilterChip extends StatefulWidget {
   const FilterChip({
-    Key? key,
+    super.key,
     required this.label,
     required this.count,
     required this.isSelected,
     required this.color,
     required this.onTap,
-  }) : super(key: key);
+  });
 
   final String label;
   final int count;
@@ -128,12 +128,12 @@ class _FilterChipState extends State<FilterChip> {
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeInOut,
           transform: Matrix4.identity()..scale(_isHovered ? 1.05 : 1.0),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
             color: widget.isSelected
-                ? widget.color.withOpacity(0.1)
+                ? widget.color.withValues(alpha: 0.1)
                 : const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: widget.isSelected ? widget.color : Colors.transparent,
               width: 2,
@@ -141,7 +141,7 @@ class _FilterChipState extends State<FilterChip> {
             boxShadow: _isHovered
                 ? [
                     BoxShadow(
-                      color: widget.color.withOpacity(0.2),
+                      color: widget.color.withValues(alpha: 0.2),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -175,7 +175,7 @@ class _FilterChipState extends State<FilterChip> {
                   fontWeight: widget.isSelected
                       ? FontWeight.w600
                       : FontWeight.w500,
-                  fontSize: 13,
+                  fontSize: 11,
                 ),
                 child: Text(widget.label),
               ),
@@ -185,7 +185,7 @@ class _FilterChipState extends State<FilterChip> {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: widget.isSelected
-                      ? widget.color.withOpacity(0.2)
+                      ? widget.color.withValues(alpha: 0.2)
                       : const Color(0xFFE2E8F0),
                   borderRadius: BorderRadius.circular(6),
                 ),

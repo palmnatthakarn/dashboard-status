@@ -7,8 +7,7 @@ class ReportContent extends StatelessWidget {
   // but for now we follow the user's structure of having the logic inside.
   // Ideally, data should be passed in. I will keep the mock generation here for now as part of extraction.
 
-  const ReportContent({Key? key, required this.selectedReportType})
-    : super(key: key);
+  const ReportContent({super.key, required this.selectedReportType});
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +18,7 @@ class ReportContent extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF64748B).withOpacity(0.08),
+            color: const Color(0xFF64748B).withValues(alpha: 0.08),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -98,16 +97,22 @@ class ReportContent extends StatelessWidget {
       return _buildStockCardTable();
     } else if (type.contains('สรุปความเคลื่อนไหวสินค้า')) {
       return _buildStockMovementTable();
-    } else if (type.contains('สมุดรายวันทั่วไป')) {
+    } else if (type == 'ทุกสมุดรายวัน') {
+      return _buildAllJournalsTable();
+    } else if (type == 'ทั่วไป' || type.contains('สมุดรายวันทั่วไป')) {
       return _buildGeneralJournalTable();
-    } else if (type.contains('สมุดรายวันจ่าย')) {
+    } else if (type == 'จ่าย' || type.contains('สมุดรายวันจ่าย')) {
       return _buildPaymentJournalTable();
-    } else if (type.contains('สมุดรายวันรับ')) {
+    } else if (type == 'รับ' || type.contains('สมุดรายวันรับ')) {
       return _buildReceiptJournalTable();
-    } else if (type.contains('สมุดรายวันซื้อ')) {
+    } else if (type == 'ซื้อ' || type.contains('สมุดรายวันซื้อ')) {
       return _buildPurchaseJournalTable();
-    } else if (type.contains('สมุดรายวันขาย')) {
+    } else if (type == 'ขาย' || type.contains('สมุดรายวันขาย')) {
       return _buildSalesJournalTable();
+    } else if (type == 'ธนาคาร') {
+      return _buildBankJournalTable();
+    } else if (type == 'ไม่บันทึกบัญชี') {
+      return _buildNonAccountingTable();
     }
     return const SizedBox.shrink();
   }
@@ -742,6 +747,219 @@ class ReportContent extends StatelessWidget {
         ['รวม', '', '', '', '', '107,000.00', '107,000.00'],
       ],
       highlightRows: [3],
+    );
+  }
+
+  Widget _buildAllJournalsTable() {
+    return _buildGenericTable(
+      headers: [
+        'วันที่',
+        'เลขที่ใบสำคัญ',
+        'ประเภท',
+        'คู่ค้า/รายการ',
+        'เลขที่บัญชี',
+        'ชื่อบัญชี',
+        'เดบิต',
+        'เครดิต',
+      ],
+      rows: [
+        [
+          '01/12/2025',
+          'JV-001',
+          'ทั่วไป',
+          'ปรับปรุงบัญชีเงินเดือน',
+          '55001',
+          'เงินเดือน',
+          '50,000.00',
+          '-',
+        ],
+        ['', '', '', '', '21001', 'ค่าใช้จ่ายค้างจ่าย', '-', '50,000.00'],
+        [
+          '02/12/2025',
+          'RV-001',
+          'รับ',
+          'ลูกค้าทั่วไป',
+          '11001',
+          'เงินสด',
+          '5,000.00',
+          '-',
+        ],
+        ['', '', '', '', '41001', 'รายได้จากการขาย', '-', '5,000.00'],
+        [
+          '03/12/2025',
+          'SJ-001',
+          'ขาย',
+          'บจก. ลูกค้าประจำ',
+          '13001',
+          'ลูกหนี้การค้า',
+          '107,000.00',
+          '-',
+        ],
+        ['', '', '', '', '41001', 'ขายสินค้า', '-', '100,000.00'],
+        ['', '', '', '', '21501', 'ภาษีขาย', '-', '7,000.00'],
+        [
+          '05/12/2025',
+          'PV-001',
+          'จ่าย',
+          'บจก. ซัพพลายเออร์',
+          '21001',
+          'เจ้าหนี้การค้า',
+          '10,700.00',
+          '-',
+        ],
+        ['', '', '', '', '11001', 'เงินสด', '-', '10,700.00'],
+        [
+          '08/12/2025',
+          'BK-001',
+          'ธนาคาร',
+          'โอนเข้าบัญชี',
+          '11002',
+          'เงินฝากธนาคาร',
+          '100,000.00',
+          '-',
+        ],
+        ['', '', '', '', '11001', 'เงินสด', '-', '100,000.00'],
+        [
+          '10/12/2025',
+          'PJ-001',
+          'ซื้อ',
+          'บจก. วัตถุดิบไทย',
+          '52001',
+          'ซื้อสินค้า',
+          '50,000.00',
+          '-',
+        ],
+        ['', '', '', '', '21001', 'เจ้าหนี้การค้า', '-', '53,500.00'],
+        ['', '', '', '', '11501', 'ภาษีซื้อ', '3,500.00', '-'],
+        [
+          '12/12/2025',
+          'RV-002',
+          'รับ',
+          'บจก. เอ บี ซี',
+          '11002',
+          'เงินฝากธนาคาร',
+          '20,000.00',
+          '-',
+        ],
+        ['', '', '', '', '13001', 'ลูกหนี้การค้า', '-', '20,000.00'],
+        ['รวม', '', '', '', '', '', '346,200.00', '346,200.00'],
+      ],
+      highlightRows: [16],
+    );
+  }
+
+  Widget _buildBankJournalTable() {
+    return _buildGenericTable(
+      headers: [
+        'วันที่',
+        'เลขที่ใบสำคัญ',
+        'รายละเอียด',
+        'เลขที่บัญชี',
+        'ชื่อบัญชี',
+        'เดบิต',
+        'เครดิต',
+      ],
+      rows: [
+        [
+          '08/12/2025',
+          'BK-001',
+          'โอนเงินจากเงินสดเข้าบัญชีธนาคาร',
+          '11002',
+          'เงินฝากธนาคาร',
+          '100,000.00',
+          '-',
+        ],
+        ['', '', '', '11001', 'เงินสด', '-', '100,000.00'],
+        [
+          '15/12/2025',
+          'BK-002',
+          'รับชำระหนี้โอนเข้าบัญชี',
+          '11002',
+          'เงินฝากธนาคาร',
+          '50,000.00',
+          '-',
+        ],
+        ['', '', '', '13001', 'ลูกหนี้การค้า', '-', '50,000.00'],
+        [
+          '20/12/2025',
+          'BK-003',
+          'จ่ายค่าเช่าผ่านธนาคาร',
+          '53002',
+          'ค่าเช่า',
+          '15,000.00',
+          '-',
+        ],
+        ['', '', '', '11002', 'เงินฝากธนาคาร', '-', '15,000.00'],
+        [
+          '25/12/2025',
+          'BK-004',
+          'ดอกเบี้ยรับ',
+          '11002',
+          'เงินฝากธนาคาร',
+          '500.00',
+          '-',
+        ],
+        ['', '', '', '42001', 'ดอกเบี้ยรับ', '-', '500.00'],
+        ['รวม', '', '', '', '', '165,500.00', '165,500.00'],
+      ],
+      highlightRows: [8],
+    );
+  }
+
+  Widget _buildNonAccountingTable() {
+    return _buildGenericTable(
+      headers: [
+        'วันที่',
+        'เลขที่เอกสาร',
+        'รายละเอียด',
+        'ประเภท',
+        'จำนวนเงิน',
+        'หมายเหตุ',
+      ],
+      rows: [
+        [
+          '01/12/2025',
+          'MEMO-001',
+          'บันทึกภายใน - ของขวัญลูกค้า',
+          'ค่าใช้จ่าย',
+          '5,000.00',
+          'ไม่บันทึกบัญชี',
+        ],
+        [
+          '05/12/2025',
+          'MEMO-002',
+          'เงินสดย่อยพนักงาน',
+          'เงินสดย่อย',
+          '2,000.00',
+          'รอตรวจสอบ',
+        ],
+        [
+          '10/12/2025',
+          'MEMO-003',
+          'ค่าเลี้ยงรับรองลูกค้า',
+          'ค่าใช้จ่าย',
+          '3,500.00',
+          'ไม่มีใบเสร็จ',
+        ],
+        [
+          '15/12/2025',
+          'MEMO-004',
+          'เงินทดรองจ่าย',
+          'เงินทดรอง',
+          '10,000.00',
+          'รอเคลียร์',
+        ],
+        [
+          '20/12/2025',
+          'MEMO-005',
+          'ค่าขนส่งจิปาถะ',
+          'ค่าใช้จ่าย',
+          '1,500.00',
+          'ไม่มีเอกสาร',
+        ],
+        ['รวม', '', '', '', '22,000.00', ''],
+      ],
+      highlightRows: [5],
     );
   }
 

@@ -31,8 +31,8 @@ class JournalToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
           // Search Field
@@ -59,20 +59,20 @@ class JournalToolbar extends StatelessWidget {
 
   Widget _buildSearchField() {
     return Container(
-      height: 44,
+      height: 36,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
       child: TextField(
         controller: searchController,
         onChanged: onSearchChanged,
-        style: const TextStyle(fontSize: 14),
+        style: const TextStyle(fontSize: 12),
         decoration: const InputDecoration(
-          prefixIcon: Icon(Icons.search, size: 20, color: Color(0xFF9CA3AF)),
+          prefixIcon: Icon(Icons.search, size: 16, color: Color(0xFF9CA3AF)),
           hintText: 'ค้นหา...',
-          hintStyle: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+          hintStyle: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
           border: InputBorder.none,
           contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
@@ -82,8 +82,8 @@ class JournalToolbar extends StatelessWidget {
 
   Widget _buildIconButton(IconData icon, VoidCallback onPressed) {
     return Container(
-      height: 44,
-      padding: const EdgeInsets.all(4),
+      height: 36,
+      padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
@@ -91,11 +91,11 @@ class JournalToolbar extends StatelessWidget {
       ),
       child: IconButton(
         onPressed: onPressed,
-        icon: Icon(icon, size: 20),
+        icon: Icon(icon, size: 16),
         style: IconButton.styleFrom(
           foregroundColor: const Color(0xFF6B7280),
           padding: EdgeInsets.zero,
-          minimumSize: const Size(36, 36),
+          minimumSize: const Size(28, 28),
         ),
       ),
     );
@@ -108,22 +108,15 @@ class JournalToolbar extends StatelessWidget {
       child: InkWell(
         onTap: () => onTypeChanged(value),
         child: Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: isSelected ? const Color(0xFF111827) : Colors.white,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: const Color(0xFFE5E7EB)),
           ),
           alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              color: isSelected ? Colors.white : const Color(0xFF374151),
-              fontSize: 13,
-            ),
-          ),
+          child: Text(label, style: TextStyle(fontSize: 11)),
         ),
       ),
     );

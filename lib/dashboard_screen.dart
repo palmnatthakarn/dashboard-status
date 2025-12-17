@@ -9,7 +9,7 @@ import '../components/dashboard_loading_widgets.dart';
 import '../utils/dashboard_helper.dart';
 
 class DashboardScreen extends StatefulWidget {
-  DashboardScreen({super.key});
+  const DashboardScreen({super.key});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -37,14 +37,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         appBar: AppBar(
           elevation: 0,
           backgroundColor: Colors.white,
-          leading: MediaQuery.of(context).size.width < 800
-              ? Builder(
-                  builder: (context) => IconButton(
-                    icon: const Icon(Icons.menu, color: Color(0xFF1E293B)),
-                    onPressed: () => Scaffold.of(context).openDrawer(),
-                  ),
-                )
-              : null,
           title: const Text(
             '',
             style: TextStyle(

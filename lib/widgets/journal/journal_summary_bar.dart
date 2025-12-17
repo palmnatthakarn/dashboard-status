@@ -13,12 +13,14 @@ class JournalSummaryBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10),
+        ],
       ),
       child: Row(
         children: [
@@ -28,7 +30,7 @@ class JournalSummaryBar extends StatelessWidget {
             color: const Color(0xFF3B82F6),
             icon: Icons.arrow_circle_up,
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           _SummaryItem(
             label: 'เครดิต',
             value: totalCredit,
@@ -60,15 +62,19 @@ class _SummaryItem extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: 8),
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: 6),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: TextStyle(fontSize: 12, color: color)),
+              Text(label, style: TextStyle(fontSize: 10, color: color)),
               Text(
                 value,
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
               ),
             ],
           ),

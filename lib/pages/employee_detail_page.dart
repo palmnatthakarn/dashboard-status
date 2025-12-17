@@ -449,7 +449,7 @@ class _EmployeeDetailPageState extends State<EmployeeDetailPage> {
     );
   }
 
-  Widget _buildSummaryCard(
+  /*Widget _buildSummaryCard(
     String title,
     int count,
     IconData icon,
@@ -485,7 +485,7 @@ class _EmployeeDetailPageState extends State<EmployeeDetailPage> {
         ],
       ),
     );
-  }
+  }*/
 
   Widget _buildCountChip(int count, Color color, {bool isBold = false}) {
     return Container(

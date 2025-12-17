@@ -13,7 +13,6 @@ class AppTheme {
   static ThemeData lightTheme = ThemeData.light().copyWith(
     scaffoldBackgroundColor: AppColors.white,
     colorScheme: ColorScheme.light(
-      background: AppColors.white,
       surface: AppColors.white,
       primary: AppColors.skyBlue,
       secondary: AppColors.navyBlue,

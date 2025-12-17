@@ -127,7 +127,7 @@ class BranchDataSource extends DataTableSource {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       /*decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.1),
+        color: statusColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
       ),*/
       child: Row(
@@ -221,7 +221,7 @@ class BranchDataSource extends DataTableSource {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       /* decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(6),
       ),*/
       child: Row(
@@ -270,7 +270,7 @@ class BranchDataSource extends DataTableSource {
             Icon(
               Icons.account_balance_wallet_rounded,
               size: 14,
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
             ),
             const SizedBox(width: 6),
             Text(
@@ -339,7 +339,7 @@ class BranchDataSource extends DataTableSource {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       /*decoration: BoxDecoration(
-        color: const Color(0xFF6366F1).withOpacity(0.1),
+        color: const Color(0xFF6366F1).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
       ),*/
       child: const Row(

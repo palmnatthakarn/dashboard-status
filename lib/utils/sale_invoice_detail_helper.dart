@@ -39,7 +39,7 @@ class SaleInvoiceDetailHelper {
     final quantity = formatQuantity(detail.quantity);
     final unitPrice = formatUnitPrice(detail.unitPrice);
     
-    return '$productName (${quantity} x ฿${unitPrice})';
+    return '$productName ($quantity x ฿$unitPrice)';
   }
 
   /// Get discount percentage
