@@ -5,11 +5,13 @@ import '../../models/doc_details.dart';
 class BranchDetailDialog extends StatelessWidget {
   final String shopId;
   final List<DocDetails> shops;
+  final DateTime? selectedDate;
 
   const BranchDetailDialog({
     super.key,
     required this.shopId,
     required this.shops,
+    this.selectedDate,
   });
 
   @override
@@ -100,14 +102,12 @@ class BranchDetailDialog extends StatelessWidget {
 
     // Calculate daily total from transactions
     double dailyTotal = 0.0;
-    if (shops.isNotEmpty) {
-      final now = DateTime.now();
-      final todayStr =
-          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    if (shops.isNotEmpty && selectedDate != null) {
+      final targetDate = DateFormat('yyyy-MM-dd').format(selectedDate!);
       for (final shop in shops) {
         if (shop.daily != null) {
           for (final tx in shop.daily!) {
-            if (tx.timestamp != null && tx.timestamp!.startsWith(todayStr)) {
+            if (tx.timestamp != null && tx.timestamp!.startsWith(targetDate)) {
               dailyTotal += tx.deposit ?? 0;
             }
           }
@@ -117,13 +117,15 @@ class BranchDetailDialog extends StatelessWidget {
 
     // Calculate monthly total
     double monthlyTotal = 0.0;
-    final now = DateTime.now();
-    final monthStr = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-    for (final shop in shops) {
-      if (shop.monthlySummary != null) {
-        for (final entry in shop.monthlySummary!.entries) {
-          if (entry.key.startsWith(monthStr)) {
-            monthlyTotal += entry.value.deposit ?? 0;
+    if (selectedDate != null) {
+      final monthStr =
+          '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}';
+      for (final shop in shops) {
+        if (shop.monthlySummary != null) {
+          for (final entry in shop.monthlySummary!.entries) {
+            if (entry.key.startsWith(monthStr)) {
+              monthlyTotal += entry.value.deposit ?? 0;
+            }
           }
         }
       }

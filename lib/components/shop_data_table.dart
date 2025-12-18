@@ -149,9 +149,9 @@ class _ShopDataTableState extends State<ShopDataTable>
             ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 300, maxHeight: 350),
               child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: _buildDataTable(dataSource),
-              ),
+              padding: const EdgeInsets.all(12),
+              child: _buildDataTable(dataSource),
+            ),
             ),
           ],
         ),
@@ -174,36 +174,36 @@ class _ShopDataTableState extends State<ShopDataTable>
     ).whereType<DataRow>().toList();
 
     return Column(
-      children: [
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: DataTable2(
-              columnSpacing: 8,
-              horizontalMargin: 12,
-              minWidth: 1000,
-              headingRowHeight: 44,
-              dataRowHeight: 52,
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: DataTable2(
+                columnSpacing: 8,
+                horizontalMargin: 12,
+                minWidth: 1000,
+                headingRowHeight: 44,
+                dataRowHeight: 52,
               headingRowColor: WidgetStateProperty.all(const Color(0xFFF9FAFB)),
-              showCheckboxColumn: false,
-              columns: _buildColumns(),
-              rows: currentPageRows,
+                showCheckboxColumn: false,
+                columns: _buildColumns(),
+                rows: currentPageRows,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 10),
-        CustomPagination(
-          currentPage: _currentPage,
-          totalItems: totalRows,
-          rowsPerPage: _rowsPerPage,
-          rowsPerPageOptions: const [8, 16, 24],
-          onPageChanged: (page) => setState(() => _currentPage = page),
-          onRowsPerPageChanged: (rows) => setState(() {
-            _rowsPerPage = rows;
-            _currentPage = 1;
-          }),
-        ),
-      ],
+          const SizedBox(height: 10),
+          CustomPagination(
+            currentPage: _currentPage,
+            totalItems: totalRows,
+            rowsPerPage: _rowsPerPage,
+            rowsPerPageOptions: const [8, 16, 24],
+            onPageChanged: (page) => setState(() => _currentPage = page),
+            onRowsPerPageChanged: (rows) => setState(() {
+              _rowsPerPage = rows;
+              _currentPage = 1;
+            }),
+          ),
+        ],
     );
   }
 
