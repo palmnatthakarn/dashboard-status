@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:moniter/pages/daily_journal_page.dart';
 
 import 'package:moniter/pages/report_page.dart';
 import 'package:moniter/pages/tax_page.dart';
 import '../pages/financial_statements_page.dart';
 import '../components/app_sidebar.dart';
-import '../dashboard_screen.dart';
+import '../dashboard_content.dart';
 import '../pages/kpi/kpi_page.dart';
-import '../pages/documents_page.dart';
+
 import '../pages/settings_page.dart';
+import '../blocs/auth/auth_bloc.dart';
+import '../pages/login_page.dart';
 
 /// Breakpoints สำหรับ responsive design
 class ScreenBreakpoints {
@@ -92,9 +95,9 @@ class _MainLayoutState extends State<MainLayout> {
   bool _isSidebarExpanded = true;
 
   final List<Widget> _pages = [
-    DashboardScreen(),
+    const DashboardContent(),
     const KpiPage(),
-    const DocumentsPage(),
+
     const ReportPage(title: 'รายงานภาพรวม'),
     const FinancialStatementsPage(),
     const TaxPage(),
@@ -113,6 +116,16 @@ class _MainLayoutState extends State<MainLayout> {
     setState(() {
       _isSidebarExpanded = !_isSidebarExpanded;
     });
+  }
+
+  void _handleSignOut(BuildContext context) {
+    // Dispatch logout event to AuthBloc
+    context.read<AuthBloc>().add(LogoutRequested());
+    // Navigate to LoginPage and remove all previous routes
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (route) => false,
+    );
   }
 
   @override
@@ -146,6 +159,7 @@ class _MainLayoutState extends State<MainLayout> {
                   onItemSelected: _onItemSelected,
                   isCollapsed: !_isSidebarExpanded,
                   onToggleCollapse: _toggleSidebar,
+                  onSignOut: () => _handleSignOut(context),
                 ),
               ),
             ),
@@ -163,6 +177,7 @@ class _MainLayoutState extends State<MainLayout> {
           _onItemSelected(index);
           Navigator.pop(context);
         },
+        onSignOut: () => _handleSignOut(context),
       );
     }
     return null;

@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'dart:developer';
 import 'package:http/http.dart' as http;
+import 'auth_repository.dart';
 import '../models/sale_invoice.dart';
 
 class SaleInvoiceService {
-  static const String baseUrl = 'http://localhost:3000/api';
+  static const String baseUrl = AuthRepository.baseUrl;
 
   /// GET /api/sale-invoices - Get all sale invoices
   static Future<SaleInvoiceResponse> getAllSaleInvoices({
@@ -34,7 +35,11 @@ class SaleInvoiceService {
     log('🌐 Fetching sale invoices from: $uri');
 
     try {
-      final response = await http.get(uri);
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(uri, headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -71,7 +76,11 @@ class SaleInvoiceService {
     log('🌐 Fetching sale invoice by ID from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -114,7 +123,11 @@ class SaleInvoiceService {
     log('🌐 Fetching sale invoice summary from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {

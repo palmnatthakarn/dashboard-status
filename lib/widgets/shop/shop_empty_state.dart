@@ -42,7 +42,7 @@ class ShopEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             const Text(
-              'ไม่มีข้อมูลสาขา',
+              'ไม่มีข้อมูลร้าน',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -51,7 +51,7 @@ class ShopEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'ยังไม่มีข้อมูลสาขาในระบบ\nกรุณาตรวจสอบการเชื่อมต่อหรือเพิ่มข้อมูลสาขา',
+              'ยังไม่มีข้อมูลร้านในระบบ\nกรุณาตรวจสอบการเชื่อมต่อหรือเพิ่มข้อมูลร้าน',
               style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
               textAlign: TextAlign.center,
             ),

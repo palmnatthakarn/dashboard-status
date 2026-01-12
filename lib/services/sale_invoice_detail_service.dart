@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'dart:developer';
 import 'package:http/http.dart' as http;
+import 'auth_repository.dart';
 import '../models/sale_invoice_detail.dart';
 
 class SaleInvoiceDetailService {
-  static const String baseUrl = 'http://localhost:3000/api';
+  static const String baseUrl = AuthRepository.baseUrl;
 
   /// GET /api/sale-invoice-details - Get all sale invoice details
   static Future<SaleInvoiceDetailResponse> getAllSaleInvoiceDetails({
@@ -27,18 +28,23 @@ class SaleInvoiceDetailService {
     if (startDate != null) queryParams['start_date'] = startDate;
     if (endDate != null) queryParams['end_date'] = endDate;
 
-    final uri = Uri.parse('$baseUrl/sale-invoice-details')
-        .replace(queryParameters: queryParams);
+    final uri = Uri.parse(
+      '$baseUrl/sale-invoice-details',
+    ).replace(queryParameters: queryParams);
     log('🌐 Fetching sale invoice details from: $uri');
 
     try {
-      final response = await http.get(uri);
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(uri, headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
         log('✅ Successfully parsed sale invoice details data');
-        
+
         // Handle API response structure
         if (data['success'] == true && data['data'] != null) {
           return SaleInvoiceDetailResponse(
@@ -69,7 +75,11 @@ class SaleInvoiceDetailService {
     log('🌐 Fetching sale invoice detail by ID from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -130,16 +140,26 @@ class SaleInvoiceDetailService {
     log('🌐 Fetching sale invoice detail summary from: $uri');
 
     try {
-      final response = await http.get(uri);
-      log('📥 Sale invoice detail summary response status: ${response.statusCode}');
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(uri, headers: headers);
+      log(
+        '📥 Sale invoice detail summary response status: ${response.statusCode}',
+      );
       log('📥 Sale invoice detail summary response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         return SaleInvoiceDetailSummary.fromJson(data);
       } else {
-        log('❌ Failed to fetch sale invoice detail summary: ${response.statusCode}');
-        throw Exception('Failed to load sale invoice detail summary: ${response.statusCode}');
+        log(
+          '❌ Failed to fetch sale invoice detail summary: ${response.statusCode}',
+        );
+        throw Exception(
+          'Failed to load sale invoice detail summary: ${response.statusCode}',
+        );
       }
     } catch (e) {
       log('❌ Error fetching sale invoice detail summary: $e');
@@ -196,12 +216,17 @@ class SaleInvoiceDetailService {
 
   /// GET /api/sale-invoice-details/summary/:invoice_id - Get summary for invoice
   static Future<SaleInvoiceDetailSummary?> getSummaryByInvoiceId(
-      int invoiceId) async {
+    int invoiceId,
+  ) async {
     final url = '$baseUrl/sale-invoice-details/summary/$invoiceId';
     log('🌐 Fetching sale invoice detail summary from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -298,8 +323,9 @@ class SaleInvoiceDetailService {
             (detail.totalAmount ?? 0);
         branchSummaries[branchId]!['line_count'] =
             (branchSummaries[branchId]!['line_count'] as int) + 1;
-        (branchSummaries[branchId]!['details'] as List<SaleInvoiceDetail>)
-            .add(detail);
+        (branchSummaries[branchId]!['details'] as List<SaleInvoiceDetail>).add(
+          detail,
+        );
 
         // Item summaries
         if (!itemSummaries.containsKey(itemCode)) {
@@ -324,12 +350,30 @@ class SaleInvoiceDetailService {
 
       return {
         'total_lines': details.length,
-        'total_quantity': details.fold(0.0, (sum, d) => sum + (d.quantity ?? 0)),
-        'total_line_amount': details.fold(0.0, (sum, d) => sum + (d.lineTotal ?? 0)),
-        'total_discount_amount': details.fold(0.0, (sum, d) => sum + (d.discountAmount ?? 0)),
-        'total_net_amount': details.fold(0.0, (sum, d) => sum + (d.netAmount ?? 0)),
-        'total_vat_amount': details.fold(0.0, (sum, d) => sum + (d.vatAmount ?? 0)),
-        'total_amount': details.fold(0.0, (sum, d) => sum + (d.totalAmount ?? 0)),
+        'total_quantity': details.fold(
+          0.0,
+          (sum, d) => sum + (d.quantity ?? 0),
+        ),
+        'total_line_amount': details.fold(
+          0.0,
+          (sum, d) => sum + (d.lineTotal ?? 0),
+        ),
+        'total_discount_amount': details.fold(
+          0.0,
+          (sum, d) => sum + (d.discountAmount ?? 0),
+        ),
+        'total_net_amount': details.fold(
+          0.0,
+          (sum, d) => sum + (d.netAmount ?? 0),
+        ),
+        'total_vat_amount': details.fold(
+          0.0,
+          (sum, d) => sum + (d.vatAmount ?? 0),
+        ),
+        'total_amount': details.fold(
+          0.0,
+          (sum, d) => sum + (d.totalAmount ?? 0),
+        ),
         'branch_summaries': branchSummaries.values.toList(),
         'item_summaries': itemSummaries.values.toList(),
         'details': details,

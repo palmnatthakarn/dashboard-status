@@ -31,11 +31,15 @@ class KpiPageContent extends StatefulWidget {
 class _KpiPageContentState extends State<KpiPageContent> {
   final _searchController = TextEditingController();
   final _taxIdController = TextEditingController();
-  String _selectedBranch = 'ทุกสาขา';
+  String _selectedBranch = 'ทุกร้าน';
   DateTime? _documentReceiveStartDate;
   DateTime? _documentReceiveEndDate;
   DateTimeRange? _previousDateRange;
   DateTimeRange? _statusCheckDateRange;
+
+  // Shop selection state
+  String? _selectedShopId;
+  String? _selectedShopName;
 
   // Pagination state
   int _currentPage = 1;
@@ -61,22 +65,6 @@ class _KpiPageContentState extends State<KpiPageContent> {
     });
   }
 
-  void _applyManualSearch() {
-    context.read<KpiBloc>().add(
-      ApplyAllFilters(
-        query: _searchController.text,
-        branch: _selectedBranch,
-        startDate: _documentReceiveStartDate,
-        endDate: _documentReceiveEndDate,
-        taxId: _taxIdController.text,
-        previousDateStart: _previousDateRange?.start,
-        previousDateEnd: _previousDateRange?.end,
-        statusCheckDateStart: _statusCheckDateRange?.start,
-        statusCheckDateEnd: _statusCheckDateRange?.end,
-      ),
-    );
-  }
-
   @override
   void dispose() {
     _searchController.dispose();
@@ -86,113 +74,154 @@ class _KpiPageContentState extends State<KpiPageContent> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: _buildAppBar(),
-      body: BlocBuilder<KpiBloc, KpiState>(
-        builder: (context, state) {
-          if (state is KpiLoading) {
-            return const DashboardLoadingWidget();
-          }
+    return BlocBuilder<KpiBloc, KpiState>(
+      builder: (context, state) {
+        return Stack(
+          children: [
+            Scaffold(
+              backgroundColor: const Color(0xFFF8FAFC),
+              appBar: _buildAppBar(),
+              body: Builder(
+                builder: (context) {
+                  if (state is KpiLoading) {
+                    return const DashboardLoadingWidget();
+                  }
 
-          if (state is KpiError) {
-            return DashboardErrorWidget(
-              message: state.message,
-              onRetry: () => context.read<KpiBloc>().add(LoadKpiData()),
-            );
-          }
+                  if (state is KpiError) {
+                    return DashboardErrorWidget(
+                      message: state.message,
+                      onRetry: () => context.read<KpiBloc>().add(LoadKpiData()),
+                    );
+                  }
 
-          if (state is KpiLoaded) {
-            return RefreshIndicator(
-              onRefresh: () async {
-                context.read<KpiBloc>().add(LoadKpiData());
-              },
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    KpiBottleneckSection(
-                      state: state,
-                      onStatusSelected: (status) {
-                        context.read<KpiBloc>().add(
-                          FilterByStatus(status ?? 'all'),
-                        );
+                  if (state is KpiLoaded) {
+                    return RefreshIndicator(
+                      onRefresh: () async {
+                        context.read<KpiBloc>().add(LoadKpiData());
                       },
-                    ),
-                    const SizedBox(height: 15),
-                    if (_isFilterExpanded) ...[
-                      KpiFilterSection(
-                        searchController: _searchController,
-                        taxIdController: _taxIdController,
-                        selectedBranch: _selectedBranch,
-                        documentReceiveStartDate: _documentReceiveStartDate,
-                        documentReceiveEndDate: _documentReceiveEndDate,
-                        previousDateRange: _previousDateRange,
-                        statusCheckDateRange: _statusCheckDateRange,
-                        isAdvancedFilterExpanded: _isAdvancedFilterExpanded,
-                        employees: state.employees,
-                        onToggleAdvancedFilter: () {
-                          setState(() {
-                            _isAdvancedFilterExpanded =
-                                !_isAdvancedFilterExpanded;
-                          });
-                        },
-                        onBranchChanged: (val) {
-                          setState(() => _selectedBranch = val);
-                        },
-                        onStartDateChanged: (date) {
-                          setState(() => _documentReceiveStartDate = date);
-                        },
-                        onEndDateChanged: (date) {
-                          setState(() => _documentReceiveEndDate = date);
-                        },
-                        onPreviousDateRangeChanged: (range) {
-                          setState(() => _previousDateRange = range);
-                        },
-                        onStatusCheckDateRangeChanged: (range) {
-                          setState(() => _statusCheckDateRange = range);
-                        },
-                        onSearch: _applyManualSearch,
-                        onClearSearch: () {
-                          setState(() => _searchController.clear());
-                        },
-                        onRefresh: () {
-                          context.read<KpiBloc>().add(LoadKpiData());
-                        },
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            KpiBottleneckSection(
+                              state: state,
+                              onStatusSelected: (status) {
+                                context.read<KpiBloc>().add(
+                                  FilterByStatus(status ?? 'all'),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 15),
+                            if (_isFilterExpanded) ...[
+                              KpiFilterSection(
+                                searchController: _searchController,
+                                taxIdController: _taxIdController,
+                                selectedBranch: _selectedBranch,
+                                documentReceiveStartDate:
+                                    _documentReceiveStartDate,
+                                documentReceiveEndDate: _documentReceiveEndDate,
+                                previousDateRange: _previousDateRange,
+                                statusCheckDateRange: _statusCheckDateRange,
+                                isAdvancedFilterExpanded:
+                                    _isAdvancedFilterExpanded,
+                                employees: state.employees,
+                                shops: state.shops,
+                                selectedShopId: state.selectedShopId,
+                                selectedShopName: state.selectedShopName,
+                                isSearching: state.isSearching,
+                                onToggleAdvancedFilter: () {
+                                  setState(() {
+                                    _isAdvancedFilterExpanded =
+                                        !_isAdvancedFilterExpanded;
+                                  });
+                                },
+                                onBranchChanged: (val) {
+                                  setState(() => _selectedBranch = val);
+                                },
+                                onShopSelected: (shopId, shopName) {
+                                  setState(() {
+                                    _selectedShopId = shopId;
+                                    _selectedShopName = shopName;
+                                  });
+                                },
+                                onStartDateChanged: (date) {
+                                  setState(
+                                    () => _documentReceiveStartDate = date,
+                                  );
+                                },
+                                onEndDateChanged: (date) {
+                                  setState(
+                                    () => _documentReceiveEndDate = date,
+                                  );
+                                },
+                                onPreviousDateRangeChanged: (range) {
+                                  setState(() => _previousDateRange = range);
+                                },
+                                onStatusCheckDateRangeChanged: (range) {
+                                  setState(() => _statusCheckDateRange = range);
+                                },
+                                onSearch: () {
+                                  context.read<KpiBloc>().add(
+                                    SelectShopAndSearch(
+                                      shopId: _selectedShopId,
+                                      shopName: _selectedShopName,
+                                      startDate: _documentReceiveStartDate,
+                                      endDate: _documentReceiveEndDate,
+                                      query: _searchController.text,
+                                    ),
+                                  );
+                                },
+                                onClearSearch: () {
+                                  setState(() => _searchController.clear());
+                                },
+                                onRefresh: () {
+                                  context.read<KpiBloc>().add(LoadKpiData());
+                                },
+                              ),
+                              const SizedBox(height: 15),
+                            ],
+                            KpiEmployeeTable(
+                              employees: state.filteredEmployees,
+                              expandedEmployeeIds: _expandedEmployeeIds,
+                              currentPage: _currentPage,
+                              rowsPerPage: _rowsPerPage,
+                              fontScale: _fontScale,
+                              totalEmployees: state.filteredEmployees.length,
+                              onToggleExpand: _toggleExpansion,
+                              onPageChanged: (page) {
+                                setState(() => _currentPage = page);
+                              },
+                              onRowsPerPageChanged: (rows) {
+                                setState(() {
+                                  _rowsPerPage = rows;
+                                  _currentPage = 1;
+                                });
+                              },
+                              onFontScaleChanged: (scale) {
+                                setState(() => _fontScale = scale);
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 15),
-                    ],
-                    KpiEmployeeTable(
-                      employees: state.filteredEmployees,
-                      expandedEmployeeIds: _expandedEmployeeIds,
-                      currentPage: _currentPage,
-                      rowsPerPage: _rowsPerPage,
-                      fontScale: _fontScale,
-                      totalEmployees: state.filteredEmployees.length,
-                      onToggleExpand: _toggleExpansion,
-                      onPageChanged: (page) {
-                        setState(() => _currentPage = page);
-                      },
-                      onRowsPerPageChanged: (rows) {
-                        setState(() {
-                          _rowsPerPage = rows;
-                          _currentPage = 1;
-                        });
-                      },
-                      onFontScaleChanged: (scale) {
-                        setState(() => _fontScale = scale);
-                      },
-                    ),
-                  ],
+                    );
+                  }
+
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+            if (state is KpiLoaded && state.isSearching)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  child: const DashboardLoadingWidget(),
                 ),
               ),
-            );
-          }
-
-          return const SizedBox.shrink();
-        },
-      ),
+          ],
+        );
+      },
     );
   }
 

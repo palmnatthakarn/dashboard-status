@@ -60,7 +60,8 @@ class GenericReportTable extends StatelessWidget {
                   horizontalMargin: 24,
                   columnSpacing: 32,
                   headingRowHeight: 52,
-                  dataRowHeight: 56,
+                  dataRowMinHeight: 56,
+                  dataRowMaxHeight: double.infinity,
                   dividerThickness: 1,
                   border: TableBorder(
                     horizontalInside: BorderSide(
@@ -121,6 +122,7 @@ class GenericReportTable extends StatelessWidget {
 
                         return DataCell(
                           Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                             alignment: isFirst
                                 ? Alignment.centerLeft
                                 : Alignment.centerRight,
@@ -130,6 +132,8 @@ class GenericReportTable extends StatelessWidget {
                                 fontWeight: fontWeight,
                                 color: textColor,
                               ),
+                              softWrap: true,
+                              overflow: TextOverflow.visible,
                             ),
                           ),
                         );

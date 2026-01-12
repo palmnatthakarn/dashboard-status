@@ -1,5 +1,12 @@
+import 'package:flutter/material.dart';
+
+import 'dart:developer';
+
 class DashboardHelper {
-  static double getIncomeForPeriod(dynamic shop, DateTime? selectedDate) {
+  static double getIncomeForPeriod(
+    dynamic shop,
+    DateTimeRange? selectedDateRange,
+  ) {
     // คำนวณยอดรายปีจาก monthly_summary
     if (shop.monthlySummary == null) return 0.0;
 
@@ -15,14 +22,14 @@ class DashboardHelper {
   static int getShopCountByStatus(
     List shops,
     String status,
-    DateTime? selectedDate,
+    DateTimeRange? selectedDateRange,
   ) {
     try {
       if (shops.isEmpty) return 0;
 
       return shops.where((shop) {
         try {
-          final profitLoss = calculateProfitLoss(shop, selectedDate);
+          final profitLoss = calculateProfitLoss(shop, selectedDateRange);
           switch (status) {
             case 'safe':
               return profitLoss < 1000000;
@@ -36,22 +43,25 @@ class DashboardHelper {
               return false;
           }
         } catch (e) {
-          print('Error calculating profit/loss for shop: $e');
+          log('Error calculating profit/loss for shop: $e');
           return false;
         }
       }).length;
     } catch (e) {
-      print('Error in getShopCountByStatus: $e');
+      log('Error in getShopCountByStatus: $e');
       return 0;
     }
   }
 
   // คำนวณกำไร/ขาดทุนจากข้อมูล journal
-  static double calculateProfitLoss(dynamic shop, DateTime? selectedDate) {
+  static double calculateProfitLoss(
+    dynamic shop,
+    DateTimeRange? selectedDateRange,
+  ) {
     try {
       if (shop.dailyTransactions == null || shop.dailyTransactions.isEmpty) {
         // ใช้ข้อมูลจาก monthlySummary แทนถ้าไม่มี dailyTransactions
-        return getIncomeForPeriod(shop, selectedDate);
+        return getIncomeForPeriod(shop, selectedDateRange);
       }
 
       double totalIncome = 0.0; // รายรับ (credit - debit)
@@ -76,7 +86,7 @@ class DashboardHelper {
       return totalIncome - totalExpenses; // กำไร/ขาดทุน
     } catch (e) {
       // หากมีข้อผิดพลาด ให้ใช้ข้อมูลจาก monthlySummary
-      return getIncomeForPeriod(shop, selectedDate);
+      return getIncomeForPeriod(shop, selectedDateRange);
     }
   }
 
@@ -101,11 +111,16 @@ class DashboardHelper {
 
       for (final shop in shops) {
         try {
-          // คำนวณจาก dailyTransactions
+          // นับจาก localImageCount (imagecount จาก API)
+          if (shop.localImageCount != null) {
+            final imageCount = shop.localImageCount as int;
+            totalDocs += imageCount;
+          }
+
+          // คำนวณจาก dailyTransactions สำหรับ deposit/withdraw
           if (shop.dailyTransactions != null) {
             for (final transaction in shop.dailyTransactions) {
               if (transaction is Map<String, dynamic>) {
-                totalDocs++;
                 final accountType =
                     transaction['account_type']?.toString() ?? '';
                 if (accountType.toUpperCase() == 'INCOME') {
@@ -118,35 +133,28 @@ class DashboardHelper {
               }
             }
           }
-
-          // หรือคำนวณจาก dailyImages ถ้ามี
-          if (shop.dailyImages != null) {
-            final imageCount = shop.dailyImages!.length as int;
-            totalDocs += imageCount;
-            approved += imageCount;
-          }
         } catch (e) {
-          print('Error processing shop documents: $e');
+          log('Error processing shop documents: $e');
         }
       }
 
       return {
         'deposit': totalDeposit,
         'withdraw': totalWithdraw,
-        'total': totalDocs > 0 ? totalDocs : 150, // fallback value
-        'approved': approved > 0 ? approved : 120,
-        'pending': pending > 0 ? pending : 25,
-        'rejected': 5,
+        'total': totalDocs, // ใช้ค่าจาก imagecount
+        'approved': approved > 0 ? approved : 0,
+        'pending': pending > 0 ? pending : 0,
+        'rejected': 0,
       };
     } catch (e) {
-      print('Error in getDocumentCounts: $e');
+      log('Error in getDocumentCounts: $e');
       return {
-        'deposit': 50,
-        'withdraw': 30,
-        'total': 150,
-        'approved': 120,
-        'pending': 25,
-        'rejected': 5,
+        'deposit': 0,
+        'withdraw': 0,
+        'total': 0,
+        'approved': 0,
+        'pending': 0,
+        'rejected': 0,
       };
     }
   }

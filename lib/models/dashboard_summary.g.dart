@@ -8,26 +8,26 @@ part of 'dashboard_summary.dart';
 
 DashboardSummary _$DashboardSummaryFromJson(Map<String, dynamic> json) =>
     DashboardSummary(
-      totalshop: (json['totalshop'] as num).toInt(),
-      doctotal: (json['doctotal'] as num).toInt(),
-      docsuccess: (json['docsuccess'] as num).toInt(),
-      docwarning: (json['docwarning'] as num).toInt(),
-      docerror: (json['docerror'] as num).toInt(),
-      timestamp: json['timestamp'] as String,
-      success_rate: (json['success_rate'] as num).toInt(),
-      warning_rate: (json['warning_rate'] as num).toInt(),
-      error_rate: (json['error_rate'] as num).toInt(),
+      totalShop: (json['totalshop'] as num).toInt(),
+      docTotal: (json['doctotal'] as num).toInt(),
+      docSuccess: (json['docsuccess'] as num).toInt(),
+      docWarning: (json['docwarning'] as num).toInt(),
+      docError: (json['docerror'] as num).toInt(),
+      timestamp: json['timestamp'] as String? ?? '',
+      successRate: (json['success_rate'] as num).toDouble(),
+      warningRate: (json['warning_rate'] as num).toDouble(),
+      errorRate: (json['error_rate'] as num).toDouble(),
     );
 
 Map<String, dynamic> _$DashboardSummaryToJson(DashboardSummary instance) =>
     <String, dynamic>{
-      'totalshop': instance.totalshop,
-      'doctotal': instance.doctotal,
-      'docsuccess': instance.docsuccess,
-      'docwarning': instance.docwarning,
-      'docerror': instance.docerror,
+      'totalshop': instance.totalShop,
+      'doctotal': instance.docTotal,
+      'docsuccess': instance.docSuccess,
+      'docwarning': instance.docWarning,
+      'docerror': instance.docError,
       'timestamp': instance.timestamp,
-      'success_rate': instance.success_rate,
-      'warning_rate': instance.warning_rate,
-      'error_rate': instance.error_rate,
+      'success_rate': instance.successRate,
+      'warning_rate': instance.warningRate,
+      'error_rate': instance.errorRate,
     };

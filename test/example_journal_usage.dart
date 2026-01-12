@@ -124,14 +124,18 @@ Future<void> example4DisplayFormatted() async {
 
   for (final journal in journals) {
     print('╔═══════════════════════════════════════════════╗');
-    print('║ Journal Entry #${journal.id?.toString().padRight(33)}║');
+    print('║ Journal Entry #${(journal.id?.toString() ?? '-').padRight(33)}║');
     print('╠═══════════════════════════════════════════════╣');
     print('║ Document Information                          ║');
     print('║   Branch: ${(journal.branchSync ?? '-').padRight(36)}║');
     print('║   Doc No: ${(journal.docNo ?? '-').padRight(36)}║');
     print('║   Date: ${journal.displayDate.padRight(38)}║');
-    print('║   Period: ${(journal.periodNumber ?? '-').padRight(36)}║');
-    print('║   Year: ${(journal.accountYear ?? '-').padRight(38)}║');
+    print(
+      '║   Period: ${(journal.periodNumber?.toString() ?? '-').padRight(36)}║',
+    );
+    print(
+      '║   Year: ${(journal.accountYear?.toString() ?? '-').padRight(38)}║',
+    );
     print('╠═══════════════════════════════════════════════╣');
     print('║ Account Information                           ║');
     print('║   Code: ${(journal.accountCode ?? '-').padRight(38)}║');

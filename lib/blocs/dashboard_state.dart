@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import '../models/doc_details.dart';
 import '../models/daily_images.dart';
 
@@ -12,30 +13,30 @@ class DashboardLoaded extends DashboardState {
   final int docsuccess;
   final int docwarning;
   final int docerror;
-  final int success_rate;
-  final int warning_rate;
-  final int error_rate;
+  final double successRate;
+  final double warningRate;
+  final double errorRate;
   final int totalshop;
   final List<DocDetails> shops;
   final List<DocDetails> filteredShops;
   final String searchQuery;
   final String selectedFilter;
-  final DateTime? selectedDate;
+  final DateTimeRange? selectedDateRange;
 
   DashboardLoaded({
     required this.doctotal,
     required this.docsuccess,
     required this.docwarning,
     required this.docerror,
-    required this.success_rate,
-    required this.warning_rate,
-    required this.error_rate,
+    required this.successRate,
+    required this.warningRate,
+    required this.errorRate,
     required this.totalshop,
     required this.shops,
     required this.filteredShops,
     required this.searchQuery,
     required this.selectedFilter,
-    required this.selectedDate,
+    required this.selectedDateRange,
   });
 
   DashboardLoaded copyWith({
@@ -43,30 +44,30 @@ class DashboardLoaded extends DashboardState {
     int? docsuccess,
     int? docwarning,
     int? docerror,
-    int? successRate,
-    int? warningRate,
-    int? errorRate,
+    double? successRate,
+    double? warningRate,
+    double? errorRate,
     int? totalshop,
     List<DocDetails>? shops,
     List<DocDetails>? filteredShops,
     String? searchQuery,
     String? selectedFilter,
-    DateTime? selectedDate,
+    DateTimeRange? selectedDateRange,
   }) {
     return DashboardLoaded(
       doctotal: doctotal ?? this.doctotal,
       docsuccess: docsuccess ?? this.docsuccess,
       docwarning: docwarning ?? this.docwarning,
       docerror: docerror ?? this.docerror,
-      success_rate: successRate ?? success_rate,
-      warning_rate: warningRate ?? warning_rate,
-      error_rate: errorRate ?? error_rate,
+      successRate: successRate ?? this.successRate,
+      warningRate: warningRate ?? this.warningRate,
+      errorRate: errorRate ?? this.errorRate,
       totalshop: totalshop ?? this.totalshop,
       shops: shops ?? this.shops,
       filteredShops: filteredShops ?? this.filteredShops,
       searchQuery: searchQuery ?? this.searchQuery,
       selectedFilter: selectedFilter ?? this.selectedFilter,
-      selectedDate: selectedDate ?? this.selectedDate,
+      selectedDateRange: selectedDateRange ?? this.selectedDateRange,
     );
   }
 }

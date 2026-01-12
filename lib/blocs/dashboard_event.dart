@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 abstract class DashboardEvent {}
 
 class FetchDashboardData extends DashboardEvent {}
@@ -18,6 +20,6 @@ class UpdateFilter extends DashboardEvent {
 }
 
 class UpdateSelectedDate extends DashboardEvent {
-  final DateTime? date;
-  UpdateSelectedDate(this.date);
+  final DateTimeRange? dateRange;
+  UpdateSelectedDate(this.dateRange);
 }

@@ -4,32 +4,51 @@ part 'dashboard_summary.g.dart';
 
 @JsonSerializable()
 class DashboardSummary {
-  final int totalshop;
-  final int doctotal;
-  final int docsuccess;
-  final int docwarning;
-  final int docerror;
-  final String timestamp;
-  final int success_rate;
-  final int warning_rate;
-  final int error_rate;
+  @JsonKey(name: 'totalshop')
+  final int totalShop;
+
+  @JsonKey(name: 'doctotal')
+  final int docTotal;
+
+  @JsonKey(name: 'docsuccess')
+  final int docSuccess;
+
+  @JsonKey(name: 'docwarning')
+  final int docWarning;
+
+  @JsonKey(name: 'docerror')
+  final int docError;
+
+  @JsonKey(name: 'timestamp', defaultValue: '')
+  final String? timestamp;
+
+  @JsonKey(name: 'success_rate')
+  final double successRate;
+
+  @JsonKey(name: 'warning_rate')
+  final double warningRate;
+
+  @JsonKey(name: 'error_rate')
+  final double errorRate;
 
   DashboardSummary({
-    required this.totalshop,
-    required this.doctotal,
-    required this.docsuccess,
-    required this.docwarning,
-    required this.docerror,
-    required this.timestamp,
-    required this.success_rate,
-    required this.warning_rate,
-    required this.error_rate,
+    required this.totalShop,
+    required this.docTotal,
+    required this.docSuccess,
+    required this.docWarning,
+    required this.docError,
+    this.timestamp,
+    required this.successRate,
+    required this.warningRate,
+    required this.errorRate,
   });
 
-  int get completedCount => docsuccess;
-  int get pendingCount => docwarning;
-  int get failedCount => docerror;
+  // Getters for compatibility if needed elsewhere
+  int get completedCount => docSuccess;
+  int get pendingCount => docWarning;
+  int get failedCount => docError;
 
-  factory DashboardSummary.fromJson(Map<String, dynamic> json) => _$DashboardSummaryFromJson(json);
+  factory DashboardSummary.fromJson(Map<String, dynamic> json) =>
+      _$DashboardSummaryFromJson(json);
   Map<String, dynamic> toJson() => _$DashboardSummaryToJson(this);
 }

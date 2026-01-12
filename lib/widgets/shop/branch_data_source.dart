@@ -9,16 +9,17 @@ import '../../services/journal_service.dart';
 import '../../pages/journal_page.dart';
 import 'branch_detail_dialog.dart';
 import 'image_gallery_dialog.dart';
+import '../../pages/gl_journal_page.dart';
 
 class BranchDataSource extends DataTableSource {
   final Map<String, List<DocDetails>> branchData;
-  final DateTime? selectedDate;
+  final DateTimeRange? selectedDateRange;
   final NumberFormat moneyFormat;
   final BuildContext context;
 
   BranchDataSource({
     required this.branchData,
-    required this.selectedDate,
+    required this.selectedDateRange,
     required this.moneyFormat,
     required this.context,
   });
@@ -30,7 +31,7 @@ class BranchDataSource extends DataTableSource {
     final shopId = branchData.keys.elementAt(index);
     final shops = branchData[shopId]!;
 
-    final shopName = shops.isNotEmpty ? shops.first.shopname ?? shopId : shopId;
+    final shopName = _extractShopName(shops, shopId);
     final dailyAmount = _getDailyAmount(shops);
     final monthlyAmount = _getMonthlyAmount(shops);
     final yearlyAmount = _getYearlyAmount(shops);
@@ -50,15 +51,9 @@ class BranchDataSource extends DataTableSource {
         }
       },
       cells: [
-        DataCell(_buildStatusIndicator(shops.length)),
+        DataCell(_buildStatusIndicator(yearlyAmount)),
         DataCell(_buildBranchNameCell(shopId, shopName, shops)),
-        DataCell(
-          InkWell(
-            onTap: () => _showBranchDetail(shopId, shops),
-            borderRadius: BorderRadius.circular(6),
-            child: _buildBranchCodeCell(shopId),
-          ),
-        ),
+        // Removed shop code cell - code now shows under shop name
         DataCell(
           InkWell(
             onTap: () => _showBranchDetail(shopId, shops),
@@ -92,9 +87,9 @@ class BranchDataSource extends DataTableSource {
             ),
           ),
         ),
-        DataCell(_buildJournalCell(shopId, shops, totalIncome)),
-        DataCell(_buildUploadCell(shops)),
-        DataCell(_buildResponsibleCell()),
+        //DataCell(_buildJournalCell(shopId, shops, totalIncome)),
+        DataCell(_buildUploadCell(shopId, shops)),
+        //DataCell(_buildResponsibleCell()),
       ],
     );
   }
@@ -105,23 +100,26 @@ class BranchDataSource extends DataTableSource {
     return const Color(0xFF10B981);
   }
 
-  Widget _buildStatusIndicator(int count) {
+  Widget _buildStatusIndicator(double amount) {
     final Color statusColor;
     final IconData statusIcon;
-    final String status;
+    // final String status; // Not currently used in display
 
-    if (count > 10) {
-      statusColor = const Color(0xFF10B981);
-      statusIcon = Icons.check_circle;
-      status = 'ปกติ';
-    } else if (count > 5) {
-      statusColor = const Color(0xFFF59E0B);
-      statusIcon = Icons.warning_amber;
-      status = 'ระวัง';
-    } else {
+    if (amount > 1800000) {
+      // Exceeded / Critical
       statusColor = const Color(0xFFEF4444);
-      statusIcon = Icons.error;
-      status = 'มาก';
+      statusIcon = Icons.error_rounded;
+      // status = 'มาก';
+    } else if (amount >= 1000000) {
+      // Warning
+      statusColor = const Color(0xFFF59E0B);
+      statusIcon = Icons.warning_rounded;
+      // status = 'ระวัง';
+    } else {
+      // Safe
+      statusColor = const Color(0xFF10B981);
+      statusIcon = Icons.check_circle_rounded;
+      // status = 'ปกติ';
     }
 
     return Container(
@@ -180,15 +178,6 @@ class BranchDataSource extends DataTableSource {
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${shops.length} รายการ',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF9CA3AF),
-                    fontWeight: FontWeight.w400,
-                  ),
                 ),
               ],
             ),
@@ -252,43 +241,114 @@ class BranchDataSource extends DataTableSource {
         ? const Color(0xFF10B981)
         : const Color(0xFFEF4444);
 
-    return InkWell(
-      onTap: () {
-        HapticFeedback.mediumImpact();
-        _showJournalDialogForBranch(shopId, shops);
-      },
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: primaryColor,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Journal 1 Button
+        InkWell(
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            _showJournalDialogForBranch(shopId, shops);
+          },
           borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.account_balance_wallet_rounded,
-              size: 14,
-              color: Colors.white.withValues(alpha: 0.9),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: primaryColor,
+              borderRadius: BorderRadius.circular(8),
             ),
-            const SizedBox(width: 6),
-            Text(
-              _formatAmount(totalIncome),
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.account_balance_wallet_rounded,
+                  size: 14,
+                  color: Colors.white.withValues(alpha: 0.9),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '1', // Label for Journal 1
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+        const SizedBox(width: 6),
+        // Journal 2 Button
+        InkWell(
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            _showJournal2DialogForBranch(shopId, shops);
+          },
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF8B5CF6), // Different color for Journal 2
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.receipt_long_rounded,
+                  size: 14,
+                  color: Colors.white.withValues(alpha: 0.9),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '2', // Label for Journal 2
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildUploadCell(List<DocDetails> shops) {
-    // Calculate total images from dailyImages
+  Widget _buildUploadCell(String shopId, List<DocDetails> shops) {
+    // Use API data if available
+    if (shops.isNotEmpty && shops.first.localImageCount != null) {
+      final imageCount = shops.first.localImageCount!;
+      final hasImages = imageCount > 0;
+      final color = hasImages
+          ? const Color(0xFF10B981)
+          : const Color(0xFF9CA3AF);
+
+      return InkWell(
+        onTap: () => _showImageGallery(shopId, shops),
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$imageCount บิล',
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Fallback to calculation
     int imageCount = 0;
     for (final shop in shops) {
       if (shop.dailyImages != null) {
@@ -302,7 +362,7 @@ class BranchDataSource extends DataTableSource {
     final color = hasImages ? const Color(0xFF10B981) : const Color(0xFF9CA3AF);
 
     return InkWell(
-      onTap: () => _showImageGallery(shops),
+      onTap: () => _showImageGallery(shopId, shops),
       borderRadius: BorderRadius.circular(6),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -325,13 +385,16 @@ class BranchDataSource extends DataTableSource {
     );
   }
 
-  void _showImageGallery(List<DocDetails> shops) {
+  void _showImageGallery(String shopId, List<DocDetails> shops) {
+    if (shops.isEmpty) return;
+
+    // Use passed shopId instead of extracting from shops list
+    // final shopId = shops.first.shopid ?? '';
+    final shopName = _extractShopName(shops, shopId);
+
     showDialog(
       context: context,
-      builder: (context) => ImageGalleryDialog(
-        title: 'บิลสาขา ${shops.first.shopid}',
-        shops: shops,
-      ),
+      builder: (context) => ImageGalleryDialog(title: shopName, shopId: shopId),
     );
   }
 
@@ -366,15 +429,29 @@ class BranchDataSource extends DataTableSource {
   }
 
   double _getDailyAmount(List<DocDetails> shops) {
-    if (selectedDate == null) return 0.0;
-    final targetDate = DateFormat('yyyy-MM-dd').format(selectedDate!);
+    // Use API data if available
+    if (shops.isNotEmpty && shops.first.dailyAverage != null) {
+      return shops.first.dailyAverage!;
+    }
+
+    if (selectedDateRange == null) return 0.0;
+
+    final start = selectedDateRange!.start;
+    final end = selectedDateRange!.end.add(const Duration(days: 1));
+
     double total = 0.0;
     for (final shop in shops) {
       if (shop.daily != null) {
         for (final dailyTransaction in shop.daily!) {
-          if (dailyTransaction.timestamp != null &&
-              dailyTransaction.timestamp!.startsWith(targetDate)) {
-            total += dailyTransaction.deposit ?? 0.0;
+          if (dailyTransaction.timestamp != null) {
+            final DateTime? txDate = DateTime.tryParse(
+              dailyTransaction.timestamp!,
+            );
+            if (txDate != null &&
+                txDate.isAfter(start.subtract(const Duration(seconds: 1))) &&
+                txDate.isBefore(end)) {
+              total += dailyTransaction.deposit ?? 0.0;
+            }
           }
         }
       }
@@ -383,6 +460,11 @@ class BranchDataSource extends DataTableSource {
   }
 
   double _getMonthlyAmount(List<DocDetails> shops) {
+    // Use API data if available
+    if (shops.isNotEmpty && shops.first.monthlyAverage != null) {
+      return shops.first.monthlyAverage!;
+    }
+
     final now = DateTime.now();
     final monthStr = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     double total = 0.0;
@@ -399,6 +481,11 @@ class BranchDataSource extends DataTableSource {
   }
 
   double _getYearlyAmount(List<DocDetails> shops) {
+    // Use API data if available
+    if (shops.isNotEmpty && shops.first.yearlyAverage != null) {
+      return shops.first.yearlyAverage!;
+    }
+
     final yearStr = '${DateTime.now().year}';
     double total = 0.0;
     for (final shop in shops) {
@@ -417,6 +504,39 @@ class BranchDataSource extends DataTableSource {
     if (amount >= 1000000) return '${(amount / 1000000).toStringAsFixed(2)}M';
     if (amount >= 1000) return '${(amount / 1000).toStringAsFixed(2)}K';
     return amount.toStringAsFixed(2);
+  }
+
+  /// Extract shop name from names array or fallback to shopname/shopid
+  String _extractShopName(List<DocDetails> shops, String shopId) {
+    if (shops.isEmpty) return shopId;
+
+    final shop = shops.first;
+
+    // Try to get name from names array (new structure)
+    // Expected structure: "names": [{"code": "th", "name": "ชื่อร้าน", ...}]
+    try {
+      if (shop.names != null && shop.names!.isNotEmpty) {
+        // Find Thai name (code == 'th')
+        final thaiName = shop.names!.firstWhere(
+          (name) => name.code == 'th',
+          orElse: () => shop.names!.first, // Fallback to first name if no 'th'
+        );
+
+        if (thaiName.name != null && thaiName.name!.isNotEmpty) {
+          return thaiName.name!;
+        }
+      }
+
+      // Fallback to shopname field (old structure)
+      if (shop.shopname != null && shop.shopname!.isNotEmpty) {
+        return shop.shopname!;
+      }
+    } catch (e) {
+      debugPrint('Error extracting shop name: $e');
+    }
+
+    // Final fallback to shopid
+    return shopId;
   }
 
   // Dialog methods
@@ -456,21 +576,63 @@ class BranchDataSource extends DataTableSource {
     } catch (e) {
       if (context.mounted) Navigator.of(context).pop();
       if (context.mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('เกิดข้อผิดพลาด'),
-            content: Text('ไม่สามารถโหลดข้อมูล Journal ได้\n${e.toString()}'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('ปิด'),
-              ),
-            ],
+        _showErrorDialog(e.toString());
+      }
+    }
+  }
+
+  void _showJournal2DialogForBranch(
+    String shopId,
+    List<DocDetails> shops,
+  ) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const _JournalLoadingDialog(),
+    );
+
+    try {
+      // Extract shop name
+      final shopName = _extractShopName(shops, shopId);
+
+      final journalResponse = await JournalService.getAllGLJournals(
+        shopId: shopId,
+        limit: 1000,
+      );
+      if (context.mounted) Navigator.of(context).pop();
+      if (context.mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => GLJournalPage(
+              shopids: shopId, // Changed from branchSync
+              shopName: shopName, // Pass shop name
+              journals: journalResponse.journals ?? [],
+            ),
           ),
         );
       }
+    } catch (e) {
+      if (context.mounted) Navigator.of(context).pop();
+      if (context.mounted) {
+        _showErrorDialog(e.toString());
+      }
     }
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('เกิดข้อผิดพลาด'),
+        content: Text('ไม่สามารถโหลดข้อมูล Journal ได้\n$message'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('ปิด'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'dart:developer';
 import 'package:http/http.dart' as http;
+import 'auth_repository.dart';
 import '../models/stock.dart';
 
 class StockService {
-  static const String baseUrl = 'http://localhost:3000/api';
+  static const String baseUrl = AuthRepository.baseUrl;
 
   /// GET /api/stock - Get all stocks (alias for getAllStock)
   static Future<StockResponse> getAllStocks({
@@ -84,18 +85,23 @@ class StockService {
     if (endDate != null) queryParams['end_date'] = endDate;
     if (warehouseCode != null) queryParams['warehouse_code'] = warehouseCode;
 
-    final uri = Uri.parse('$baseUrl/stock')
-        .replace(queryParameters: queryParams);
+    final uri = Uri.parse(
+      '$baseUrl/stock',
+    ).replace(queryParameters: queryParams);
     log('🌐 Fetching stock movements from: $uri');
 
     try {
-      final response = await http.get(uri);
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(uri, headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
         log('✅ Successfully parsed stock data');
-        
+
         // Handle API response structure
         if (data['success'] == true && data['data'] != null) {
           return StockResponse(
@@ -126,7 +132,11 @@ class StockService {
     log('🌐 Fetching stock movement by ID from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -200,17 +210,22 @@ class StockService {
 
   /// GET /api/stock/summary/:branch_sync - Get stock summary by branch
   static Future<List<StockSummary>> getStockSummaryByBranch(
-      String branchSync) async {
+    String branchSync,
+  ) async {
     final url = '$baseUrl/stock/summary/$branchSync';
     log('🌐 Fetching stock summary from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data is List) {
           return data.map((json) => StockSummary.fromJson(json)).toList();
         } else if (data is Map && data['data'] is List) {
@@ -243,12 +258,17 @@ class StockService {
     if (branchSync != null) queryParams['branch_sync'] = branchSync;
     if (warehouseCode != null) queryParams['warehouse_code'] = warehouseCode;
 
-    final uri = Uri.parse('$baseUrl/stock/balance/$itemCode')
-        .replace(queryParameters: queryParams);
+    final uri = Uri.parse(
+      '$baseUrl/stock/balance/$itemCode',
+    ).replace(queryParameters: queryParams);
     log('🌐 Fetching stock balance from: $uri');
 
     try {
-      final response = await http.get(uri);
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(uri, headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -382,9 +402,18 @@ class StockService {
 
       return {
         'total_movements': stocks.length,
-        'total_quantity_in': stocks.fold(0.0, (sum, s) => sum + (s.quantityIn ?? 0)),
-        'total_quantity_out': stocks.fold(0.0, (sum, s) => sum + (s.quantityOut ?? 0)),
-        'total_cost_value': stocks.fold(0.0, (sum, s) => sum + (s.totalCost ?? 0)),
+        'total_quantity_in': stocks.fold(
+          0.0,
+          (sum, s) => sum + (s.quantityIn ?? 0),
+        ),
+        'total_quantity_out': stocks.fold(
+          0.0,
+          (sum, s) => sum + (s.quantityOut ?? 0),
+        ),
+        'total_cost_value': stocks.fold(
+          0.0,
+          (sum, s) => sum + (s.totalCost ?? 0),
+        ),
         'branch_summaries': branchSummaries.values.toList(),
         'item_summaries': itemSummaries.values.toList(),
         'movement_summaries': movementSummaries.values.toList(),

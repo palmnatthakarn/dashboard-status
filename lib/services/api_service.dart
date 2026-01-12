@@ -1,13 +1,14 @@
 import 'dart:convert';
 import 'dart:developer';
 import 'package:http/http.dart' as http;
+import 'auth_repository.dart';
 import '../models/dashboard_summary.dart';
 import '../models/shops_response.dart';
 import '../models/daily_images.dart';
 import '../models/daily_transaction.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:3000/api';
+  static const String baseUrl = AuthRepository.baseUrl;
 
   static Future<ShopsResponse> fetchShops({int page = 1, int size = 50}) async {
     log('🌐 Fetching journal data from multiple account types...');
@@ -22,7 +23,11 @@ class ApiService {
         log('📊 Fetching $accountType from: $url');
 
         try {
-          final response = await http.get(Uri.parse(url));
+          final token = AuthRepository.token;
+          final headers = <String, String>{'Content-Type': 'application/json'};
+          if (token != null) headers['Authorization'] = 'Bearer $token';
+
+          final response = await http.get(Uri.parse(url), headers: headers);
 
           if (response.statusCode == 200) {
             final data = json.decode(response.body);
@@ -35,7 +40,7 @@ class ApiService {
               for (final journal in journals) {
                 final branchSync = journal['branch_sync']?.toString() ?? '';
                 final branchName =
-                    journal['branch_name']?.toString() ?? 'ไม่ระบุชื่อสาขา';
+                    journal['branch_name']?.toString() ?? 'ไม่ระบุชื่อร้าน';
 
                 if (branchSync.isNotEmpty) {
                   if (!branchGroups.containsKey(branchSync)) {
@@ -125,7 +130,11 @@ class ApiService {
     log('🌐 Fetching journal data to calculate summary from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -204,7 +213,11 @@ class ApiService {
     log('🌐 Fetching daily images from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
       log('📡 Response status: ${response.statusCode}');
       log('📄 Response body: ${response.body}');
 
@@ -250,35 +263,39 @@ class ApiService {
 
   static Future<List<DailyImage>> fetchShopDaily(String shopId) async {
     final url = '$baseUrl/dashboard/shops/$shopId/daily';
-    print('🌐 Fetching shop daily data from: $url');
+    log('🌐 Fetching shop daily data from: $url');
     log('🌐 Fetching shop daily data from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
-      print('📡 Response status: ${response.statusCode}');
-      print('📄 Response body: ${response.body}');
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
+      log('📡 Response status: ${response.statusCode}');
+      log('📄 Response body: ${response.body}');
       log('📡 Response status: ${response.statusCode}');
       log('📄 Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-        print('✅ Successfully parsed shop daily response');
-        print('🔍 Response type: ${responseData.runtimeType}');
-        print('🔍 Full response data: $responseData');
+        log('✅ Successfully parsed shop daily response');
+        log('🔍 Response type: ${responseData.runtimeType}');
+        log('🔍 Full response data: $responseData');
         log('✅ Successfully parsed shop daily response');
         log('🔍 Response type: ${responseData.runtimeType}');
 
         // จัดการกรณีที่ response เป็น null
         if (responseData == null) {
-          print('⚠️ Received null response for shop $shopId');
+          log('⚠️ Received null response for shop $shopId');
           log('⚠️ Received null response for shop $shopId');
           return [];
         }
 
         // ตรวจสอบโครงสร้างของ response
-        print('🔍 Checking response structure for shop $shopId...');
+        log('🔍 Checking response structure for shop $shopId...');
         if (responseData is List) {
-          print('✅ Response is a List with ${responseData.length} items');
+          log('✅ Response is a List with ${responseData.length} items');
           // ถ้า response เป็น array โดยตรง
           if (responseData.isEmpty) {
             log('📭 Empty array response for shop $shopId');
@@ -306,26 +323,26 @@ class ApiService {
           );
           return images;
         } else if (responseData is Map<String, dynamic>) {
-          print('✅ Response is a Map with keys: ${responseData.keys.toList()}');
+          log('✅ Response is a Map with keys: ${responseData.keys.toList()}');
           // ถ้า response เป็น object ที่มี daily transactions
           final dailyList = responseData['daily'] ?? [];
 
-          print('🔍 Found daily list type: ${dailyList.runtimeType}');
+          log('🔍 Found daily list type: ${dailyList.runtimeType}');
           if (dailyList is List) {
-            print('📝 Daily list has ${dailyList.length} items');
+            log('📝 Daily list has ${dailyList.length} items');
             if (dailyList.isEmpty) {
-              print('📭 Empty daily list for shop $shopId');
+              log('📭 Empty daily list for shop $shopId');
               return [];
             }
 
             // เนื่องจาก daily data ไม่ใช่ images จึงส่งคืน empty list
             // ข้อมูล daily จะถูกใช้ในส่วนอื่นของระบบ
-            print(
+            log(
               '⚠️ Daily data found but no images in this endpoint for shop $shopId',
             );
             return [];
           } else {
-            print(
+            log(
               '⚠️ Daily list is not an array for shop $shopId: ${dailyList.runtimeType}',
             );
             return [];
@@ -337,19 +354,19 @@ class ApiService {
           return [];
         }
       } else if (response.statusCode == 404) {
-        print('📭 No daily data found for shop $shopId (404)');
+        log('📭 No daily data found for shop $shopId (404)');
         log('📭 No daily data found for shop $shopId (404)');
         return [];
       } else {
-        print('❌ Failed to load shop daily - Status: ${response.statusCode}');
-        print('📄 Error response body: ${response.body}');
+        log('❌ Failed to load shop daily - Status: ${response.statusCode}');
+        log('📄 Error response body: ${response.body}');
         log('❌ Failed to load shop daily - Status: ${response.statusCode}');
         throw Exception(
           'Failed to load shop daily for shop $shopId - Status: ${response.statusCode}',
         );
       }
     } catch (e) {
-      print('💥 Error fetching shop daily for shop $shopId: $e');
+      log('💥 Error fetching shop daily for shop $shopId: $e');
       log('💥 Error fetching shop daily for shop $shopId: $e');
       rethrow;
     }
@@ -359,57 +376,61 @@ class ApiService {
     String shopId,
   ) async {
     final url = '$baseUrl/dashboard/shops/$shopId/daily';
-    print('🌐 Fetching shop daily transactions from: $url');
+    log('🌐 Fetching shop daily transactions from: $url');
     log('🌐 Fetching shop daily transactions from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
-      print('📡 Response status: ${response.statusCode}');
-      print('📄 Response body: ${response.body}');
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
+      log('📡 Response status: ${response.statusCode}');
+      log('📄 Response body: ${response.body}');
       log('📡 Response status: ${response.statusCode}');
       log('📄 Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-        print('✅ Successfully parsed shop daily transactions response');
+        log('✅ Successfully parsed shop daily transactions response');
         log('✅ Successfully parsed shop daily transactions response');
 
         if (responseData == null) {
-          print('⚠️ Received null response for shop $shopId');
+          log('⚠️ Received null response for shop $shopId');
           return null;
         }
 
         if (responseData is Map<String, dynamic>) {
-          print('✅ Response is a Map with keys: ${responseData.keys.toList()}');
+          log('✅ Response is a Map with keys: ${responseData.keys.toList()}');
 
           try {
             final shopDailyResponse = ShopDailyResponse.fromJson(responseData);
-            print(
+            log(
               '🎉 Created ShopDailyResponse with ${shopDailyResponse.daily.length} transactions',
             );
             return shopDailyResponse;
           } catch (e) {
-            print('💥 Error parsing ShopDailyResponse: $e');
+            log('💥 Error parsing ShopDailyResponse: $e');
             return null;
           }
         } else {
-          print('⚠️ Unexpected response type: ${responseData.runtimeType}');
+          log('⚠️ Unexpected response type: ${responseData.runtimeType}');
           return null;
         }
       } else if (response.statusCode == 404) {
-        print('📭 No daily transactions found for shop $shopId (404)');
+        log('📭 No daily transactions found for shop $shopId (404)');
         return null;
       } else {
-        print(
+        log(
           '❌ Failed to load shop daily transactions - Status: ${response.statusCode}',
         );
-        print('📄 Error response body: ${response.body}');
+        log('📄 Error response body: ${response.body}');
         throw Exception(
           'Failed to load shop daily transactions for shop $shopId - Status: ${response.statusCode}',
         );
       }
     } catch (e) {
-      print('💥 Error fetching shop daily transactions for shop $shopId: $e');
+      log('💥 Error fetching shop daily transactions for shop $shopId: $e');
       rethrow;
     }
   }

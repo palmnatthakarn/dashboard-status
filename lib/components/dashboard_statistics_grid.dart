@@ -6,7 +6,7 @@ import '../blocs/bloc_exports.dart';
 class DashboardStatisticsGrid extends StatelessWidget {
   final List shops;
   final String selectedFilter;
-  final DateTime? selectedDate;
+  final DateTimeRange? selectedDateRange;
   final Function(String) onFilterTap;
   final Function(List, String) getShopCountByStatus;
   final Function(List) getDocumentCounts;
@@ -16,7 +16,7 @@ class DashboardStatisticsGrid extends StatelessWidget {
     super.key,
     required this.shops,
     required this.selectedFilter,
-    required this.selectedDate,
+    required this.selectedDateRange,
     required this.onFilterTap,
     required this.getShopCountByStatus,
     required this.getDocumentCounts,
@@ -31,7 +31,7 @@ class DashboardStatisticsGrid extends StatelessWidget {
         height: 200,
         child: const Center(
           child: Text(
-            'ไม่มีข้อมูลสาขา',
+            'ไม่มีข้อมูลร้าน',
             style: TextStyle(fontSize: 16, color: Colors.grey),
           ),
         ),
@@ -74,7 +74,7 @@ class DashboardStatisticsGrid extends StatelessWidget {
             child: ModernStatCard(
               title: 'กำไรต่ำกว่า 1 ล้านบาท',
               value: numFmt.format(getShopCountByStatus(shops, 'safe')),
-              subtitle: 'สาขา',
+              subtitle: 'ร้าน',
               icon: Icons.check_circle_rounded,
               gradient: const LinearGradient(
                 colors: [Color(0xFF10B981), Color(0xFF059669)],
@@ -90,7 +90,7 @@ class DashboardStatisticsGrid extends StatelessWidget {
             child: ModernStatCard(
               title: 'กำไร 1-1.8 ล้านบาท',
               value: numFmt.format(getShopCountByStatus(shops, 'warning')),
-              subtitle: 'สาขา',
+              subtitle: 'ร้าน',
               icon: Icons.warning_rounded,
               gradient: const LinearGradient(
                 colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
@@ -106,7 +106,7 @@ class DashboardStatisticsGrid extends StatelessWidget {
             child: ModernStatCard(
               title: 'กำไรเกิน 1.8 ล้านบาท',
               value: numFmt.format(getShopCountByStatus(shops, 'exceeded')),
-              subtitle: 'สาขา',
+              subtitle: 'ร้าน',
               icon: Icons.error_rounded,
               gradient: const LinearGradient(
                 colors: [Color(0xFFEF4444), Color(0xFFDC2626)],

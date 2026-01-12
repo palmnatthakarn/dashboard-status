@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../blocs/kpi/kpi_state.dart';
 import '../../models/kpi_employee.dart';
 
-class KpiFilterSection extends StatelessWidget {
+class KpiFilterSection extends StatefulWidget {
   final TextEditingController searchController;
   final TextEditingController taxIdController;
   final String selectedBranch;
@@ -13,9 +14,15 @@ class KpiFilterSection extends StatelessWidget {
   final DateTimeRange? statusCheckDateRange;
   final bool isAdvancedFilterExpanded;
   final List<KpiEmployee> employees;
+  // New shop list from API44
+  final List<KpiShopItem> shops;
+  final String? selectedShopId;
+  final String? selectedShopName;
+  final bool isSearching;
 
   final VoidCallback onToggleAdvancedFilter;
   final Function(String) onBranchChanged;
+  final Function(String? shopId, String? shopName) onShopSelected;
   final Function(DateTime) onStartDateChanged;
   final Function(DateTime) onEndDateChanged;
   final Function(DateTimeRange?) onPreviousDateRangeChanged;
@@ -35,8 +42,13 @@ class KpiFilterSection extends StatelessWidget {
     required this.statusCheckDateRange,
     required this.isAdvancedFilterExpanded,
     required this.employees,
+    this.shops = const [],
+    this.selectedShopId,
+    this.selectedShopName,
+    this.isSearching = false,
     required this.onToggleAdvancedFilter,
     required this.onBranchChanged,
+    required this.onShopSelected,
     required this.onStartDateChanged,
     required this.onEndDateChanged,
     required this.onPreviousDateRangeChanged,
@@ -47,6 +59,25 @@ class KpiFilterSection extends StatelessWidget {
   });
 
   @override
+  State<KpiFilterSection> createState() => _KpiFilterSectionState();
+}
+
+class _KpiFilterSectionState extends State<KpiFilterSection> {
+  late FocusNode _searchFocusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchFocusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
@@ -54,7 +85,7 @@ class KpiFilterSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF64748B).withValues(alpha: 0.1),
+            color: const Color(0xFF64748B).withOpacity(0.1),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -79,60 +110,17 @@ class KpiFilterSection extends StatelessWidget {
                         width: constraints.maxWidth > 500
                             ? constraints.maxWidth * 0.5 - 12
                             : constraints.maxWidth,
-                        child: Container(
-                          height: 48,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.search_rounded,
-                                color: Color(0xFF94A3B8),
-                                size: 22,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: TextField(
-                                  controller: searchController,
-                                  decoration: InputDecoration(
-                                    hintText: 'ค้นหาชื่อหรือรหัสพนักงาน...',
-                                    hintStyle: TextStyle(
-                                      color: Colors.grey[400],
-                                      fontSize: 14,
-                                    ),
-                                    border: InputBorder.none,
-                                    contentPadding: EdgeInsets.zero,
-                                    isDense: true,
-                                  ),
-                                ),
-                              ),
-                              if (searchController.text.isNotEmpty)
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.clear_rounded,
-                                    size: 18,
-                                  ),
-                                  color: const Color(0xFF94A3B8),
-                                  onPressed: onClearSearch,
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                ),
-                            ],
-                          ),
-                        ),
+                        child: _buildSearchField(isSmallScreen: true),
                       ),
-                      // Branch Selector
+                      // Shop Selector (from API)
                       SizedBox(
-                        width: 160,
+                        width: 200,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              'สาขา',
+                              'ร้าน',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: Colors.grey[500],
@@ -143,7 +131,11 @@ class KpiFilterSection extends StatelessWidget {
                               height: 24,
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
-                                  value: selectedBranch,
+                                  value:
+                                      widget.selectedShopId ??
+                                      (widget.shops.isNotEmpty
+                                          ? widget.shops.first.shopId
+                                          : null),
                                   isExpanded: true,
                                   icon: const Icon(
                                     Icons.keyboard_arrow_down_rounded,
@@ -154,20 +146,37 @@ class KpiFilterSection extends StatelessWidget {
                                     fontWeight: FontWeight.w600,
                                     color: Color(0xFF334155),
                                   ),
-                                  items:
-                                      [
-                                        'ทุกสาขา',
-                                        ...employees
-                                            .map((e) => e.branch)
-                                            .toSet(),
-                                      ].map((String value) {
-                                        return DropdownMenuItem<String>(
-                                          value: value,
-                                          child: Text(value),
+                                  items: [
+                                    const DropdownMenuItem<String>(
+                                      value: '',
+                                      child: Text('ทุกร้าน'),
+                                    ),
+                                    ...widget.shops.map((shop) {
+                                      return DropdownMenuItem<String>(
+                                        value: shop.shopId,
+                                        child: Text(
+                                          shop.shopName,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      );
+                                    }),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      if (val.isEmpty) {
+                                        widget.onShopSelected('', 'ทุกร้าน');
+                                      } else {
+                                        final shop = widget.shops.firstWhere(
+                                          (s) => s.shopId == val,
+                                          orElse: () => widget.shops.first,
                                         );
-                                      }).toList(),
-                                  onChanged: (val) =>
-                                      val != null ? onBranchChanged(val) : null,
+                                        widget.onShopSelected(
+                                          shop.shopId,
+                                          shop.shopName,
+                                        );
+                                      }
+                                    }
+                                  },
                                 ),
                               ),
                             ),
@@ -181,8 +190,8 @@ class KpiFilterSection extends StatelessWidget {
                           _buildCompactDateSelector(
                             context,
                             'วันที่รับเอกสาร',
-                            documentReceiveStartDate,
-                            onStartDateChanged,
+                            widget.documentReceiveStartDate,
+                            widget.onStartDateChanged,
                           ),
                           const Padding(
                             padding: EdgeInsets.symmetric(horizontal: 8),
@@ -195,8 +204,8 @@ class KpiFilterSection extends StatelessWidget {
                           _buildCompactDateSelector(
                             context,
                             'ถึงวันที่',
-                            documentReceiveEndDate,
-                            onEndDateChanged,
+                            widget.documentReceiveEndDate,
+                            widget.onEndDateChanged,
                           ),
                         ],
                       ),
@@ -205,25 +214,25 @@ class KpiFilterSection extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            onPressed: onRefresh,
+                            onPressed: widget.onRefresh,
                             icon: const Icon(Icons.refresh_rounded),
                             color: const Color(0xFF64748B),
                             tooltip: 'รีเฟรชข้อมูล',
                           ),
                           IconButton(
-                            onPressed: onToggleAdvancedFilter,
+                            onPressed: widget.onToggleAdvancedFilter,
                             icon: Icon(
-                              isAdvancedFilterExpanded
+                              widget.isAdvancedFilterExpanded
                                   ? Icons.tune_rounded
                                   : Icons.tune_outlined,
                             ),
-                            color: isAdvancedFilterExpanded
+                            color: widget.isAdvancedFilterExpanded
                                 ? const Color(0xFF3B82F6)
                                 : const Color(0xFF64748B),
                             tooltip: 'ตัวกรองเพิ่มเติม',
                           ),
                           ElevatedButton.icon(
-                            onPressed: onSearch,
+                            onPressed: widget.onSearch,
                             icon: const Icon(Icons.search, size: 18),
                             label: const Text('ค้นหา'),
                             style: ElevatedButton.styleFrom(
@@ -251,47 +260,7 @@ class KpiFilterSection extends StatelessWidget {
                     // 1. Search Field (Expanded)
                     Expanded(
                       flex: 3,
-                      child: Container(
-                        height: 48,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.search_rounded,
-                              color: Color(0xFF94A3B8),
-                              size: 22,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextField(
-                                controller: searchController,
-                                decoration: InputDecoration(
-                                  hintText: 'ค้นหาชื่อหรือรหัสพนักงาน...',
-                                  hintStyle: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 14,
-                                  ),
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.zero,
-                                  isDense: true,
-                                ),
-                              ),
-                            ),
-                            if (searchController.text.isNotEmpty)
-                              IconButton(
-                                icon: const Icon(Icons.clear_rounded, size: 18),
-                                color: const Color(0xFF94A3B8),
-                                onPressed: onClearSearch,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                              ),
-                          ],
-                        ),
-                      ),
+                      child: _buildSearchField(isSmallScreen: false),
                     ),
 
                     const SizedBox(width: 16),
@@ -302,15 +271,15 @@ class KpiFilterSection extends StatelessWidget {
                     ),
                     const SizedBox(width: 16),
 
-                    // 2. Branch Selector
+                    // 2. Shop Selector (from API)
                     SizedBox(
-                      width: 160,
+                      width: 200,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            'สาขา',
+                            'ร้าน',
                             style: TextStyle(
                               fontSize: 11,
                               color: Colors.grey[500],
@@ -321,7 +290,11 @@ class KpiFilterSection extends StatelessWidget {
                             height: 24,
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
-                                value: selectedBranch,
+                                value:
+                                    widget.selectedShopId ??
+                                    (widget.shops.isNotEmpty
+                                        ? widget.shops.first.shopId
+                                        : null),
                                 isExpanded: true,
                                 icon: const Icon(
                                   Icons.keyboard_arrow_down_rounded,
@@ -332,18 +305,37 @@ class KpiFilterSection extends StatelessWidget {
                                   fontWeight: FontWeight.w600,
                                   color: Color(0xFF334155),
                                 ),
-                                items:
-                                    [
-                                      'ทุกสาขา',
-                                      ...employees.map((e) => e.branch).toSet(),
-                                    ].map((String value) {
-                                      return DropdownMenuItem<String>(
-                                        value: value,
-                                        child: Text(value),
+                                items: [
+                                  const DropdownMenuItem<String>(
+                                    value: '',
+                                    child: Text('ทุกร้าน'),
+                                  ),
+                                  ...widget.shops.map((shop) {
+                                    return DropdownMenuItem<String>(
+                                      value: shop.shopId,
+                                      child: Text(
+                                        shop.shopName,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    );
+                                  }),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    if (val.isEmpty) {
+                                      widget.onShopSelected('', 'ทุกร้าน');
+                                    } else {
+                                      final shop = widget.shops.firstWhere(
+                                        (s) => s.shopId == val,
+                                        orElse: () => widget.shops.first,
                                       );
-                                    }).toList(),
-                                onChanged: (val) =>
-                                    val != null ? onBranchChanged(val) : null,
+                                      widget.onShopSelected(
+                                        shop.shopId,
+                                        shop.shopName,
+                                      );
+                                    }
+                                  }
+                                },
                               ),
                             ),
                           ),
@@ -364,9 +356,9 @@ class KpiFilterSection extends StatelessWidget {
                       children: [
                         _buildCompactDateSelector(
                           context,
-                          'วันที่รับเอกสาร (ไม่ใช่วันที่ตามเอกสาร)',
-                          documentReceiveStartDate,
-                          onStartDateChanged,
+                          'วันที่รับเอกสาร',
+                          widget.documentReceiveStartDate,
+                          widget.onStartDateChanged,
                         ),
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 8),
@@ -379,15 +371,15 @@ class KpiFilterSection extends StatelessWidget {
                         _buildCompactDateSelector(
                           context,
                           'ถึงวันที่',
-                          documentReceiveEndDate,
-                          onEndDateChanged,
+                          widget.documentReceiveEndDate,
+                          widget.onEndDateChanged,
                         ),
                       ],
                     ),
 
                     const Spacer(),
                     IconButton(
-                      onPressed: onRefresh,
+                      onPressed: widget.onRefresh,
                       icon: const Icon(Icons.refresh_rounded),
                       color: const Color(0xFF64748B),
                       style: IconButton.styleFrom(
@@ -398,17 +390,17 @@ class KpiFilterSection extends StatelessWidget {
                     const SizedBox(width: 8),
                     // 4. Tools and Toggle
                     IconButton(
-                      onPressed: onToggleAdvancedFilter,
+                      onPressed: widget.onToggleAdvancedFilter,
                       icon: Icon(
-                        isAdvancedFilterExpanded
+                        widget.isAdvancedFilterExpanded
                             ? Icons.tune_rounded
                             : Icons.tune_outlined,
                       ),
-                      color: isAdvancedFilterExpanded
+                      color: widget.isAdvancedFilterExpanded
                           ? const Color(0xFF3B82F6)
                           : const Color(0xFF64748B),
                       style: IconButton.styleFrom(
-                        backgroundColor: isAdvancedFilterExpanded
+                        backgroundColor: widget.isAdvancedFilterExpanded
                             ? const Color(0xFFEFF6FF)
                             : Colors.transparent,
                       ),
@@ -416,7 +408,7 @@ class KpiFilterSection extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     ElevatedButton.icon(
-                      onPressed: onSearch,
+                      onPressed: widget.onSearch,
                       icon: const Icon(Icons.search, size: 18),
                       label: const Text('ค้นหา'),
                       style: ElevatedButton.styleFrom(
@@ -439,7 +431,7 @@ class KpiFilterSection extends StatelessWidget {
           ),
 
           // Collapsible Advanced Filters
-          if (isAdvancedFilterExpanded)
+          if (widget.isAdvancedFilterExpanded)
             Container(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: Column(
@@ -466,7 +458,9 @@ class KpiFilterSection extends StatelessWidget {
                             SizedBox(
                               height: 45,
                               child: TextField(
-                                controller: taxIdController,
+                                controller: widget.taxIdController,
+                                textInputAction: TextInputAction.search,
+                                onSubmitted: (_) => widget.onSearch(),
                                 decoration: InputDecoration(
                                   hintText: 'ระบุเลข 13 หลัก',
                                   filled: true,
@@ -489,8 +483,8 @@ class KpiFilterSection extends StatelessWidget {
                         child: _buildDateFilterItem(
                           context,
                           'วันที่ก่อนหน้า',
-                          previousDateRange,
-                          onPreviousDateRangeChanged,
+                          widget.previousDateRange,
+                          widget.onPreviousDateRangeChanged,
                           icon: Icons.history_rounded,
                         ),
                       ),
@@ -499,8 +493,8 @@ class KpiFilterSection extends StatelessWidget {
                         child: _buildDateFilterItem(
                           context,
                           'วันตรวจสอบสถานะ',
-                          statusCheckDateRange,
-                          onStatusCheckDateRangeChanged,
+                          widget.statusCheckDateRange,
+                          widget.onStatusCheckDateRangeChanged,
                           icon: Icons.fact_check_rounded,
                         ),
                       ),
@@ -528,6 +522,30 @@ class KpiFilterSection extends StatelessWidget {
           initialDate: date ?? DateTime.now(),
           firstDate: DateTime(2020),
           lastDate: DateTime(2030),
+          builder: (context, child) {
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 400.0,
+                  maxHeight: 520.0,
+                ),
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: const ColorScheme.light(
+                      primary: Color(0xFF3B82F6),
+                      onPrimary: Colors.white,
+                      surface: Colors.white,
+                      onSurface: Color(0xFF1E293B),
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: child!,
+                  ),
+                ),
+              ),
+            );
+          },
         );
         if (picked != null) onSelect(picked);
       },
@@ -627,6 +645,30 @@ class KpiFilterSection extends StatelessWidget {
               context: context,
               firstDate: DateTime(2020),
               lastDate: DateTime(2030),
+              builder: (context, child) {
+                return Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: 400.0,
+                      maxHeight: 520.0,
+                    ),
+                    child: Theme(
+                      data: Theme.of(context).copyWith(
+                        colorScheme: const ColorScheme.light(
+                          primary: Color(0xFF3B82F6),
+                          onPrimary: Colors.white,
+                          surface: Colors.white,
+                          onSurface: Color(0xFF1E293B),
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: child!,
+                      ),
+                    ),
+                  ),
+                );
+              },
             );
             if (picked != null) onSelect(picked);
           },
@@ -641,7 +683,7 @@ class KpiFilterSection extends StatelessWidget {
             child: Row(
               children: [
                 Icon(icon, size: 18, color: color),
-                const SizedBox(width: 12),
+                const SizedBox(width: 20),
                 Expanded(
                   child: Text(
                     range != null
@@ -680,6 +722,143 @@ class KpiFilterSection extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSearchField({required bool isSmallScreen}) {
+    return RawAutocomplete<KpiEmployee>(
+      textEditingController: widget.searchController,
+      focusNode: _searchFocusNode,
+      displayStringForOption: (KpiEmployee option) => option.name,
+      optionsBuilder: (TextEditingValue textEditingValue) {
+        if (textEditingValue.text.isEmpty) {
+          return const Iterable<KpiEmployee>.empty();
+        }
+        final query = textEditingValue.text.toLowerCase();
+        return widget.employees.where((KpiEmployee option) {
+          return option.name.toLowerCase().contains(query) ||
+              option.id.toLowerCase().contains(query);
+        });
+      },
+      onSelected: (KpiEmployee selection) {
+        widget.searchController.text = selection.name;
+        widget.onSearch();
+      },
+      fieldViewBuilder:
+          (
+            BuildContext context,
+            TextEditingController fieldTextEditingController,
+            FocusNode fieldFocusNode,
+            VoidCallback onFieldSubmitted,
+          ) {
+            return Container(
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.search_rounded,
+                    color: Color(0xFF94A3B8),
+                    size: 22,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: fieldTextEditingController,
+                      focusNode: fieldFocusNode,
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (_) {
+                        widget.onSearch();
+                        onFieldSubmitted();
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'ค้นหาชื่อหรือรหัสพนักงาน...',
+                        hintStyle: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 14,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  if (widget.searchController.text.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.clear_rounded, size: 18),
+                      color: const Color(0xFF94A3B8),
+                      onPressed:
+                          widget.onClearSearch, // Ensure clear uses widget prop
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                ],
+              ),
+            );
+          },
+      optionsViewBuilder:
+          (
+            BuildContext context,
+            AutocompleteOnSelected<KpiEmployee> onSelected,
+            Iterable<KpiEmployee> options,
+          ) {
+            return Align(
+              alignment: Alignment.topLeft,
+              child: Material(
+                elevation: 4.0,
+                borderRadius: BorderRadius.circular(12),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxHeight: 200,
+                    maxWidth: 300,
+                  ), // Limit width and height
+                  child: ListView.builder(
+                    padding: EdgeInsets.zero,
+                    shrinkWrap: true,
+                    itemCount: options.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      final KpiEmployee option = options.elementAt(index);
+                      return InkWell(
+                        onTap: () {
+                          onSelected(option);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 12.0,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                option.name,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF334155),
+                                ),
+                              ),
+                              Text(
+                                option.id,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            );
+          },
     );
   }
 }

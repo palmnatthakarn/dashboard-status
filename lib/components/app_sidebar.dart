@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'common/app_logo.dart';
+import '../services/auth_repository.dart';
 
 class AppSidebar extends StatefulWidget {
   final int selectedIndex;
@@ -27,11 +29,7 @@ class AppSidebar extends StatefulWidget {
       icon: Icons.analytics_outlined,
       selectedIcon: Icons.analytics_rounded,
     ),
-    SidebarMenuItem(
-      title: 'Documents',
-      icon: Icons.folder_outlined,
-      selectedIcon: Icons.folder_rounded,
-    ),
+
     SidebarMenuItem(
       title: 'Reports',
       icon: Icons.article_outlined,
@@ -176,10 +174,10 @@ class _AppSidebarState extends State<AppSidebar> {
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.dashboard_customize_rounded,
-                color: Colors.white,
-                size: 20,
+              child: const AppLogo(
+                size: 38,
+                showBackground: false,
+                barColor: Colors.white,
               ),
             ),
           ),
@@ -206,16 +204,21 @@ class _AppSidebarState extends State<AppSidebar> {
             borderRadius: BorderRadius.circular(10),
             boxShadow: [
               BoxShadow(
-                color: const Color.fromARGB(255, 65, 74, 242).withValues(alpha: 0.35),
+                color: const Color.fromARGB(
+                  255,
+                  65,
+                  74,
+                  242,
+                ).withValues(alpha: 0.35),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
             ],
           ),
-          child: const Icon(
-            Icons.dashboard_customize_rounded,
-            color: Colors.white,
-            size: 20,
+          child: const AppLogo(
+            size: 38,
+            showBackground: false,
+            barColor: Colors.white,
           ),
         ),
         const SizedBox(width: 10),
@@ -231,7 +234,7 @@ class _AppSidebarState extends State<AppSidebar> {
                   ],
                 ).createShader(bounds),
                 child: const Text(
-                  'Account SAH',
+                  'KPI Sea and hill',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -241,7 +244,7 @@ class _AppSidebarState extends State<AppSidebar> {
                 ),
               ),
               Text(
-                'NameUser@gmail.com',
+                AuthRepository.username ?? 'User',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
@@ -558,7 +561,9 @@ class _AppSidebarState extends State<AppSidebar> {
               ],
             ),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.2)),
+            border: Border.all(
+              color: const Color(0xFF6366F1).withValues(alpha: 0.2),
+            ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -571,7 +576,7 @@ class _AppSidebarState extends State<AppSidebar> {
               if (!widget.isCollapsed) ...[
                 const SizedBox(width: 10),
                 const Text(
-                  'Sign Out',
+                  'Logout',
                   style: TextStyle(
                     color: Color(0xFF6366F1),
                     fontSize: 14,
@@ -590,7 +595,7 @@ class _AppSidebarState extends State<AppSidebar> {
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
-      barrierLabel: 'Sign Out Dialog',
+      barrierLabel: 'Logout Dialog',
       barrierColor: Colors.black54,
       transitionDuration: const Duration(milliseconds: 200),
       pageBuilder: (context, anim1, anim2) {
@@ -634,7 +639,7 @@ class _AppSidebarState extends State<AppSidebar> {
                   ),
                   const SizedBox(height: 20),
                   const Text(
-                    'Sign Out',
+                    'Logout',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
@@ -643,7 +648,7 @@ class _AppSidebarState extends State<AppSidebar> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Are you sure you want to sign out?',
+                    'Are you sure you want to logout?',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                   ),

@@ -7,6 +7,7 @@ part 'doc_details.g.dart';
 class DocDetails {
   final String? shopid;
   final String? shopname;
+  final List<ShopName>? names; // New field for names array
   @JsonKey(name: 'monthly_summary')
   final Map<String, MonthlyData>? monthlySummary;
   final List<DailyTransaction>? daily;
@@ -23,9 +24,16 @@ class DocDetails {
   @JsonKey(name: 'daily_transactions')
   final List? dailyTransactions;
 
+  // Fields for Multi-Shop API
+  final double? dailyAverage;
+  final double? monthlyAverage;
+  final double? yearlyAverage;
+  final int? localImageCount;
+
   DocDetails({
     this.shopid,
     this.shopname,
+    this.names,
     this.monthlySummary,
     this.daily,
     this.responsible,
@@ -35,6 +43,10 @@ class DocDetails {
     this.timezone,
     this.dailyImages,
     this.dailyTransactions,
+    this.dailyAverage,
+    this.monthlyAverage,
+    this.yearlyAverage,
+    this.localImageCount,
   });
 
   double get totalDeposit {
@@ -194,4 +206,18 @@ class RecordedBy {
   factory RecordedBy.fromJson(Map<String, dynamic> json) =>
       _$RecordedByFromJson(json);
   Map<String, dynamic> toJson() => _$RecordedByToJson(this);
+}
+
+@JsonSerializable()
+class ShopName {
+  final String? code;
+  final String? name;
+  final bool? isauto;
+  final bool? isdelete;
+
+  ShopName({this.code, this.name, this.isauto, this.isdelete});
+
+  factory ShopName.fromJson(Map<String, dynamic> json) =>
+      _$ShopNameFromJson(json);
+  Map<String, dynamic> toJson() => _$ShopNameToJson(this);
 }

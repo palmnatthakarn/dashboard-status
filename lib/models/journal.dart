@@ -9,38 +9,44 @@ class Journal {
   // Document Information
   @JsonKey(name: 'branch_sync')
   final String? branchSync;
-  @JsonKey(name: 'doc_datetime')
+  @JsonKey(name: 'docdate')
   final String? docDatetime;
-  @JsonKey(name: 'doc_no')
+  @JsonKey(name: 'docno')
   final String? docNo;
-  @JsonKey(name: 'period_number')
-  final String? periodNumber;
-  @JsonKey(name: 'account_year')
-  final String? accountYear;
+  @JsonKey(name: 'accountperiod')
+  final int? periodNumber;
+  @JsonKey(name: 'accountyear')
+  final int? accountYear;
 
   // Book Information
-  @JsonKey(name: 'book_code')
+  @JsonKey(name: 'bookcode')
   final String? bookCode;
-  @JsonKey(name: 'book_name')
+  @JsonKey(name: 'bookname')
   final String? bookName;
 
   // Account Information
-  @JsonKey(name: 'account_code')
+  @JsonKey(name: 'accountcode')
   final String? accountCode;
-  @JsonKey(name: 'account_name')
+  @JsonKey(name: 'accountname')
   final String? accountName;
-  @JsonKey(name: 'account_type')
+  @JsonKey(name: 'accounttype')
   final String? accountType; // ASSETS, EXPENSES, LIABILITIES, INCOME
 
   // Transaction Amounts
   final double? debit;
   final double? credit;
+  @JsonKey(name: 'amount')
+  final double? apiAmount;
 
   // Branch Information
-  @JsonKey(name: 'branch_code')
+  @JsonKey(name: 'branchcode')
   final String? branchCode;
-  @JsonKey(name: 'branch_name')
+  @JsonKey(name: 'branchname')
   final String? branchName;
+
+  // Description
+  @JsonKey(name: 'accountdescription')
+  final String? description;
 
   Journal({
     this.id,
@@ -56,8 +62,10 @@ class Journal {
     this.accountType,
     this.debit,
     this.credit,
+    this.apiAmount,
     this.branchCode,
     this.branchName,
+    this.description,
   });
 
   // Helper getters

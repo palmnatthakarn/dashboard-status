@@ -45,7 +45,7 @@ class DashboardService {
         if (journals.isEmpty) continue;
 
         // ใช้ branch name จาก journal แรก
-        final branchName = journals.first.branchName ?? 'สาขา $branchSync';
+        final branchName = journals.first.branchName ?? 'ร้าน $branchSync';
 
         // คำนวณข้อมูลสถิติ
         final dailyTransactions = _buildDailyTransactions(journals);

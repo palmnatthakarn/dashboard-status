@@ -1,6 +1,14 @@
 import 'package:equatable/equatable.dart';
 import '../../models/kpi_employee.dart';
 
+/// Shop item for dropdown
+class KpiShopItem {
+  final String shopId;
+  final String shopName;
+
+  const KpiShopItem({required this.shopId, required this.shopName});
+}
+
 abstract class KpiState extends Equatable {
   const KpiState();
 
@@ -26,6 +34,11 @@ class KpiLoaded extends KpiState {
   final DateTime? previousDateEnd;
   final DateTime? statusCheckDateStart;
   final DateTime? statusCheckDateEnd;
+  // Shop list from /list-shop API
+  final List<KpiShopItem> shops;
+  final String? selectedShopId;
+  final String? selectedShopName;
+  final bool isSearching;
 
   const KpiLoaded({
     required this.employees,
@@ -40,6 +53,10 @@ class KpiLoaded extends KpiState {
     this.previousDateEnd,
     this.statusCheckDateStart,
     this.statusCheckDateEnd,
+    this.shops = const [],
+    this.selectedShopId,
+    this.selectedShopName,
+    this.isSearching = false,
   });
 
   int get totalDocuments =>
@@ -71,6 +88,10 @@ class KpiLoaded extends KpiState {
     DateTime? previousDateEnd,
     DateTime? statusCheckDateStart,
     DateTime? statusCheckDateEnd,
+    List<KpiShopItem>? shops,
+    String? selectedShopId,
+    String? selectedShopName,
+    bool? isSearching,
   }) {
     return KpiLoaded(
       employees: employees ?? this.employees,
@@ -85,6 +106,10 @@ class KpiLoaded extends KpiState {
       previousDateEnd: previousDateEnd ?? this.previousDateEnd,
       statusCheckDateStart: statusCheckDateStart ?? this.statusCheckDateStart,
       statusCheckDateEnd: statusCheckDateEnd ?? this.statusCheckDateEnd,
+      shops: shops ?? this.shops,
+      selectedShopId: selectedShopId ?? this.selectedShopId,
+      selectedShopName: selectedShopName ?? this.selectedShopName,
+      isSearching: isSearching ?? this.isSearching,
     );
   }
 
@@ -102,6 +127,10 @@ class KpiLoaded extends KpiState {
     previousDateEnd,
     statusCheckDateStart,
     statusCheckDateEnd,
+    shops,
+    selectedShopId,
+    selectedShopName,
+    isSearching,
   ];
 }
 

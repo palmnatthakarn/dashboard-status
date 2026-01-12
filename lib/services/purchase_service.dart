@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'dart:developer';
 import 'package:http/http.dart' as http;
+import 'auth_repository.dart';
 import '../models/purchase.dart';
 
 class PurchaseService {
-  static const String baseUrl = 'http://localhost:3000/api';
+  static const String baseUrl = AuthRepository.baseUrl;
 
   /// GET /api/purchases - Get all purchases
   static Future<PurchaseResponse> getAllPurchases({
@@ -27,18 +28,23 @@ class PurchaseService {
     if (status != null) queryParams['status'] = status;
     if (vendorCode != null) queryParams['vendor_code'] = vendorCode;
 
-    final uri = Uri.parse('$baseUrl/purchases')
-        .replace(queryParameters: queryParams);
+    final uri = Uri.parse(
+      '$baseUrl/purchases',
+    ).replace(queryParameters: queryParams);
     log('🌐 Fetching purchases from: $uri');
 
     try {
-      final response = await http.get(uri);
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(uri, headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
         log('✅ Successfully parsed purchases data');
-        
+
         // Handle API response structure
         if (data['success'] == true && data['data'] != null) {
           return PurchaseResponse(
@@ -69,7 +75,11 @@ class PurchaseService {
     log('🌐 Fetching purchase by ID from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -107,12 +117,17 @@ class PurchaseService {
 
   /// GET /api/purchases/summary/:branch_sync - Get purchase summary by branch
   static Future<PurchaseSummary?> getPurchaseSummaryByBranch(
-      String branchSync) async {
+    String branchSync,
+  ) async {
     final url = '$baseUrl/purchases/summary/$branchSync';
     log('🌐 Fetching purchase summary from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -209,18 +224,25 @@ class PurchaseService {
             (purchase.totalAmount ?? 0);
         branchSummaries[branchId]!['purchase_count'] =
             (branchSummaries[branchId]!['purchase_count'] as int) + 1;
-        (branchSummaries[branchId]!['purchases'] as List<Purchase>)
-            .add(purchase);
+        (branchSummaries[branchId]!['purchases'] as List<Purchase>).add(
+          purchase,
+        );
       }
 
       return {
         'total_purchases': purchases.length,
-        'total_net_amount':
-            purchases.fold(0.0, (sum, p) => sum + (p.purchaseAmount ?? 0)),
-        'total_vat_amount':
-            purchases.fold(0.0, (sum, p) => sum + (p.vatAmount ?? 0)),
-        'total_amount':
-            purchases.fold(0.0, (sum, p) => sum + (p.totalAmount ?? 0)),
+        'total_net_amount': purchases.fold(
+          0.0,
+          (sum, p) => sum + (p.purchaseAmount ?? 0),
+        ),
+        'total_vat_amount': purchases.fold(
+          0.0,
+          (sum, p) => sum + (p.vatAmount ?? 0),
+        ),
+        'total_amount': purchases.fold(
+          0.0,
+          (sum, p) => sum + (p.totalAmount ?? 0),
+        ),
         'branch_summaries': branchSummaries.values.toList(),
         'purchases': purchases,
       };

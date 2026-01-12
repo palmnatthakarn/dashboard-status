@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
-import '../../models/doc_details.dart';
-import '../../models/daily_images.dart';
+import '../../services/document_image_service.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 class ImageGalleryDialog extends StatefulWidget {
   final String title;
-  final List<DocDetails> shops;
+  final String shopId;
 
   const ImageGalleryDialog({
     super.key,
     required this.title,
-    required this.shops,
+    required this.shopId,
   });
 
   @override
@@ -18,109 +19,255 @@ class ImageGalleryDialog extends StatefulWidget {
 
 class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
   // Map category -> List of images
-  final Map<String, List<DailyImage>> _categorizedImages = {};
+  final Map<String, List<DocumentImage>> _categorizedImages = {};
   String? _selectedCategory;
+  Offset _offset = Offset.zero; // Track drag offset
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _processImages();
+    _fetchImages();
   }
 
-  void _processImages() {
-    for (final shop in widget.shops) {
-      if (shop.dailyImages != null) {
-        for (final img in shop.dailyImages!) {
-          if (img.imageUrl?.isNotEmpty == true) {
-            // Default category if null or empty
-            final category = (img.category?.isNotEmpty == true)
-                ? img.category!
-                : 'อื่นๆ';
+  Future<void> _fetchImages() async {
+    print('🔄 Starting _fetchImages for shopId: ${widget.shopId}');
 
-            _categorizedImages[category]!.add(img);
-          }
-        }
-      }
-    }
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _categorizedImages.clear(); // Clear previous shop's images
+      _selectedCategory = null; // Reset selected category
+    });
 
-    // [MOCK] Generate 50 mock images
-    final categories = [
-      'บิลค่าใช้จ่าย',
-      'สลิปโอนเงิน',
-      'บิลค่าน้ำ',
-      'บิลค่าไฟ',
-      'อื่นๆ',
-    ];
-    for (int i = 0; i < 50; i++) {
-      final category = categories[i % categories.length];
-      final mockImg = DailyImage(
-        imageid: 'mock_$i',
-        category: category,
-        subcategory: 'รายละเอียดบิลใบที่ ${i + 1}',
-        description: i.toString().padLeft(2, '0'),
-        uploadedAt: DateTime.now()
-            .subtract(Duration(minutes: i * 10))
-            .toIso8601String(),
-        imageUrl: 'https://picsum.photos/seed/$i/300/400',
-        shopid: 'MOCK001',
+    try {
+      print('📞 Calling DocumentImageService.fetchShopImages...');
+      final images = await DocumentImageService.fetchShopImages(
+        shopId: widget.shopId,
       );
 
-      _categorizedImages.putIfAbsent(category, () => []);
-      _categorizedImages[category]!.add(mockImg);
-    }
+      print('📥 Received ${images.length} images from service');
 
-    // Sort categories (optional, you might want specific order)
-    if (_categorizedImages.isNotEmpty) {
-      _selectedCategory = _categorizedImages.keys.first;
+      if (!mounted) {
+        print('⚠️ Widget not mounted, returning');
+        return;
+      }
+
+      if (images.isEmpty) {
+        print('❌ No images received, showing error');
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'ไม่พบรูปภาพ';
+        });
+        return;
+      }
+
+      print('✅ Processing ${images.length} images...');
+
+      // Categorize images by file type
+      for (final img in images) {
+        print(
+          '🖼️ Image: id=${img.imageId}, url=${img.imageUrl}, category=${img.category}',
+        );
+
+        if (img.imageUrl?.isNotEmpty == true) {
+          // Determine category based on file extension
+          final isPdf = img.imageUrl!.toLowerCase().endsWith('.pdf');
+          final category = isPdf ? 'ไฟล์ PDF' : 'รูปภาพ (JPG/PNG)';
+
+          _categorizedImages.putIfAbsent(category, () => []);
+          _categorizedImages[category]!.add(img);
+          print('  ✓ Added to category: $category');
+        } else {
+          print('  ✗ Skipped (no imageUrl)');
+        }
+      }
+
+      print('📊 Categories: ${_categorizedImages.keys.toList()}');
+      print(
+        '📊 Total categorized images: ${_categorizedImages.values.fold(0, (sum, list) => sum + list.length)}',
+      );
+
+      // Set first category as selected (prefer Images over PDF)
+      if (_categorizedImages.isNotEmpty) {
+        // Prefer showing images first
+        _selectedCategory = _categorizedImages.containsKey('รูปภาพ (JPG/PNG)')
+            ? 'รูปภาพ (JPG/PNG)'
+            : _categorizedImages.keys.first;
+        print('✅ Selected category: $_selectedCategory');
+      } else {
+        print('⚠️ No categories after processing!');
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      print('✅ _fetchImages completed successfully');
+    } catch (e, stackTrace) {
+      print('💥 Error in _fetchImages: $e');
+      print('📍 Stack trace: $stackTrace');
+
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'เกิดข้อผิดพลาด: $e';
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Show loading state
+    if (_isLoading) {
+      return _buildLoadingState(context);
+    }
+
+    // Show error state
+    if (_errorMessage != null) {
+      return _buildErrorState(context);
+    }
+
+    // Show empty state
     if (_categorizedImages.isEmpty) {
       return _buildEmptyState(context);
     }
 
+    final screenSize = MediaQuery.of(context).size;
+
+    return Stack(
+      children: [
+        // Background overlay
+        GestureDetector(
+          onTap: () => Navigator.of(context).pop(),
+          child: Container(color: Colors.black.withOpacity(0.5)),
+        ),
+        // Draggable dialog
+        Positioned(
+          left: (screenSize.width - 900) / 2 + _offset.dx,
+          top: (screenSize.height - 700) / 2 + _offset.dy,
+          child: GestureDetector(
+            onPanUpdate: (details) {
+              setState(() {
+                _offset += details.delta;
+              });
+            },
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                width: 900,
+                height: 700,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 30,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildHeader(context),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          // Left Sidebar: Categories
+                          Container(
+                            width: 250,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFF9FAFB),
+                              borderRadius: BorderRadius.only(
+                                bottomLeft: Radius.circular(24),
+                              ),
+                            ),
+                            child: _buildCategoryList(),
+                          ),
+                          const VerticalDivider(width: 1),
+                          // Right Content: Image Grid
+                          Expanded(child: _buildImageGrid()),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLoadingState(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.white,
       child: Container(
-        width: 900,
-        height: 700,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 30,
-              offset: const Offset(0, 10),
+        width: 400,
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            const Text(
+              'กำลังโหลดรูปภาพ...',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF374151),
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      backgroundColor: Colors.white,
+      child: Container(
+        width: 400,
+        padding: const EdgeInsets.all(32),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            _buildHeader(context),
-            const Divider(height: 1),
-            Expanded(
-              child: Row(
-                children: [
-                  // Left Sidebar: Categories
-                  Container(
-                    width: 250,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFF9FAFB),
-                      borderRadius: BorderRadius.only(
-                        bottomLeft: Radius.circular(24),
-                      ),
-                    ),
-                    child: _buildCategoryList(),
-                  ),
-                  const VerticalDivider(width: 1),
-                  // Right Content: Image Grid
-                  Expanded(child: _buildImageGrid()),
-                ],
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 64,
+              color: Color(0xFFEF4444),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage ?? 'เกิดข้อผิดพลาด',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF374151),
               ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('ปิด'),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _fetchImages,
+                  child: const Text('ลองใหม่'),
+                ),
+              ],
             ),
           ],
         ),
@@ -169,51 +316,54 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+    return MouseRegion(
+      cursor: SystemMouseCursors.move,
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.photo_library_rounded,
+                color: Color(0xFF3B82F6),
+                size: 24,
+              ),
             ),
-            child: const Icon(
-              Icons.photo_library_rounded,
-              color: Color(0xFF3B82F6),
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1F2937),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1F2937),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${_getTotalImageCount()} บิลทั้งหมด',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF6B7280),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${_getTotalImageCount()} บิลทั้งหมด',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF6B7280),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close_rounded, color: Color(0xFF9CA3AF)),
-          ),
-        ],
+            IconButton(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.close_rounded, color: Color(0xFF9CA3AF)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -232,6 +382,7 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
         final category = _categorizedImages.keys.elementAt(index);
         final count = _categorizedImages[category]!.length;
         final isSelected = category == _selectedCategory;
+        final isPdfCategory = category == 'ไฟล์ PDF';
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
@@ -259,10 +410,14 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
               child: Row(
                 children: [
                   Icon(
-                    Icons.folder_rounded,
+                    isPdfCategory
+                        ? Icons.picture_as_pdf_rounded
+                        : Icons.image_rounded,
                     size: 20,
                     color: isSelected
-                        ? const Color(0xFF3B82F6)
+                        ? (isPdfCategory
+                              ? Colors.red[400]
+                              : const Color(0xFF3B82F6))
                         : const Color(0xFF9CA3AF),
                   ),
                   const SizedBox(width: 12),
@@ -287,7 +442,11 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
                     ),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? const Color(0xFF3B82F6).withValues(alpha: 0.1)
+                          ? (isPdfCategory
+                                ? Colors.red.withValues(alpha: 0.1)
+                                : const Color(
+                                    0xFF3B82F6,
+                                  ).withValues(alpha: 0.1))
                           : const Color(0xFFF3F4F6),
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -297,7 +456,9 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: isSelected
-                            ? const Color(0xFF3B82F6)
+                            ? (isPdfCategory
+                                  ? Colors.red[400]
+                                  : const Color(0xFF3B82F6))
                             : const Color(0xFF6B7280),
                       ),
                     ),
@@ -332,13 +493,20 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
     );
   }
 
-  Widget _buildImageCard(DailyImage img) {
+  Widget _buildImageCard(DocumentImage img) {
     // Generate a unique tag based on ID or URL, combined with object hash to ensure uniqueness
-    // handling potential duplicates in data or same URLs
-    final String heroTag = '${img.imageid ?? img.imageUrl}_${img.hashCode}';
+    final String heroTag = '${img.imageId ?? img.imageUrl}_${img.hashCode}';
+    final bool isPdf = img.imageUrl?.toLowerCase().endsWith('.pdf') ?? false;
 
     return InkWell(
-      onTap: () => _showImageDetail(context, img, heroTag),
+      onTap: () {
+        if (isPdf) {
+          // Open PDF in new tab
+          _openPdfInNewTab(img.imageUrl!);
+        } else {
+          _showImageDetail(context, img, heroTag);
+        }
+      },
       borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
@@ -361,24 +529,53 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(15),
                 ),
-                child: Hero(
-                  tag: heroTag,
-                  child: Image.network(
-                    img.imageUrl ?? '',
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
+                child: isPdf
+                    ? Container(
                         color: const Color(0xFFF3F4F6),
-                        child: const Center(
-                          child: Icon(
-                            Icons.broken_image_rounded,
-                            color: Color(0xFF9CA3AF),
-                          ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.picture_as_pdf_rounded,
+                              size: 64,
+                              color: Colors.red[400],
+                            ),
+                            const SizedBox(height: 8),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              child: Text(
+                                'PDF Document',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
                         ),
-                      );
-                    },
-                  ),
-                ),
+                      )
+                    : Hero(
+                        tag: heroTag,
+                        child: Image.network(
+                          img.imageUrl ?? '',
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: const Color(0xFFF3F4F6),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.broken_image_rounded,
+                                  color: Color(0xFF9CA3AF),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
               ),
             ),
             Padding(
@@ -386,36 +583,57 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    img.subcategory ?? 'ไม่มีรายละเอียด',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF374151),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (img.description?.isNotEmpty == true) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      img.description!,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF6B7280),
+                  Row(
+                    children: [
+                      if (isPdf)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: Icon(
+                            Icons.picture_as_pdf,
+                            size: 14,
+                            color: Colors.red[400],
+                          ),
+                        ),
+                      Expanded(
+                        child: Text(
+                          img.subcategory ??
+                              img.description ??
+                              'ไม่มีรายละเอียด',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF374151),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatDate(img.uploadedAt),
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Color(0xFF9CA3AF),
-                    ),
+                    ],
                   ),
+                  const SizedBox(height: 6),
+                  // Uploaded by
+                  if (img.uploadedBy?.isNotEmpty == true)
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.person_outline_rounded,
+                          size: 11,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            img.uploadedBy!,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Color(0xFF6B7280),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),
@@ -425,7 +643,26 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
     );
   }
 
-  void _showImageDetail(BuildContext context, DailyImage img, String heroTag) {
+  void _openPdfInNewTab(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        print('❌ Could not launch URL: $url');
+      }
+    } catch (e) {
+      print('❌ Error opening PDF: $e');
+    }
+  }
+
+  void _showImageDetail(
+    BuildContext context,
+    DocumentImage img,
+    String heroTag,
+  ) {
+    final bool isPdf = img.imageUrl?.toLowerCase().endsWith('.pdf') ?? false;
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -434,7 +671,7 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
           alignment: Alignment.center,
           children: [
             Container(
-              constraints: const BoxConstraints(maxWidth: 800, maxHeight: 800),
+              constraints: const BoxConstraints(maxWidth: 900, maxHeight: 800),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
@@ -443,61 +680,111 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Flexible(
-                    child: ClipRRect(
+                  // Header
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(20),
                       ),
-                      child: Hero(
-                        tag: heroTag,
-                        child: Image.network(
-                          img.imageUrl ?? '',
-                          fit: BoxFit.contain,
-                        ),
+                      border: Border(
+                        bottom: BorderSide(color: Colors.grey[200]!),
                       ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
+                    child: Row(
                       children: [
-                        Text(
-                          img.subcategory ?? 'ไม่มีรายละเอียด',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1F2937),
+                        if (isPdf)
+                          Icon(
+                            Icons.picture_as_pdf_rounded,
+                            color: Colors.red[400],
+                            size: 24,
+                          )
+                        else
+                          const Icon(
+                            Icons.image_rounded,
+                            color: Color(0xFF3B82F6),
+                            size: 24,
+                          ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                img.subcategory ??
+                                    img.description ??
+                                    'ไม่มีรายละเอียด',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1F2937),
+                                ),
+                              ),
+                              if (img.description?.isNotEmpty == true &&
+                                  img.description != img.subcategory) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  img.description!,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF6B7280),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
-                        if (img.description?.isNotEmpty == true) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            img.description!,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Color(0xFF4B5563),
+                      ],
+                    ),
+                  ),
+                  // Content
+                  Flexible(
+                    child: isPdf
+                        ? _buildPdfViewer(img.imageUrl!)
+                        : ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                              bottom: Radius.circular(20),
                             ),
-                          ),
-                        ],
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.calendar_today_rounded,
-                              size: 16,
-                              color: Color(0xFF9CA3AF),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'อัปโหลดเมื่อ: ${_formatDate(img.uploadedAt)}',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF6B7280),
+                            child: InteractiveViewer(
+                              minScale: 0.5,
+                              maxScale: 4.0,
+                              panEnabled: true,
+                              scaleEnabled: true,
+                              child: Hero(
+                                tag: heroTag,
+                                child: Image.network(
+                                  img.imageUrl ?? '',
+                                  fit: BoxFit.contain,
+                                ),
                               ),
                             ),
-                          ],
+                          ),
+                  ),
+                  // Footer with date
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: const BorderRadius.vertical(
+                        bottom: Radius.circular(20),
+                      ),
+                      border: Border(top: BorderSide(color: Colors.grey[200]!)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_today_rounded,
+                          size: 16,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'อัปโหลดเมื่อ: ${_formatDate(img.uploadedAt)}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF6B7280),
+                          ),
                         ),
                       ],
                     ),
@@ -512,12 +799,25 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
                 onPressed: () => Navigator.of(context).pop(),
                 icon: const Icon(Icons.close_rounded, color: Colors.black54),
                 style: IconButton.styleFrom(
-                  backgroundColor: Colors.white.withValues(alpha: 0.8),
+                  backgroundColor: Colors.white.withValues(alpha: 0.9),
                 ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPdfViewer(String url) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: SfPdfViewer.network(
+        url,
+        enableDoubleTapZooming: true,
+        enableTextSelection: true,
+        canShowScrollHead: true,
+        canShowScrollStatus: true,
       ),
     );
   }

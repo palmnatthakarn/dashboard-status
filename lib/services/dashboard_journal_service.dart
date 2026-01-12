@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:developer';
 import 'package:http/http.dart' as http;
+import 'auth_repository.dart';
 import '../models/journal.dart';
 import '../models/dashboard_summary.dart';
 import '../models/daily_images.dart';
@@ -8,7 +9,7 @@ import 'journal_service.dart';
 
 /// Service สำหรับ Dashboard ที่ใช้ Journal แทน DocDetails
 class DashboardJournalService {
-  static const String baseUrl = 'http://localhost:3000/api';
+  static const String baseUrl = AuthRepository.baseUrl;
 
   /// ดึงข้อมูล Dashboard ครบชุดโดยใช้ Journal API
   static Future<DashboardJournalData> fetchDashboardData({
@@ -77,7 +78,11 @@ class DashboardJournalService {
     log('🌐 Fetching summary from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -101,7 +106,11 @@ class DashboardJournalService {
     log('🌐 Fetching daily images from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -163,7 +172,11 @@ class DashboardJournalService {
     log('🌐 Fetching shop daily images from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {

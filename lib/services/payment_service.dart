@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'dart:developer';
 import 'package:http/http.dart' as http;
+import 'auth_repository.dart';
 import '../models/payment.dart';
 
 class PaymentService {
-  static const String baseUrl = 'http://localhost:3000/api';
+  static const String baseUrl = AuthRepository.baseUrl;
 
   /// GET /api/payments - Get all payments
   static Future<PaymentResponse> getAllPayments({
@@ -29,18 +30,23 @@ class PaymentService {
     if (paymentMethod != null) queryParams['payment_method'] = paymentMethod;
     if (vendorCode != null) queryParams['vendor_code'] = vendorCode;
 
-    final uri = Uri.parse('$baseUrl/payments')
-        .replace(queryParameters: queryParams);
+    final uri = Uri.parse(
+      '$baseUrl/payments',
+    ).replace(queryParameters: queryParams);
     log('🌐 Fetching payments from: $uri');
 
     try {
-      final response = await http.get(uri);
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(uri, headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
         log('✅ Successfully parsed payments data');
-        
+
         // Handle API response structure
         if (data['success'] == true && data['data'] != null) {
           return PaymentResponse(
@@ -71,7 +77,11 @@ class PaymentService {
     log('🌐 Fetching payment by ID from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -109,12 +119,17 @@ class PaymentService {
 
   /// GET /api/payments/summary/:branch_sync - Get payment summary by branch
   static Future<PaymentSummary?> getPaymentSummaryByBranch(
-      String branchSync) async {
+    String branchSync,
+  ) async {
     final url = '$baseUrl/payments/summary/$branchSync';
     log('🌐 Fetching payment summary from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -214,8 +229,7 @@ class PaymentService {
             (payment.netAmount ?? 0);
         branchSummaries[branchId]!['payment_count'] =
             (branchSummaries[branchId]!['payment_count'] as int) + 1;
-        (branchSummaries[branchId]!['payments'] as List<Payment>)
-            .add(payment);
+        (branchSummaries[branchId]!['payments'] as List<Payment>).add(payment);
 
         // Method summaries
         if (!methodSummaries.containsKey(method)) {
@@ -235,12 +249,18 @@ class PaymentService {
 
       return {
         'total_payments': payments.length,
-        'total_payment_amount':
-            payments.fold(0.0, (sum, p) => sum + (p.paymentAmount ?? 0)),
-        'total_discount_amount':
-            payments.fold(0.0, (sum, p) => sum + (p.discountAmount ?? 0)),
-        'total_net_amount':
-            payments.fold(0.0, (sum, p) => sum + (p.netAmount ?? 0)),
+        'total_payment_amount': payments.fold(
+          0.0,
+          (sum, p) => sum + (p.paymentAmount ?? 0),
+        ),
+        'total_discount_amount': payments.fold(
+          0.0,
+          (sum, p) => sum + (p.discountAmount ?? 0),
+        ),
+        'total_net_amount': payments.fold(
+          0.0,
+          (sum, p) => sum + (p.netAmount ?? 0),
+        ),
         'branch_summaries': branchSummaries.values.toList(),
         'method_summaries': methodSummaries.values.toList(),
         'payments': payments,

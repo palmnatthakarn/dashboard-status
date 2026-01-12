@@ -7,16 +7,16 @@ import './common/custom_pagination.dart';
 
 class ShopDataTable extends StatefulWidget {
   final List<dynamic> shops;
-  final DateTime? selectedDate;
-  final Function(DateTime?) onDateChanged;
+  final DateTimeRange? selectedDateRange;
+  final Function(DateTimeRange?) onDateRangeChanged;
   final Function getIncomeForPeriod;
   final NumberFormat moneyFormat;
 
   const ShopDataTable({
     super.key,
     required this.shops,
-    this.selectedDate,
-    required this.onDateChanged,
+    this.selectedDateRange,
+    required this.onDateRangeChanged,
     required this.getIncomeForPeriod,
     required this.moneyFormat,
   });
@@ -88,7 +88,7 @@ class _ShopDataTableState extends State<ShopDataTable>
       final groupedByBranch = _groupByBranch(branchShops);
       final dataSource = BranchDataSource(
         branchData: groupedByBranch,
-        selectedDate: widget.selectedDate,
+        selectedDateRange: widget.selectedDateRange,
         moneyFormat: widget.moneyFormat,
         context: context,
       );
@@ -117,7 +117,18 @@ class _ShopDataTableState extends State<ShopDataTable>
   }
 
   Widget _buildContainer(BranchDataSource dataSource) {
+    // Calculate height: Screen Height - Header (approx 420px)
+    // You can adjust the padding value (420) to fit your layout
+    final double screenHeight = MediaQuery.of(context).size.height;
+    final double headerOffset = 390.0;
+    final double containerHeight = (screenHeight - headerOffset).clamp(
+      400.0,
+      double.infinity,
+    );
+
     return Container(
+      //width: double.infinity,
+      height: containerHeight,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -138,20 +149,19 @@ class _ShopDataTableState extends State<ShopDataTable>
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          // mainAxisSize: MainAxisSize.min, // Remove min to allow expansion
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ShopHeader(
-              selectedDate: widget.selectedDate,
-              onDateChanged: widget.onDateChanged,
+              selectedDateRange: widget.selectedDateRange,
+              onDateRangeChanged: widget.onDateRangeChanged,
             ),
             const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
-            ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 300, maxHeight: 350),
+            Expanded(
               child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: _buildDataTable(dataSource),
-            ),
+                padding: const EdgeInsets.all(12),
+                child: _buildDataTable(dataSource),
+              ),
             ),
           ],
         ),
@@ -174,36 +184,36 @@ class _ShopDataTableState extends State<ShopDataTable>
     ).whereType<DataRow>().toList();
 
     return Column(
-        children: [
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: DataTable2(
-                columnSpacing: 8,
-                horizontalMargin: 12,
-                minWidth: 1000,
-                headingRowHeight: 44,
-                dataRowHeight: 52,
+      children: [
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: DataTable2(
+              columnSpacing: 8,
+              horizontalMargin: 12,
+              minWidth: 1000,
+              headingRowHeight: 44,
+              dataRowHeight: 52,
               headingRowColor: WidgetStateProperty.all(const Color(0xFFF9FAFB)),
-                showCheckboxColumn: false,
-                columns: _buildColumns(),
-                rows: currentPageRows,
-              ),
+              showCheckboxColumn: false,
+              columns: _buildColumns(),
+              rows: currentPageRows,
             ),
           ),
-          const SizedBox(height: 10),
-          CustomPagination(
-            currentPage: _currentPage,
-            totalItems: totalRows,
-            rowsPerPage: _rowsPerPage,
-            rowsPerPageOptions: const [8, 16, 24],
-            onPageChanged: (page) => setState(() => _currentPage = page),
-            onRowsPerPageChanged: (rows) => setState(() {
-              _rowsPerPage = rows;
-              _currentPage = 1;
-            }),
-          ),
-        ],
+        ),
+        const SizedBox(height: 10),
+        CustomPagination(
+          currentPage: _currentPage,
+          totalItems: totalRows,
+          rowsPerPage: _rowsPerPage,
+          rowsPerPageOptions: const [8, 16, 24],
+          onPageChanged: (page) => setState(() => _currentPage = page),
+          onRowsPerPageChanged: (rows) => setState(() {
+            _rowsPerPage = rows;
+            _currentPage = 1;
+          }),
+        ),
+      ],
     );
   }
 
@@ -217,13 +227,10 @@ class _ShopDataTableState extends State<ShopDataTable>
     return const [
       DataColumn2(label: Text('สถานะ', style: headerStyle), fixedWidth: 60),
       DataColumn2(
-        label: Text('ชื่อสาขา', style: headerStyle),
+        label: Text('ชื่อร้าน', style: headerStyle),
         size: ColumnSize.L,
       ),
-      DataColumn2(
-        label: Text('รหัสสาขา', style: headerStyle),
-        size: ColumnSize.M,
-      ),
+      // Removed shop code column - code now shows under shop name
       DataColumn2(
         label: Text('รายวัน', style: headerStyle),
         size: ColumnSize.S,
@@ -236,18 +243,18 @@ class _ShopDataTableState extends State<ShopDataTable>
         label: Text('รายปี', style: headerStyle),
         size: ColumnSize.S,
       ),
-      DataColumn2(
+      /*DataColumn2(
         label: Text('Journal', style: headerStyle),
         size: ColumnSize.S,
-      ),
+      ),*/
       DataColumn2(
         label: Text('บิล', style: headerStyle),
         size: ColumnSize.S,
       ),
-      DataColumn2(
+     /* DataColumn2(
         label: Text('ผู้รับผิดชอบ', style: headerStyle),
         size: ColumnSize.S,
-      ),
+      ),*/
     ];
   }
 

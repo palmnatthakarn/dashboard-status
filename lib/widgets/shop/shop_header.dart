@@ -5,12 +5,12 @@ import 'package:intl/intl.dart';
 class ShopHeader extends StatelessWidget {
   const ShopHeader({
     super.key,
-    required this.selectedDate,
-    required this.onDateChanged,
+    required this.selectedDateRange,
+    required this.onDateRangeChanged,
   });
 
-  final DateTime? selectedDate;
-  final Function(DateTime?) onDateChanged;
+  final DateTimeRange? selectedDateRange;
+  final Function(DateTimeRange?) onDateRangeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +67,7 @@ class ShopHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'ข้อมูลสาขา',
+            'ข้อมูลร้าน',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w800,
@@ -77,7 +77,7 @@ class ShopHeader extends StatelessWidget {
           ),
           SizedBox(height: 4),
           Text(
-            'จัดการและติดตามข้อมูลสาขาทั้งหมด',
+            'จัดการและติดตามข้อมูลร้านทั้งหมด',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
@@ -90,10 +90,15 @@ class ShopHeader extends StatelessWidget {
   }
 
   Widget _buildDatePicker(BuildContext context) {
+    final startDate = selectedDateRange?.start ?? DateTime.now();
+    final endDate = selectedDateRange?.end ?? DateTime.now();
+    final startText = DateFormat('dd/MM/yyyy').format(startDate);
+    final endText = DateFormat('dd/MM/yyyy').format(endDate);
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => _selectDate(context),
+        onTap: () => _selectDateRange(context),
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -130,7 +135,7 @@ class ShopHeader extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    'วันที่เลือก',
+                    'ช่วงเวลาที่เลือก',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
@@ -138,7 +143,7 @@ class ShopHeader extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    DateFormat('dd/MM/yyyy').format(selectedDate ?? DateTime.now()),
+                    '$startText - $endText',
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -160,30 +165,41 @@ class ShopHeader extends StatelessWidget {
     );
   }
 
-  Future<void> _selectDate(BuildContext context) async {
+  Future<void> _selectDateRange(BuildContext context) async {
     HapticFeedback.lightImpact();
-    final DateTime? picked = await showDatePicker(
+    final DateTimeRange? picked = await showDateRangePicker(
       context: context,
-      initialDate: selectedDate ?? DateTime.now(),
+      initialDateRange: selectedDateRange,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
       builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF3B82F6),
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Color(0xFF1E293B),
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 600.0,
+              maxHeight: 600.0,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  colorScheme: const ColorScheme.light(
+                    primary: Color(0xFF3B82F6),
+                    onPrimary: Colors.white,
+                    surface: Colors.white,
+                    onSurface: Color(0xFF1E293B),
+                  ),
+                ),
+                child: child!,
+              ),
             ),
           ),
-          child: child!,
         );
       },
     );
 
     if (picked != null) {
-      onDateChanged(picked);
+      onDateRangeChanged(picked);
     }
   }
 }

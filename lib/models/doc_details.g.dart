@@ -9,6 +9,9 @@ part of 'doc_details.dart';
 DocDetails _$DocDetailsFromJson(Map<String, dynamic> json) => DocDetails(
   shopid: json['shopid'] as String?,
   shopname: json['shopname'] as String?,
+  names: (json['names'] as List<dynamic>?)
+      ?.map((e) => ShopName.fromJson(e as Map<String, dynamic>))
+      .toList(),
   monthlySummary: (json['monthly_summary'] as Map<String, dynamic>?)?.map(
     (k, e) => MapEntry(k, MonthlyData.fromJson(e as Map<String, dynamic>)),
   ),
@@ -30,12 +33,17 @@ DocDetails _$DocDetailsFromJson(Map<String, dynamic> json) => DocDetails(
       ?.map((e) => DailyImage.fromJson(e as Map<String, dynamic>))
       .toList(),
   dailyTransactions: json['daily_transactions'] as List<dynamic>?,
+  dailyAverage: (json['dailyAverage'] as num?)?.toDouble(),
+  monthlyAverage: (json['monthlyAverage'] as num?)?.toDouble(),
+  yearlyAverage: (json['yearlyAverage'] as num?)?.toDouble(),
+  localImageCount: (json['localImageCount'] as num?)?.toInt(),
 );
 
 Map<String, dynamic> _$DocDetailsToJson(DocDetails instance) =>
     <String, dynamic>{
       'shopid': instance.shopid,
       'shopname': instance.shopname,
+      'names': instance.names,
       'monthly_summary': instance.monthlySummary,
       'daily': instance.daily,
       'responsible': instance.responsible,
@@ -45,6 +53,10 @@ Map<String, dynamic> _$DocDetailsToJson(DocDetails instance) =>
       'timezone': instance.timezone,
       'daily_images': instance.dailyImages,
       'daily_transactions': instance.dailyTransactions,
+      'dailyAverage': instance.dailyAverage,
+      'monthlyAverage': instance.monthlyAverage,
+      'yearlyAverage': instance.yearlyAverage,
+      'localImageCount': instance.localImageCount,
     };
 
 MonthlyData _$MonthlyDataFromJson(Map<String, dynamic> json) => MonthlyData(
@@ -110,3 +122,17 @@ Map<String, dynamic> _$RecordedByToJson(RecordedBy instance) =>
       'name': instance.name,
       'employee_id': instance.employeeId,
     };
+
+ShopName _$ShopNameFromJson(Map<String, dynamic> json) => ShopName(
+  code: json['code'] as String?,
+  name: json['name'] as String?,
+  isauto: json['isauto'] as bool?,
+  isdelete: json['isdelete'] as bool?,
+);
+
+Map<String, dynamic> _$ShopNameToJson(ShopName instance) => <String, dynamic>{
+  'code': instance.code,
+  'name': instance.name,
+  'isauto': instance.isauto,
+  'isdelete': instance.isdelete,
+};

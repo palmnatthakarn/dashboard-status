@@ -1,10 +1,13 @@
 import 'dart:convert';
 import 'dart:developer';
 import 'package:http/http.dart' as http;
+import 'auth_repository.dart';
 import '../models/journal.dart';
+import '../models/journal_detail.dart';
+import '../models/journal_book.dart';
 
 class JournalService {
-  static const String baseUrl = 'http://localhost:3000/api';
+  static const String baseUrl = AuthRepository.baseUrl;
 
   /// GET /api/journals - Get all journals
   static Future<JournalResponse> getAllJournals({
@@ -16,6 +19,7 @@ class JournalService {
     String? transactionType,
     String? accountType,
     String? status,
+    bool isRetry = false,
   }) async {
     final queryParams = <String, String>{
       'page': page.toString(),
@@ -37,13 +41,53 @@ class JournalService {
     log('🌐 Fetching journals from: $uri');
 
     try {
-      final response = await http.get(uri);
+      final token = AuthRepository.token;
+
+      // Check if token is expired before making request
+      if (AuthRepository.isTokenExpired && !isRetry) {
+        log('⏰ Token is expiring soon, refreshing before request...');
+        final authRepo = AuthRepository();
+        final refreshed = await authRepo.refreshTokenWithCredentials();
+        if (!refreshed) {
+          throw Exception('Token หมดอายุ กรุณาเข้าสู่ระบบใหม่');
+        }
+      }
+
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(uri, headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
         log('✅ Successfully parsed journals data');
         return JournalResponse.fromJson(data);
+      } else if (response.statusCode == 401) {
+        log('❌ Unauthorized - attempting token refresh...');
+
+        if (!isRetry) {
+          // Try to refresh token
+          final authRepo = AuthRepository();
+          final refreshed = await authRepo.refreshTokenWithCredentials();
+
+          if (refreshed) {
+            log('✅ Token refreshed, retrying request...');
+            return getAllJournals(
+              page: page,
+              limit: limit,
+              shopId: shopId,
+              startDate: startDate,
+              endDate: endDate,
+              transactionType: transactionType,
+              accountType: accountType,
+              status: status,
+              isRetry: true,
+            );
+          }
+        }
+
+        throw Exception('Token หมดอายุ กรุณาเข้าสู่ระบบใหม่');
       } else {
         throw Exception(
           'Failed to load journals - Status: ${response.statusCode}',
@@ -61,7 +105,11 @@ class JournalService {
     log('🌐 Fetching journal by ID from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -103,7 +151,11 @@ class JournalService {
     log('🌐 Fetching journal summary from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -128,7 +180,11 @@ class JournalService {
     log('🌐 Fetching account balance from: $url');
 
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -231,6 +287,119 @@ class JournalService {
       };
     } catch (e) {
       log('💥 Error fetching dashboard journal data: $e');
+      rethrow;
+    }
+  }
+
+  /// GET /gl/journal - Get GL journals
+  static Future<JournalResponse> getAllGLJournals({
+    int page = 1,
+    int limit = 1000,
+    String? shopId,
+  }) async {
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+
+    if (shopId != null)
+      queryParams['shopids'] = shopId; // Changed from branch_sync to shopids
+
+    final uri = Uri.parse(
+      'https://smlaicloudapi.dev.dedepos.com/gl/journal',
+    ).replace(queryParameters: queryParams);
+    log('🌐 Fetching GL journals from: $uri');
+
+    try {
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(uri, headers: headers);
+      log('📡 Response status: ${response.statusCode}');
+      log(
+        '📄 Response body preview: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}',
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        log('✅ Successfully parsed JSON. Data keys: ${data.keys.toList()}');
+
+        if (data['data'] != null) {
+          final list = data['data'] as List;
+          log('📊 Found ${list.length} items in data');
+          if (list.isNotEmpty) {
+            log('Example item: ${list.first}');
+          }
+        }
+
+        return JournalResponse.fromJson(data);
+      } else {
+        throw Exception(
+          'Failed to load GL journals - Status: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      log('💥 Error fetching GL journals: $e');
+      rethrow;
+    }
+  }
+
+  /// GET /gl/journal/docno/{docno} - Get journal detail by document number
+  static Future<JournalDetail> getJournalDetailByDocNo(String docNo) async {
+    final url = 'https://smlaicloudapi.dev.dedepos.com/gl/journal/docno/$docNo';
+    log('🌐 Fetching journal detail from: $url');
+
+    try {
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
+      log('📡 Response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+
+        if (data['success'] == true && data['data'] != null) {
+          return JournalDetail.fromJson(data['data']);
+        } else {
+          throw Exception('Invalid response format');
+        }
+      } else {
+        throw Exception(
+          'Failed to load journal detail - Status: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      log('💥 Error fetching journal detail: $e');
+      rethrow;
+    }
+  }
+
+  /// GET /gl/journalbook - Get journal books
+  static Future<List<JournalBook>> getJournalBooks() async {
+    const url = 'https://smlaicloudapi.dev.dedepos.com/gl/journalbook';
+    log('🌐 Fetching journal books from: $url');
+
+    try {
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await http.get(Uri.parse(url), headers: headers);
+      log('📡 Response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        return JournalBookResponse.fromJson(data).data;
+      } else {
+        throw Exception(
+          'Failed to load journal books - Status: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      log('💥 Error fetching journal books: $e');
       rethrow;
     }
   }

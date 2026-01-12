@@ -9,6 +9,29 @@ abstract class KpiEvent extends Equatable {
 
 class LoadKpiData extends KpiEvent {}
 
+/// Load shop list from /list-shop API
+class LoadShops extends KpiEvent {}
+
+/// Select shop and fetch tasks
+class SelectShopAndSearch extends KpiEvent {
+  final String? shopId;
+  final String? shopName;
+  final DateTime? startDate;
+  final DateTime? endDate;
+  final String? query;
+
+  const SelectShopAndSearch({
+    this.shopId,
+    this.shopName,
+    this.startDate,
+    this.endDate,
+    this.query,
+  });
+
+  @override
+  List<Object?> get props => [shopId, shopName, startDate, endDate, query];
+}
+
 class FilterByDateRange extends KpiEvent {
   final DateTime startDate;
   final DateTime endDate;
