@@ -7,7 +7,7 @@ void main() async {
     // ทดสอบ fetchSummary
     print('📊 Testing fetchSummary...');
     final summary = await ApiService.fetchSummary();
-    print('✅ Summary: ${summary.docTotal} total docs');
+    print('✅ Summary: ${summary.doctotal} total docs');
 
     // ทดสอบ fetchShops
     print('🏪 Testing fetchShops...');
