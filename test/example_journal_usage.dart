@@ -20,6 +20,9 @@ void main() async {
     // Example 5: Group by branch
     await example5GroupByBranch();
 
+    // Example 6: Fetch GL Journals with Filter Task => GL Journal
+    await example6FetchGLJournals();
+
     print('\n✅ All examples completed!');
   } catch (e) {
     print('❌ Error: $e');
@@ -193,4 +196,32 @@ String _formatCurrency(double amount) {
     return '฿${(amount / 1000).toStringAsFixed(2)}K';
   }
   return '฿${amount.toStringAsFixed(2)}';
+}
+
+// Example 6: Fetch GL Journals (Filter Task => GL Journal)
+Future<void> example6FetchGLJournals() async {
+  print('\n📝 Example 6: Fetch GL Journals (Filter Task => GL Journal)');
+  print('─' * 50);
+
+  try {
+    // Fetch GL Journals from API with the task query filter
+    final response = await JournalService.getAllGLJournals(
+      limit: 5,
+      task: 'GL Journal',
+    );
+
+    final journals = response.journals ?? [];
+    print('Found ${journals.length} GL Journals with Task=GL Journal\n');
+
+    for (final journal in journals) {
+      print('GL Journal #${journal.id ?? '-'}');
+      print('  Doc No: ${journal.docNo} (${journal.displayDate})');
+      print('  Shop ID: ${journal.branchSync}');
+      print('  Account: ${journal.accountCode} - ${journal.accountName}');
+      print('  Amount: ${journal.displayAmount}');
+      print('');
+    }
+  } catch (e) {
+    print('Error fetching GL Journals: $e');
+  }
 }

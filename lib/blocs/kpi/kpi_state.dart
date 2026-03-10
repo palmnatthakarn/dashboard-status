@@ -57,7 +57,10 @@ class KpiLoaded extends KpiState {
     this.selectedShopId,
     this.selectedShopName,
     this.isSearching = false,
+    this.selectedEmployeeIds = const [],
   });
+
+  final List<String> selectedEmployeeIds;
 
   int get totalDocuments =>
       employees.fold(0, (sum, e) => sum + e.totalDocuments);
@@ -92,6 +95,7 @@ class KpiLoaded extends KpiState {
     String? selectedShopId,
     String? selectedShopName,
     bool? isSearching,
+    List<String>? selectedEmployeeIds,
   }) {
     return KpiLoaded(
       employees: employees ?? this.employees,
@@ -110,6 +114,7 @@ class KpiLoaded extends KpiState {
       selectedShopId: selectedShopId ?? this.selectedShopId,
       selectedShopName: selectedShopName ?? this.selectedShopName,
       isSearching: isSearching ?? this.isSearching,
+      selectedEmployeeIds: selectedEmployeeIds ?? this.selectedEmployeeIds,
     );
   }
 
@@ -131,6 +136,7 @@ class KpiLoaded extends KpiState {
     selectedShopId,
     selectedShopName,
     isSearching,
+    selectedEmployeeIds,
   ];
 }
 

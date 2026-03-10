@@ -1,3 +1,4 @@
+﻿import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -51,7 +52,7 @@ class _DashboardContentState extends State<DashboardContent> {
           child: BlocBuilder<DashboardBloc, DashboardState>(
             builder: (context, state) {
               // Debug: แสดง state ปัจจุบัน
-              print('📊 Current Dashboard State: ${state.runtimeType}');
+              log('📊 Current Dashboard State: ${state.runtimeType}');
 
               if (state is DashboardInitial) {
                 // แสดง loading เมื่ออยู่ใน initial state

@@ -1,6 +1,6 @@
-import 'package:firebase_auth/firebase_auth.dart';
+﻿import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'dart:developer';
+import '../utils/app_logger.dart';
 
 class GoogleAuthService {
   FirebaseAuth get _firebaseAuth => FirebaseAuth.instance;
@@ -31,7 +31,7 @@ class GoogleAuthService {
       // Once signed in, return the UserCredential
       return await _firebaseAuth.signInWithCredential(credential);
     } catch (e) {
-      log("Error during Google Sign-In: $e");
+      dLog("Error during Google Sign-In: $e");
       rethrow;
     }
   }

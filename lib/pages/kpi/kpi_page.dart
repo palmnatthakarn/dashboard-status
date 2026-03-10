@@ -41,6 +41,9 @@ class _KpiPageContentState extends State<KpiPageContent> {
   String? _selectedShopId;
   String? _selectedShopName;
 
+  // Selected Employee Tags
+  final List<String> _selectedEmployeeIds = [];
+
   // Pagination state
   int _currentPage = 1;
   int _rowsPerPage = 10;
@@ -130,6 +133,7 @@ class _KpiPageContentState extends State<KpiPageContent> {
                                 selectedShopId: state.selectedShopId,
                                 selectedShopName: state.selectedShopName,
                                 isSearching: state.isSearching,
+                                selectedEmployeeIds: _selectedEmployeeIds,
                                 onToggleAdvancedFilter: () {
                                   setState(() {
                                     _isAdvancedFilterExpanded =
@@ -143,6 +147,20 @@ class _KpiPageContentState extends State<KpiPageContent> {
                                   setState(() {
                                     _selectedShopId = shopId;
                                     _selectedShopName = shopName;
+                                  });
+                                },
+                                onEmployeeSelected: (employee) {
+                                  setState(() {
+                                    if (!_selectedEmployeeIds.contains(
+                                      employee.id,
+                                    )) {
+                                      _selectedEmployeeIds.add(employee.id);
+                                    }
+                                  });
+                                },
+                                onEmployeeRemoved: (employee) {
+                                  setState(() {
+                                    _selectedEmployeeIds.remove(employee.id);
                                   });
                                 },
                                 onStartDateChanged: (date) {
@@ -169,11 +187,18 @@ class _KpiPageContentState extends State<KpiPageContent> {
                                       startDate: _documentReceiveStartDate,
                                       endDate: _documentReceiveEndDate,
                                       query: _searchController.text,
+                                      selectedEmployeeIds: _selectedEmployeeIds,
                                     ),
                                   );
                                 },
                                 onClearSearch: () {
-                                  setState(() => _searchController.clear());
+                                  setState(() {
+                                    _searchController.clear();
+                                    _selectedEmployeeIds.clear();
+                                  });
+                                  // Trigger search to reset results ??
+                                  // Usually clear button just clears inputs. User clicks search to refresh.
+                                  // Or user expects reset? "Search" button is explicit.
                                 },
                                 onRefresh: () {
                                   context.read<KpiBloc>().add(LoadKpiData());

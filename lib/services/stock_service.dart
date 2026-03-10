@@ -1,5 +1,5 @@
-import 'dart:convert';
-import 'dart:developer';
+﻿import 'dart:convert';
+import '../utils/app_logger.dart';
 import 'package:http/http.dart' as http;
 import 'auth_repository.dart';
 import '../models/stock.dart';
@@ -88,7 +88,7 @@ class StockService {
     final uri = Uri.parse(
       '$baseUrl/stock',
     ).replace(queryParameters: queryParams);
-    log('🌐 Fetching stock movements from: $uri');
+    dLog('🌐 Fetching stock movements from: $uri');
 
     try {
       final token = AuthRepository.token;
@@ -96,11 +96,11 @@ class StockService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(uri, headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
-        log('✅ Successfully parsed stock data');
+        dLog('✅ Successfully parsed stock data');
 
         // Handle API response structure
         if (data['success'] == true && data['data'] != null) {
@@ -121,7 +121,7 @@ class StockService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching stock movements: $e');
+      dLog('💥 Error fetching stock movements: $e');
       rethrow;
     }
   }
@@ -129,7 +129,7 @@ class StockService {
   /// GET /api/stock/:id - Get stock movement by ID
   static Future<Stock?> getStockById(int id) async {
     final url = '$baseUrl/stock/$id';
-    log('🌐 Fetching stock movement by ID from: $url');
+    dLog('🌐 Fetching stock movement by ID from: $url');
 
     try {
       final token = AuthRepository.token;
@@ -137,7 +137,7 @@ class StockService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(Uri.parse(url), headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -150,7 +150,7 @@ class StockService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching stock movement by ID: $e');
+      dLog('💥 Error fetching stock movement by ID: $e');
       rethrow;
     }
   }
@@ -213,7 +213,7 @@ class StockService {
     String branchSync,
   ) async {
     final url = '$baseUrl/stock/summary/$branchSync';
-    log('🌐 Fetching stock summary from: $url');
+    dLog('🌐 Fetching stock summary from: $url');
 
     try {
       final token = AuthRepository.token;
@@ -221,7 +221,7 @@ class StockService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(Uri.parse(url), headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -243,7 +243,7 @@ class StockService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching stock summary: $e');
+      dLog('💥 Error fetching stock summary: $e');
       rethrow;
     }
   }
@@ -261,7 +261,7 @@ class StockService {
     final uri = Uri.parse(
       '$baseUrl/stock/balance/$itemCode',
     ).replace(queryParameters: queryParams);
-    log('🌐 Fetching stock balance from: $uri');
+    dLog('🌐 Fetching stock balance from: $uri');
 
     try {
       final token = AuthRepository.token;
@@ -269,7 +269,7 @@ class StockService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(uri, headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -280,7 +280,7 @@ class StockService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching stock balance: $e');
+      dLog('💥 Error fetching stock balance: $e');
       rethrow;
     }
   }
@@ -295,7 +295,7 @@ class StockService {
     try {
       return DateTime.parse(dateString);
     } catch (e) {
-      log('💥 Error parsing date: $dateString');
+      dLog('💥 Error parsing date: $dateString');
       return null;
     }
   }
@@ -305,7 +305,7 @@ class StockService {
     String? startDate,
     String? endDate,
   }) async {
-    log('📊 Fetching dashboard stock data...');
+    dLog('📊 Fetching dashboard stock data...');
 
     try {
       final response = await getAllStock(
@@ -420,7 +420,7 @@ class StockService {
         'stocks': stocks,
       };
     } catch (e) {
-      log('💥 Error fetching dashboard stock data: $e');
+      dLog('💥 Error fetching dashboard stock data: $e');
       rethrow;
     }
   }

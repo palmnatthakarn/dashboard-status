@@ -1,18 +1,24 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'dart:developer' as dev;
-import 'dart:math';
+import '../../utils/app_logger.dart';
+
 import 'kpi_event.dart';
 import 'kpi_state.dart';
 import '../../models/kpi_employee.dart';
 import '../../services/task_service.dart';
 import '../../services/auth_repository.dart';
 import '../../services/multi_shop_service.dart';
+import '../../services/journal_service.dart';
 
 class TaskWithShop {
   final TaskItem task;
   final String shopName;
+  final String?
+  journalCreatedBy; // Added for GL Journal specific owner override
 
-  TaskWithShop(this.task, this.shopName);
+  TaskWithShop(this.task, this.shopName, {this.journalCreatedBy});
+
+  // Helper getter to get the effective owner (journalCreatedBy takes precedence if task is a GL Journal task)
+  String get effectiveOwner => journalCreatedBy ?? task.ownerBy;
 }
 
 class KpiBloc extends Bloc<KpiEvent, KpiState> {
@@ -23,7 +29,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
     on<FilterByDateRange>(_onFilterByDateRange);
     on<FilterByBranch>(_onFilterByBranch);
     on<FilterByStatus>(_onFilterByStatus);
-    on<SearchEmployee>(_onSearchEmployee);
+    on<UpdateEmployeeFilter>(_onUpdateEmployeeFilter);
     on<FilterByAdvancedOptions>(_onFilterByAdvancedOptions);
     on<ApplyAllFilters>(_onApplyAllFilters);
     on<ResetFilters>(_onResetFilters);
@@ -42,7 +48,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
       // Load shop list from /list-shop API
       if (AuthRepository.isAuthenticated) {
         try {
-          dev.log('🏪 Loading shop list from API...');
+          dLog('🏪 Loading shop list from API...');
           final shopList = await MultiShopService.listShops();
 
           if (shopList.isNotEmpty) {
@@ -67,14 +73,14 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
               return KpiShopItem(shopId: shopId, shopName: shopName);
             }).toList();
 
-            dev.log('✅ Loaded ${shops.length} shops');
+            dLog('✅ Loaded ${shops.length} shops');
 
             // Auto-select "All Shops" by default
             if (shops.isNotEmpty) {
               selectedShopId = '';
               selectedShopName = 'ทุกร้าน';
 
-              dev.log('🏪 Auto-selecting All Shops');
+              dLog('🏪 Auto-selecting All Shops');
 
               try {
                 final List<TaskWithShop> allTasks = [];
@@ -96,25 +102,64 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
                       );
                     }
                   } catch (e) {
-                    dev.log(
+                    dLog(
                       '⚠️ Failed to load tasks for shop ${shop.shopName}: $e',
                     );
                   }
                 }
 
                 if (allTasks.isNotEmpty) {
+                  // Attempt to fetch GL Journals for owner mapping
+                  try {
+                    final glJournalsResp =
+                        await JournalService.getAllGLJournals(
+                          task: 'GL Journal',
+                        );
+                    if (glJournalsResp.success == true &&
+                        glJournalsResp.journals != null) {
+                      final journals = glJournalsResp.journals!;
+
+                      final Map<String, String> journalOwnerMap = {};
+                      for (final journal in journals) {
+                        if (journal.documentRef != null &&
+                            journal.documentRef!.isNotEmpty &&
+                            journal.createdBy != null) {
+                          journalOwnerMap[journal.documentRef!] =
+                              journal.createdBy!;
+                        }
+                      }
+
+                      if (journalOwnerMap.isNotEmpty) {
+                        for (int i = 0; i < allTasks.length; i++) {
+                          final task = allTasks[i].task;
+                          if (journalOwnerMap.containsKey(task.guidfixed)) {
+                            allTasks[i] = TaskWithShop(
+                              task,
+                              allTasks[i].shopName,
+                              journalCreatedBy: journalOwnerMap[task.guidfixed],
+                            );
+                          }
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    dLog(
+                      '⚠️ Failed to fetch GL Journals for owner mapping: $e',
+                    );
+                  }
+
                   employees = _groupTasksByOwner(allTasks);
-                  dev.log(
+                  dLog(
                     '✅ Loaded ${employees.length} employees (grouped) for all shops',
                   );
                 }
               } catch (e) {
-                dev.log('⚠️ Failed to load tasks for all shops: $e');
+                dLog('⚠️ Failed to load tasks for all shops: $e');
               }
             }
           }
         } catch (e) {
-          dev.log('⚠️ Failed to load shop list: $e');
+          dLog('⚠️ Failed to load shop list: $e');
         }
       }
 
@@ -144,7 +189,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
     final currentState = state as KpiLoaded;
 
     try {
-      dev.log('🏪 Refreshing shop list...');
+      dLog('🏪 Refreshing shop list...');
       final shopList = await MultiShopService.listShops();
 
       final shops = shopList.map((shop) {
@@ -168,9 +213,9 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
       }).toList();
 
       emit(currentState.copyWith(shops: shops));
-      dev.log('✅ Shop list refreshed: ${shops.length} shops');
+      dLog('✅ Shop list refreshed: ${shops.length} shops');
     } catch (e) {
-      dev.log('❌ Failed to refresh shop list: $e');
+      dLog('❌ Failed to refresh shop list: $e');
     }
   }
 
@@ -198,7 +243,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
       if (event.shopId == null ||
           event.shopId!.isEmpty ||
           event.shopId == 'all') {
-        dev.log('🏪 Fetching tasks for ALL shops...');
+        dLog('🏪 Fetching tasks for ALL shops...');
 
         // Iterate all shops
         for (final shop in currentState.shops) {
@@ -215,12 +260,12 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
               );
             }
           } catch (e) {
-            dev.log('⚠️ Failed to load tasks for shop ${shop.shopName}: $e');
+            dLog('⚠️ Failed to load tasks for shop ${shop.shopName}: $e');
           }
         }
       } else {
         // Fetch for single shop
-        dev.log('🏪 Fetching tasks for shop ${event.shopId}...');
+        dLog('🏪 Fetching tasks for shop ${event.shopId}...');
         final response = await TaskService.fetchTasksForShop(
           shopId: event.shopId!,
           limit: 20,
@@ -261,11 +306,46 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
           }).toList();
         }
 
-        // Group tasks by ownerBy
+        // Apply GL Journal owner override before grouping
+        try {
+          final glJournalsResp = await JournalService.getAllGLJournals(
+            task: 'GL Journal',
+          );
+          if (glJournalsResp.success == true &&
+              glJournalsResp.journals != null) {
+            final journals = glJournalsResp.journals!;
+
+            final Map<String, String> journalOwnerMap = {};
+            for (final journal in journals) {
+              if (journal.documentRef != null &&
+                  journal.documentRef!.isNotEmpty &&
+                  journal.createdBy != null) {
+                journalOwnerMap[journal.documentRef!] = journal.createdBy!;
+              }
+            }
+
+            if (journalOwnerMap.isNotEmpty) {
+              for (int i = 0; i < filteredTasks.length; i++) {
+                final task = filteredTasks[i].task;
+                if (journalOwnerMap.containsKey(task.guidfixed)) {
+                  filteredTasks[i] = TaskWithShop(
+                    task,
+                    filteredTasks[i].shopName,
+                    journalCreatedBy: journalOwnerMap[task.guidfixed],
+                  );
+                }
+              }
+            }
+          }
+        } catch (e) {
+          dLog('⚠️ Failed to fetch GL Journals for owner mapping: $e');
+        }
+
+        // Group tasks by ownerBy (or effectively journalCreatedBy)
         employees = _groupTasksByOwner(filteredTasks);
-        dev.log('✅ Loaded ${employees.length} employees (grouped)');
+        dLog('✅ Loaded ${employees.length} employees (grouped)');
       } else {
-        dev.log('📋 No shop selected, showing empty list');
+        dLog('📋 No shop selected, showing empty list');
       }
 
       // Apply filters (including search query)
@@ -282,6 +362,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         previousDateEnd: currentState.previousDateEnd,
         statusCheckDateStart: currentState.statusCheckDateStart,
         statusCheckDateEnd: currentState.statusCheckDateEnd,
+        selectedEmployeeIds: event.selectedEmployeeIds,
       );
 
       emit(
@@ -294,10 +375,11 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
           endDate: event.endDate,
           searchQuery: query,
           isSearching: false,
+          selectedEmployeeIds: event.selectedEmployeeIds,
         ),
       );
     } catch (e) {
-      dev.log('❌ Error fetching tasks: $e');
+      dLog('❌ Error fetching tasks: $e');
       emit(
         currentState.copyWith(
           isSearching: false,
@@ -313,7 +395,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
     // Group tasks by ownerBy
     final Map<String, List<TaskWithShop>> groupedTasks = {};
     for (final item in tasks) {
-      final owner = item.task.ownerBy;
+      final owner = item.effectiveOwner;
       if (!groupedTasks.containsKey(owner)) {
         groupedTasks[owner] = [];
       }
@@ -336,7 +418,11 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
       int totalCompleted = 0; // Completed (status 4)
       int totalPassed = 0; // Passed (Status 1 from totaldocumentstatus)
       int totalRemaining = 0; // Remaining (Status 0 from totaldocumentstatus)
+      int totalNotRecorded =
+          0; // Not Recorded (Status 3 from totaldocumentstatus)
       int totalCancelled = 0; // Cancelled (status 2 from totaldocumentstatus)
+      int totalNotRequiredApproval =
+          0; // Not Required Approval (status 6 from totaldocumentstatus)
       DateTime? latestActive;
 
       // Create companyDetails from each task
@@ -349,7 +435,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         totalRefCount += task.referenceCount;
 
         // Count based on status
-        // status 1 = รอตรวจสอบ, status 3 = รอบันทึก, status 4 = เสร็จสิ้น
+        // status 1 = รอตรวจสอบ, status 3 = รอบันทึก, status 4 = เสร็จสิ้น, status 6 = ไม่ต้องอนุมัติ
         // Cancelled always from granular status 2
         int taskWaitingVerify = 0;
         int taskPending = 0;
@@ -359,11 +445,17 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         ); // Status 1 = Passed/Uploaded/Correct
         int taskRemaining =
             task.referenceBalance; // Use referenceBalance for remaining
+        int taskNotRecorded = task.getStatusCount(
+          3,
+        ); // Status 3 = Not Recorded/Waiting Fix
         int taskCancelled = task.cancelledCount;
+        int taskNotRequiredApproval = task.notRequiredApprovalCount;
 
         totalPassed += taskPassed;
         totalRemaining += taskRemaining;
+        totalNotRecorded += taskNotRecorded;
         totalCancelled += task.cancelledCount;
+        totalNotRequiredApproval += taskNotRequiredApproval;
 
         switch (task.status) {
           case 4: // Completed
@@ -409,19 +501,21 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
 
         return KpiCompanyDetail(
           company: task.name,
-          employee: task.ownerBy,
+          employee: item.effectiveOwner,
           recordingDate: task.ownerAt,
           totalBillCount: task
               .totalDocument, // Use totalDocument for "จำนวน" column in sub-table
           assigned: task.billCount,
           completed: taskCompleted,
           cancelled: taskCancelled,
+          notRequiredApproval: taskNotRequiredApproval,
           pending: taskPending,
           waitingKey: 0,
           waitingVerify: taskWaitingVerify,
           waitingFix: 0,
           passed: taskPassed,
           remaining: taskRemaining,
+          notRecorded: taskNotRecorded,
           referenceCount: task.referenceCount,
           status: task.status.toString(),
           lastActive: task.ownerAt,
@@ -477,7 +571,9 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         completedDocuments: totalCompleted,
         passedDocuments: totalPassed,
         remainingDocuments: totalRemaining,
+        notRecordedDocuments: totalNotRecorded,
         cancelledDocuments: totalCancelled,
+        notRequiredApprovalDocuments: totalNotRequiredApproval,
         waitingKey: 0,
         waitingVerify: totalWaitingVerify,
         waitingFix: 0,
@@ -578,7 +674,10 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
     }
   }
 
-  void _onSearchEmployee(SearchEmployee event, Emitter<KpiState> emit) {
+  void _onUpdateEmployeeFilter(
+    UpdateEmployeeFilter event,
+    Emitter<KpiState> emit,
+  ) {
     if (state is KpiLoaded) {
       final currentState = state as KpiLoaded;
       final filtered = _applyFilters(
@@ -593,12 +692,14 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         previousDateEnd: currentState.previousDateEnd,
         statusCheckDateStart: currentState.statusCheckDateStart,
         statusCheckDateEnd: currentState.statusCheckDateEnd,
+        selectedEmployeeIds: event.selectedEmployeeIds,
       );
 
       emit(
         currentState.copyWith(
           searchQuery: event.query,
           filteredEmployees: filtered,
+          selectedEmployeeIds: event.selectedEmployeeIds,
         ),
       );
     }
@@ -622,6 +723,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         previousDateEnd: event.previousDateEnd,
         statusCheckDateStart: event.statusCheckDateStart,
         statusCheckDateEnd: event.statusCheckDateEnd,
+        selectedEmployeeIds: currentState.selectedEmployeeIds,
       );
 
       emit(
@@ -656,6 +758,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         previousDateEnd: event.previousDateEnd,
         statusCheckDateStart: event.statusCheckDateStart,
         statusCheckDateEnd: event.statusCheckDateEnd,
+        selectedEmployeeIds: event.selectedEmployeeIds,
       );
 
       emit(
@@ -670,6 +773,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
           statusCheckDateStart: event.statusCheckDateStart,
           statusCheckDateEnd: event.statusCheckDateEnd,
           filteredEmployees: filtered,
+          selectedEmployeeIds: event.selectedEmployeeIds,
         ),
       );
     }
@@ -706,8 +810,40 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
     DateTime? previousDateEnd,
     DateTime? statusCheckDateStart,
     DateTime? statusCheckDateEnd,
+    List<String>? selectedEmployeeIds,
   }) {
     var filtered = employees;
+
+    // 1. Filter by Selected Employees (Tags)
+    if (selectedEmployeeIds != null && selectedEmployeeIds.isNotEmpty) {
+      // If tags are selected, SHOW ONLY those employees
+      filtered = filtered
+          .where((e) => selectedEmployeeIds.contains(e.id))
+          .toList();
+    }
+    // 2. OR Filter by Search Query (if provided)
+    // Note: If tags are present, query might be used to filter WITHIN tags or just for autocomplete.
+    // Based on requirement "can still type to search", usually typing filters the list.
+    // If selectedEmployeeIds is NOT empty, we already narrowed down to those.
+    // If we type "Som" while "Emp A" is selected, usually we don't filter Key "Emp A" out unless "Emp A" doesn't match "Som".
+    // But typically in multi-select, the text input is for ADDING new tags, not filtering the RESULT TABLE further (unless it's a separate filter).
+    // However, the prompt says "select multiple... but still can type to search".
+    // This implies the text field acts as a finder.
+    // Let's assume:
+    // - If selectedEmployeeIds is NOT EMPTY: The table shows those IDs.
+    // - If selectedEmployeeIds IS EMPTY: The table shows results matching 'query'.
+    else if (query != null && query.isNotEmpty) {
+      final q = query.toLowerCase();
+      filtered = filtered
+          .where(
+            (e) =>
+                e.name.toLowerCase().contains(q) ||
+                e.id.toLowerCase().contains(q) ||
+                (e.taxId != null && e.taxId!.toLowerCase().contains(q)) ||
+                e.branch.toLowerCase().contains(q),
+          )
+          .toList();
+    }
 
     if (startDate != null && endDate != null) {
       filtered = filtered.where((e) {
@@ -760,18 +896,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
       }
     }
 
-    if (query != null && query.isNotEmpty) {
-      final q = query.toLowerCase();
-      filtered = filtered
-          .where(
-            (e) =>
-                e.name.toLowerCase().contains(q) ||
-                e.id.toLowerCase().contains(q) ||
-                (e.taxId != null && e.taxId!.toLowerCase().contains(q)) ||
-                e.branch.toLowerCase().contains(q),
-          )
-          .toList();
-    }
+    // Query filter moved to top to handle priority with selectedEmployeeIds
 
     if (taxId != null && taxId.isNotEmpty) {
       filtered = filtered

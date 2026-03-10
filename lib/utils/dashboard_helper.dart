@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
-import 'dart:developer';
+import 'app_logger.dart';
 
 class DashboardHelper {
   static double getIncomeForPeriod(
@@ -43,12 +43,12 @@ class DashboardHelper {
               return false;
           }
         } catch (e) {
-          log('Error calculating profit/loss for shop: $e');
+          dLog('Error calculating profit/loss for shop: $e');
           return false;
         }
       }).length;
     } catch (e) {
-      log('Error in getShopCountByStatus: $e');
+      dLog('Error in getShopCountByStatus: $e');
       return 0;
     }
   }
@@ -134,7 +134,7 @@ class DashboardHelper {
             }
           }
         } catch (e) {
-          log('Error processing shop documents: $e');
+          dLog('Error processing shop documents: $e');
         }
       }
 
@@ -147,7 +147,7 @@ class DashboardHelper {
         'rejected': 0,
       };
     } catch (e) {
-      log('Error in getDocumentCounts: $e');
+      dLog('Error in getDocumentCounts: $e');
       return {
         'deposit': 0,
         'withdraw': 0,

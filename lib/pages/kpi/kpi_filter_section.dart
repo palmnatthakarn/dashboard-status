@@ -29,7 +29,13 @@ class KpiFilterSection extends StatefulWidget {
   final Function(DateTimeRange?) onStatusCheckDateRangeChanged;
   final VoidCallback onSearch;
   final VoidCallback onClearSearch;
+
   final VoidCallback onRefresh;
+
+  // Multi-select support
+  final List<String> selectedEmployeeIds;
+  final Function(KpiEmployee) onEmployeeSelected;
+  final Function(KpiEmployee) onEmployeeRemoved;
 
   const KpiFilterSection({
     super.key,
@@ -53,9 +59,13 @@ class KpiFilterSection extends StatefulWidget {
     required this.onEndDateChanged,
     required this.onPreviousDateRangeChanged,
     required this.onStatusCheckDateRangeChanged,
+
     required this.onSearch,
     required this.onClearSearch,
     required this.onRefresh,
+    this.selectedEmployeeIds = const [],
+    required this.onEmployeeSelected,
+    required this.onEmployeeRemoved,
   });
 
   @override
@@ -85,7 +95,7 @@ class _KpiFilterSectionState extends State<KpiFilterSection> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF64748B).withOpacity(0.1),
+            color: const Color(0xFF64748B).withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -726,86 +736,140 @@ class _KpiFilterSectionState extends State<KpiFilterSection> {
   }
 
   Widget _buildSearchField({required bool isSmallScreen}) {
-    return RawAutocomplete<KpiEmployee>(
-      textEditingController: widget.searchController,
-      focusNode: _searchFocusNode,
-      displayStringForOption: (KpiEmployee option) => option.name,
-      optionsBuilder: (TextEditingValue textEditingValue) {
-        if (textEditingValue.text.isEmpty) {
-          return const Iterable<KpiEmployee>.empty();
-        }
-        final query = textEditingValue.text.toLowerCase();
-        return widget.employees.where((KpiEmployee option) {
-          return option.name.toLowerCase().contains(query) ||
-              option.id.toLowerCase().contains(query);
-        });
-      },
-      onSelected: (KpiEmployee selection) {
-        widget.searchController.text = selection.name;
-        widget.onSearch();
-      },
-      fieldViewBuilder:
-          (
-            BuildContext context,
-            TextEditingController fieldTextEditingController,
-            FocusNode fieldFocusNode,
-            VoidCallback onFieldSubmitted,
-          ) {
-            return Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.search_rounded,
-                    color: Color(0xFF94A3B8),
-                    size: 22,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: fieldTextEditingController,
-                      focusNode: fieldFocusNode,
-                      textInputAction: TextInputAction.search,
-                      onSubmitted: (_) {
-                        widget.onSearch();
-                        onFieldSubmitted();
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'ค้นหาชื่อหรือรหัสพนักงาน...',
-                        hintStyle: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 14,
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                        isDense: true,
-                      ),
-                    ),
-                  ),
-                  if (widget.searchController.text.isNotEmpty)
-                    IconButton(
-                      icon: const Icon(Icons.clear_rounded, size: 18),
-                      color: const Color(0xFF94A3B8),
-                      onPressed:
-                          widget.onClearSearch, // Ensure clear uses widget prop
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                ],
-              ),
-            );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return RawAutocomplete<KpiEmployee>(
+          textEditingController: widget.searchController,
+          focusNode: _searchFocusNode,
+          displayStringForOption: (KpiEmployee option) => option.name,
+          optionsBuilder: (TextEditingValue textEditingValue) {
+            // If text is empty and no tags, show nothing or maybe initial suggestions?
+            // Requirement usually: type to search.
+            if (textEditingValue.text.isEmpty) {
+              return const Iterable<KpiEmployee>.empty();
+            }
+            final query = textEditingValue.text.toLowerCase();
+            return widget.employees.where((KpiEmployee option) {
+              // Exclude already selected
+              if (widget.selectedEmployeeIds.contains(option.id)) return false;
+
+              return option.name.toLowerCase().contains(query) ||
+                  option.id.toLowerCase().contains(query);
+            });
           },
-      optionsViewBuilder:
-          (
-            BuildContext context,
-            AutocompleteOnSelected<KpiEmployee> onSelected,
-            Iterable<KpiEmployee> options,
-          ) {
+          onSelected: (KpiEmployee selection) {
+            widget.searchController.clear();
+            widget.onEmployeeSelected(selection);
+            // Keep focus on the field for continuous typing/selecting if needed
+            // _searchFocusNode.requestFocus();
+          },
+          fieldViewBuilder:
+              (
+                BuildContext context,
+                TextEditingController fieldTextEditingController,
+                FocusNode fieldFocusNode,
+                VoidCallback onFieldSubmitted,
+              ) {
+                final selectedObjects = widget.employees
+                    .where((e) => widget.selectedEmployeeIds.contains(e.id))
+                    .toList();
+
+                return Container(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      ...selectedObjects.map((employee) {
+                        return Chip(
+                          label: Text(
+                            employee.name,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          avatar: CircleAvatar(
+                            backgroundColor: Colors.white,
+                            child: Text(
+                              employee.name[0],
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFF3B82F6),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          backgroundColor: const Color(0xFFEFF6FF),
+                          labelStyle: const TextStyle(color: Color(0xFF1E293B)),
+                          deleteIcon: const Icon(
+                            Icons.close,
+                            size: 14,
+                            color: Color(0xFF64748B),
+                          ),
+                          onDeleted: () => widget.onEmployeeRemoved(employee),
+                          padding: EdgeInsets.zero,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          side: BorderSide.none,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        );
+                      }),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minWidth: 100,
+                          maxWidth: 200,
+                        ),
+                        child: IntrinsicWidth(
+                          child: TextField(
+                            controller: fieldTextEditingController,
+                            focusNode: fieldFocusNode,
+                            textInputAction: TextInputAction.search,
+                            onSubmitted: (_) {
+                              widget
+                                  .onSearch(); // Pressing enter filters by current tags + text
+                              onFieldSubmitted();
+                            },
+                            decoration: InputDecoration(
+                              hintText: selectedObjects.isEmpty
+                                  ? 'ค้นหาชื่อหรือรหัสพนักงาน...'
+                                  : 'เพิ่ม...',
+                              hintStyle: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 16,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (widget.selectedEmployeeIds.isNotEmpty ||
+                          widget.searchController.text.isNotEmpty)
+                        IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          color: const Color(0xFF94A3B8),
+                          onPressed: widget.onClearSearch,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                    ],
+                  ),
+                );
+              },
+          optionsViewBuilder: (context, onSelected, options) {
             return Align(
               alignment: Alignment.topLeft,
               child: Material(
@@ -859,6 +923,8 @@ class _KpiFilterSectionState extends State<KpiFilterSection> {
               ),
             );
           },
+        );
+      },
     );
   }
 }

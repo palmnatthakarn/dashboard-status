@@ -1,15 +1,13 @@
-import 'dart:developer';
+﻿import '../utils/app_logger.dart';
 import 'package:intl/intl.dart';
 import '../models/doc_details.dart';
 import '../models/journal.dart';
 import 'journal_service.dart';
 
 class DashboardService {
-  static const String baseUrl = 'http://localhost:3000/api';
-
   /// ดึงข้อมูล Dashboard จาก API/journal โดยใช้ branch_sync และ doc_datetime
   static Future<List<DocDetails>> fetchDashboardData() async {
-    log('🚀 Fetching dashboard data from API/journal...');
+    dLog('🚀 Fetching dashboard data from API/journal...');
 
     try {
       // ดึงข้อมูล journal ทั้งหมด
@@ -18,7 +16,7 @@ class DashboardService {
       );
 
       final journals = journalResponse.journals ?? [];
-      log('✅ Got ${journals.length} journal records');
+      dLog('✅ Got ${journals.length} journal records');
 
       // จัดกลุ่มข้อมูลตาม branch_sync
       final Map<String, List<Journal>> branchGroups = {};
@@ -33,7 +31,7 @@ class DashboardService {
         }
       }
 
-      log('📊 Grouped data into ${branchGroups.length} branches');
+      dLog('📊 Grouped data into ${branchGroups.length} branches');
 
       // แปลงเป็น DocDetails format
       final List<DocDetails> docDetailsList = [];
@@ -79,10 +77,10 @@ class DashboardService {
         docDetailsList.add(docDetails);
       }
 
-      log('🎉 Successfully processed ${docDetailsList.length} branches');
+      dLog('🎉 Successfully processed ${docDetailsList.length} branches');
       return docDetailsList;
     } catch (e) {
-      log('💥 Error fetching dashboard data: $e');
+      dLog('💥 Error fetching dashboard data: $e');
       rethrow;
     }
   }
@@ -186,7 +184,7 @@ class DashboardService {
         return DateFormat('yyyy-MM-dd').format(date);
       }
     } catch (e) {
-      log('⚠️ Error parsing date: $dateStr - $e');
+      dLog('⚠️ Error parsing date: $dateStr - $e');
     }
 
     return '';
@@ -200,7 +198,7 @@ class DashboardService {
         return dateFormatted.substring(0, 7); // yyyy-MM
       }
     } catch (e) {
-      log('⚠️ Error parsing month key: $dateStr - $e');
+      dLog('⚠️ Error parsing month key: $dateStr - $e');
     }
 
     return '';

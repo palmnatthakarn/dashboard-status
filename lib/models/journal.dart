@@ -48,6 +48,16 @@ class Journal {
   @JsonKey(name: 'accountdescription')
   final String? description;
 
+  // Task Mapping Fields
+  @JsonKey(name: 'documentref')
+  final String? documentRef;
+  @JsonKey(name: 'createdby')
+  final String? createdBy;
+
+  // Additional Fields
+  @JsonKey(name: 'exdocrefno')
+  final String? exDocRefNo;
+
   Journal({
     this.id,
     this.branchSync,
@@ -66,6 +76,9 @@ class Journal {
     this.branchCode,
     this.branchName,
     this.description,
+    this.documentRef,
+    this.createdBy,
+    this.exDocRefNo,
   });
 
   // Helper getters

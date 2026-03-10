@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import '../models/doc_details.dart';
 
-class DashboardFilterSection extends StatelessWidget {
+class DashboardFilterSection extends StatefulWidget {
   final String searchQuery;
   final String selectedFilter;
-  final List shops;
+  final List<DocDetails> shops;
   final Function(String) onSearchChanged;
   final Function(String) onFilterChanged;
-  final Function(String) getShopCountByStatus;
+  final int Function(String) getShopCountByStatus;
 
   const DashboardFilterSection({
     super.key,
@@ -19,82 +20,110 @@ class DashboardFilterSection extends StatelessWidget {
   });
 
   @override
+  State<DashboardFilterSection> createState() => _DashboardFilterSectionState();
+}
+
+class _DashboardFilterSectionState extends State<DashboardFilterSection> {
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController(text: widget.searchQuery);
+  }
+
+  @override
+  void didUpdateWidget(DashboardFilterSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Sync controller if parent clears search externally
+    if (widget.searchQuery != oldWidget.searchQuery &&
+        widget.searchQuery != _searchController.text) {
+      _searchController.text = widget.searchQuery;
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Search and Period Selector
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              SizedBox(
-                width: 260,
-                child: TextField(
-                  onChanged: onSearchChanged,
-                  decoration: InputDecoration(
-                    hintText: 'ค้นหาชื่อร้าน หรือ Shop ID',
-                    hintStyle: TextStyle(
-                      color: Colors.grey.shade400,
-                      fontSize: 12,
-                    ),
-                    prefixIcon: Icon(
-                      Icons.search,
-                      color: Colors.grey.shade400,
-                      size: 18,
-                    ),
-                    filled: true,
-                    fillColor: const Color(0xFFF1F5F9),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Search and Filter Chips
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            SizedBox(
+              width: 260,
+              child: TextField(
+                controller: _searchController,
+                onChanged: widget.onSearchChanged,
+                decoration: InputDecoration(
+                  hintText: 'ค้นหาชื่อร้าน หรือ Shop ID',
+                  hintStyle: TextStyle(
+                    color: Colors.grey.shade400,
+                    fontSize: 12,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: Colors.grey.shade400,
+                    size: 18,
+                  ),
+                  filled: true,
+                  fillColor: const Color(0xFFF1F5F9),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
                   ),
                 ),
               ),
-              FilterChip(
-                label: 'ทั้งหมด',
-                count: shops.length,
-                isSelected: selectedFilter == 'all',
-                color: const Color(0xFF3B82F6),
-                onTap: () => onFilterChanged('all'),
-              ),
-              FilterChip(
-                label: 'Safe',
-                count: getShopCountByStatus('safe') as int,
-                isSelected: selectedFilter == 'safe',
-                color: const Color(0xFF10B981),
-                onTap: () => onFilterChanged('safe'),
-              ),
-              FilterChip(
-                label: 'Warning',
-                count: getShopCountByStatus('warning') as int,
-                isSelected: selectedFilter == 'warning',
-                color: const Color(0xFFF59E0B),
-                onTap: () => onFilterChanged('warning'),
-              ),
-              FilterChip(
-                label: 'Exceeded',
-                count: getShopCountByStatus('exceeded') as int,
-                isSelected: selectedFilter == 'exceeded',
-                color: const Color(0xFFEF4444),
-                onTap: () => onFilterChanged('exceeded'),
-              ),
-            ],
-          ),
-        ],
-      ),
+            ),
+            StatusFilterChip(
+              label: 'ทั้งหมด',
+              count: widget.shops.length,
+              isSelected: widget.selectedFilter == 'all',
+              color: const Color(0xFF3B82F6),
+              onTap: () => widget.onFilterChanged('all'),
+            ),
+            StatusFilterChip(
+              label: 'Safe',
+              count: widget.getShopCountByStatus('safe'),
+              isSelected: widget.selectedFilter == 'safe',
+              color: const Color(0xFF10B981),
+              onTap: () => widget.onFilterChanged('safe'),
+            ),
+            StatusFilterChip(
+              label: 'Warning',
+              count: widget.getShopCountByStatus('warning'),
+              isSelected: widget.selectedFilter == 'warning',
+              color: const Color(0xFFF59E0B),
+              onTap: () => widget.onFilterChanged('warning'),
+            ),
+            StatusFilterChip(
+              label: 'Exceeded',
+              count: widget.getShopCountByStatus('exceeded'),
+              isSelected: widget.selectedFilter == 'exceeded',
+              color: const Color(0xFFEF4444),
+              onTap: () => widget.onFilterChanged('exceeded'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
 
-class FilterChip extends StatefulWidget {
-  const FilterChip({
+class StatusFilterChip extends StatefulWidget {
+  const StatusFilterChip({
     super.key,
     required this.label,
     required this.count,
@@ -110,10 +139,10 @@ class FilterChip extends StatefulWidget {
   final VoidCallback onTap;
 
   @override
-  State<FilterChip> createState() => _FilterChipState();
+  State<StatusFilterChip> createState() => _StatusFilterChipState();
 }
 
-class _FilterChipState extends State<FilterChip> {
+class _StatusFilterChipState extends State<StatusFilterChip> {
   bool _isHovered = false;
 
   @override

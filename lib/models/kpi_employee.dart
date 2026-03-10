@@ -12,7 +12,9 @@ class KpiEmployee {
   final int completedDocuments;
   final int passedDocuments; // เอกสารที่ผ่านการตรวจสอบ (Status 1)
   final int remainingDocuments; // เอกสารคงเหลือ (Status 0)
+  final int notRecordedDocuments; // เอกสารที่ไม่บันทึก (Status 3)
   final int cancelledDocuments; // เอกสารที่ยกเลิก
+  final int notRequiredApprovalDocuments; // เอกสารที่ไม่ต้องอนุมัติ (Status 6)
 
   // Detailed status breakdown
   final int waitingKey; // เอกสารที่รอคีย์ข้อมูล
@@ -54,7 +56,9 @@ class KpiEmployee {
     required this.completedDocuments,
     this.passedDocuments = 0,
     this.remainingDocuments = 0,
+    this.notRecordedDocuments = 0,
     this.cancelledDocuments = 0,
+    this.notRequiredApprovalDocuments = 0,
     this.waitingKey = 0,
     this.waitingVerify = 0,
     this.waitingFix = 0,
@@ -140,7 +144,9 @@ class KpiCompanyDetail {
   final int completed;
   final int passed; // Status 1
   final int remaining; // Status 0
+  final int notRecorded; // Status 3
   final int cancelled;
+  final int notRequiredApproval; // Status 6
   final int referenceCount; // Added
   final String status;
   final DateTime? lastActive; // Added
@@ -161,7 +167,9 @@ class KpiCompanyDetail {
     required this.completed,
     this.passed = 0,
     this.remaining = 0,
+    this.notRecorded = 0,
     required this.cancelled,
+    this.notRequiredApproval = 0,
     this.referenceCount = 0,
     required this.status,
     this.lastActive,

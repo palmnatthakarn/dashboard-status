@@ -26,10 +26,20 @@ class SelectShopAndSearch extends KpiEvent {
     this.startDate,
     this.endDate,
     this.query,
+    this.selectedEmployeeIds,
   });
 
+  final List<String>? selectedEmployeeIds;
+
   @override
-  List<Object?> get props => [shopId, shopName, startDate, endDate, query];
+  List<Object?> get props => [
+    shopId,
+    shopName,
+    startDate,
+    endDate,
+    query,
+    selectedEmployeeIds,
+  ];
 }
 
 class FilterByDateRange extends KpiEvent {
@@ -60,13 +70,17 @@ class FilterByStatus extends KpiEvent {
   List<Object?> get props => [status];
 }
 
-class SearchEmployee extends KpiEvent {
+class UpdateEmployeeFilter extends KpiEvent {
+  final List<String> selectedEmployeeIds;
   final String query;
 
-  const SearchEmployee(this.query);
+  const UpdateEmployeeFilter({
+    this.selectedEmployeeIds = const [],
+    this.query = '',
+  });
 
   @override
-  List<Object?> get props => [query];
+  List<Object?> get props => [selectedEmployeeIds, query];
 }
 
 class FilterByAdvancedOptions extends KpiEvent {
@@ -115,7 +129,10 @@ class ApplyAllFilters extends KpiEvent {
     this.previousDateEnd,
     this.statusCheckDateStart,
     this.statusCheckDateEnd,
+    this.selectedEmployeeIds,
   });
+
+  final List<String>? selectedEmployeeIds;
 
   @override
   List<Object?> get props => [
@@ -128,6 +145,7 @@ class ApplyAllFilters extends KpiEvent {
     previousDateEnd,
     statusCheckDateStart,
     statusCheckDateEnd,
+    selectedEmployeeIds,
   ];
 }
 

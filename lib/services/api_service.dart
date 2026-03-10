@@ -1,7 +1,8 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:developer';
 import 'package:http/http.dart' as http;
 import 'auth_repository.dart';
+import '../core/constants/app_constants.dart';
 import '../models/dashboard_summary.dart';
 import '../models/shops_response.dart';
 import '../models/daily_images.dart';
@@ -11,84 +12,89 @@ class ApiService {
   static const String baseUrl = AuthRepository.baseUrl;
 
   static Future<ShopsResponse> fetchShops({int page = 1, int size = 50}) async {
-    log('🌐 Fetching journal data from multiple account types...');
+    log('🌐 Fetching journal data from multiple account types in parallel...');
 
     try {
-      // ดึงข้อมูลจากทุก account_type
       final accountTypes = ['INCOME', 'EXPENSES', 'LIABILITIES', 'ASSETS'];
-      final Map<String, Map<String, dynamic>> branchGroups = {};
 
-      for (final accountType in accountTypes) {
-        final url = '$baseUrl/journals?account_type=$accountType&limit=1000';
-        log('📊 Fetching $accountType from: $url');
+      // Build headers once — reused across all parallel requests
+      final token = AuthRepository.token;
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
 
-        try {
-          final token = AuthRepository.token;
-          final headers = <String, String>{'Content-Type': 'application/json'};
-          if (token != null) headers['Authorization'] = 'Bearer $token';
-
-          final response = await http.get(Uri.parse(url), headers: headers);
-
-          if (response.statusCode == 200) {
-            final data = json.decode(response.body);
-
-            if (data['success'] == true && data['data'] != null) {
-              final journals = data['data'] as List;
-              log('✅ Got ${journals.length} $accountType records');
-
-              // จัดกลุ่มข้อมูลตาม branch_sync
-              for (final journal in journals) {
-                final branchSync = journal['branch_sync']?.toString() ?? '';
-                final branchName =
-                    journal['branch_name']?.toString() ?? 'ไม่ระบุชื่อร้าน';
-
-                if (branchSync.isNotEmpty) {
-                  if (!branchGroups.containsKey(branchSync)) {
-                    branchGroups[branchSync] = {
-                      'shopid': branchSync,
-                      'shopname': branchName,
-                      'daily': [],
-                      'monthlySummary': <String, dynamic>{},
-                      'dailyTransactions': [],
-                      'totalDeposit': 0.0,
-                      'responsible': 'ระบบอัตโนมัติ',
-                      'backupResponsible': '',
-                      'createdAt': DateTime.now().toIso8601String(),
-                      'updatedAt': DateTime.now().toIso8601String(),
-                      'timezone': 'Asia/Bangkok',
-                    };
-                  }
-
-                  // เพิ่มข้อมูล transaction พร้อม account_type
-                  branchGroups[branchSync]!['dailyTransactions'].add({
-                    'doc_datetime': journal['doc_datetime'],
-                    'doc_no': journal['doc_no'],
-                    'account_type': accountType,
-                    'credit': journal['credit'],
-                    'debit': journal['debit'],
-                    'amount': journal['amount'],
-                    'description': journal['description'],
-                  });
-
-                  // เพิ่มข้อมูลรายวันเก่า (เพื่อ backward compatibility)
-                  final amount =
-                      double.tryParse(journal['amount']?.toString() ?? '0') ??
-                      0;
-                  final docDate = journal['doc_datetime']?.toString() ?? '';
-                  if (docDate.isNotEmpty) {
-                    branchGroups[branchSync]!['daily'].add({
-                      'timestamp': docDate,
-                      'deposit': amount,
-                      'docNo': journal['doc_no'],
-                    });
-                  }
-                }
+      // Fetch all 4 account types simultaneously
+      final results = await Future.wait(
+        accountTypes.map((accountType) async {
+          final url =
+              '$baseUrl/journals?account_type=$accountType&limit=${AppConstants.journalPageSize}';
+          log('📊 Fetching $accountType...');
+          try {
+            final response = await http
+                .get(Uri.parse(url), headers: headers)
+                .timeout(const Duration(seconds: 15));
+            if (response.statusCode == 200) {
+              final data = json.decode(response.body);
+              if (data['success'] == true && data['data'] != null) {
+                final journals = data['data'] as List<dynamic>;
+                log('✅ Got ${journals.length} $accountType records');
+                return (accountType, journals);
               }
+            } else {
+              log('⚠️ $accountType returned status ${response.statusCode}');
+            }
+          } catch (e) {
+            log('⚠️ Error fetching $accountType: $e');
+          }
+          return (accountType, <dynamic>[]);
+        }),
+      );
+
+      // Merge all results into branchGroups
+      final Map<String, Map<String, dynamic>> branchGroups = {};
+      for (final (accountType, journals) in results) {
+        for (final journal in journals) {
+          final branchSync = journal['branch_sync']?.toString() ?? '';
+          final branchName =
+              journal['branch_name']?.toString() ?? 'ไม่ระบุชื่อร้าน';
+
+          if (branchSync.isNotEmpty) {
+            if (!branchGroups.containsKey(branchSync)) {
+              branchGroups[branchSync] = {
+                'shopid': branchSync,
+                'shopname': branchName,
+                'daily': [],
+                'monthlySummary': <String, dynamic>{},
+                'dailyTransactions': [],
+                'totalDeposit': 0.0,
+                'responsible': 'ระบบอัตโนมัติ',
+                'backupResponsible': '',
+                'createdAt': DateTime.now().toIso8601String(),
+                'updatedAt': DateTime.now().toIso8601String(),
+                'timezone': 'Asia/Bangkok',
+              };
+            }
+
+            branchGroups[branchSync]!['dailyTransactions'].add({
+              'doc_datetime': journal['doc_datetime'],
+              'doc_no': journal['doc_no'],
+              'account_type': accountType,
+              'credit': journal['credit'],
+              'debit': journal['debit'],
+              'amount': journal['amount'],
+              'description': journal['description'],
+            });
+
+            final amount =
+                double.tryParse(journal['amount']?.toString() ?? '0') ?? 0;
+            final docDate = journal['doc_datetime']?.toString() ?? '';
+            if (docDate.isNotEmpty) {
+              branchGroups[branchSync]!['daily'].add({
+                'timestamp': docDate,
+                'deposit': amount,
+                'docNo': journal['doc_no'],
+              });
             }
           }
-        } catch (e) {
-          log('⚠️ Error fetching $accountType: $e');
-          // ข้ามไปต่อถ้า account_type นั้นมีปัญหา
         }
       }
 
@@ -126,7 +132,7 @@ class ApiService {
   }
 
   static Future<DashboardSummary> fetchSummary() async {
-    final url = '$baseUrl/journals?limit=1000';
+    final url = '$baseUrl/journals?limit=${AppConstants.journalPageSize}';
     log('🌐 Fetching journal data to calculate summary from: $url');
 
     try {
@@ -134,7 +140,9 @@ class ApiService {
       final headers = <String, String>{'Content-Type': 'application/json'};
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
-      final response = await http.get(Uri.parse(url), headers: headers);
+      final response = await http
+          .get(Uri.parse(url), headers: headers)
+          .timeout(const Duration(seconds: 15));
       log('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -173,22 +181,20 @@ class ApiService {
           final totalShops = uniqueBranches.length;
 
           final summaryData = {
-            'doctotal': totalDocs > 0
-                ? totalDocs
-                : 150, // ถ้าไม่มีข้อมูลให้ใช้จำลอง
-            'docsuccess': successCount > 0 ? successCount : 120,
-            'docwarning': warningCount > 0 ? warningCount : 25,
-            'docerror': errorCount > 0 ? errorCount : 5,
+            'doctotal': totalDocs,
+            'docsuccess': successCount,
+            'docwarning': warningCount,
+            'docerror': errorCount,
             'success_rate': totalDocs > 0
                 ? (successCount / totalDocs * 100).round()
-                : 80,
+                : 0,
             'warning_rate': totalDocs > 0
                 ? (warningCount / totalDocs * 100).round()
-                : 17,
+                : 0,
             'error_rate': totalDocs > 0
                 ? (errorCount / totalDocs * 100).round()
-                : 3,
-            'totalshop': totalShops > 0 ? totalShops : 3,
+                : 0,
+            'totalshop': totalShops,
           };
 
           log('✅ Calculated summary: $summaryData');
@@ -217,9 +223,10 @@ class ApiService {
       final headers = <String, String>{'Content-Type': 'application/json'};
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
-      final response = await http.get(Uri.parse(url), headers: headers);
+      final response = await http
+          .get(Uri.parse(url), headers: headers)
+          .timeout(const Duration(seconds: 15));
       log('📡 Response status: ${response.statusCode}');
-      log('📄 Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body) as Map<String, dynamic>;
@@ -264,30 +271,24 @@ class ApiService {
   static Future<List<DailyImage>> fetchShopDaily(String shopId) async {
     final url = '$baseUrl/dashboard/shops/$shopId/daily';
     log('🌐 Fetching shop daily data from: $url');
-    log('🌐 Fetching shop daily data from: $url');
 
     try {
       final token = AuthRepository.token;
       final headers = <String, String>{'Content-Type': 'application/json'};
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
-      final response = await http.get(Uri.parse(url), headers: headers);
+      final response = await http
+          .get(Uri.parse(url), headers: headers)
+          .timeout(const Duration(seconds: 15));
       log('📡 Response status: ${response.statusCode}');
-      log('📄 Response body: ${response.body}');
-      log('📡 Response status: ${response.statusCode}');
-      log('📄 Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
         log('✅ Successfully parsed shop daily response');
         log('🔍 Response type: ${responseData.runtimeType}');
-        log('🔍 Full response data: $responseData');
-        log('✅ Successfully parsed shop daily response');
-        log('🔍 Response type: ${responseData.runtimeType}');
 
         // จัดการกรณีที่ response เป็น null
         if (responseData == null) {
-          log('⚠️ Received null response for shop $shopId');
           log('⚠️ Received null response for shop $shopId');
           return [];
         }
@@ -355,18 +356,14 @@ class ApiService {
         }
       } else if (response.statusCode == 404) {
         log('📭 No daily data found for shop $shopId (404)');
-        log('📭 No daily data found for shop $shopId (404)');
         return [];
       } else {
-        log('❌ Failed to load shop daily - Status: ${response.statusCode}');
-        log('📄 Error response body: ${response.body}');
         log('❌ Failed to load shop daily - Status: ${response.statusCode}');
         throw Exception(
           'Failed to load shop daily for shop $shopId - Status: ${response.statusCode}',
         );
       }
     } catch (e) {
-      log('💥 Error fetching shop daily for shop $shopId: $e');
       log('💥 Error fetching shop daily for shop $shopId: $e');
       rethrow;
     }
@@ -377,22 +374,19 @@ class ApiService {
   ) async {
     final url = '$baseUrl/dashboard/shops/$shopId/daily';
     log('🌐 Fetching shop daily transactions from: $url');
-    log('🌐 Fetching shop daily transactions from: $url');
 
     try {
       final token = AuthRepository.token;
       final headers = <String, String>{'Content-Type': 'application/json'};
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
-      final response = await http.get(Uri.parse(url), headers: headers);
+      final response = await http
+          .get(Uri.parse(url), headers: headers)
+          .timeout(const Duration(seconds: 15));
       log('📡 Response status: ${response.statusCode}');
-      log('📄 Response body: ${response.body}');
-      log('📡 Response status: ${response.statusCode}');
-      log('📄 Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-        log('✅ Successfully parsed shop daily transactions response');
         log('✅ Successfully parsed shop daily transactions response');
 
         if (responseData == null) {
@@ -424,7 +418,6 @@ class ApiService {
         log(
           '❌ Failed to load shop daily transactions - Status: ${response.statusCode}',
         );
-        log('📄 Error response body: ${response.body}');
         throw Exception(
           'Failed to load shop daily transactions for shop $shopId - Status: ${response.statusCode}',
         );

@@ -1,5 +1,5 @@
-import 'dart:convert';
-import 'dart:developer';
+﻿import 'dart:convert';
+import '../utils/app_logger.dart';
 import 'package:http/http.dart' as http;
 import 'auth_repository.dart';
 import '../models/sale_invoice.dart';
@@ -32,7 +32,7 @@ class SaleInvoiceService {
 
     final uri = Uri.parse('$baseUrl/sale-invoices')
         .replace(queryParameters: queryParams);
-    log('🌐 Fetching sale invoices from: $uri');
+    dLog('🌐 Fetching sale invoices from: $uri');
 
     try {
       final token = AuthRepository.token;
@@ -40,11 +40,11 @@ class SaleInvoiceService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(uri, headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
-        log('✅ Successfully parsed sale invoices data');
+        dLog('✅ Successfully parsed sale invoices data');
         
         // Handle API response structure
         if (data['success'] == true && data['data'] != null) {
@@ -65,7 +65,7 @@ class SaleInvoiceService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching sale invoices: $e');
+      dLog('💥 Error fetching sale invoices: $e');
       rethrow;
     }
   }
@@ -73,7 +73,7 @@ class SaleInvoiceService {
   /// GET /api/sale-invoices/:id - Get sale invoice by ID
   static Future<SaleInvoice?> getSaleInvoiceById(int id) async {
     final url = '$baseUrl/sale-invoices/$id';
-    log('🌐 Fetching sale invoice by ID from: $url');
+    dLog('🌐 Fetching sale invoice by ID from: $url');
 
     try {
       final token = AuthRepository.token;
@@ -81,7 +81,7 @@ class SaleInvoiceService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(Uri.parse(url), headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -94,7 +94,7 @@ class SaleInvoiceService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching sale invoice by ID: $e');
+      dLog('💥 Error fetching sale invoice by ID: $e');
       rethrow;
     }
   }
@@ -120,7 +120,7 @@ class SaleInvoiceService {
   static Future<SaleInvoiceSummary?> getSaleInvoiceSummaryByBranch(
       String branchSync) async {
     final url = '$baseUrl/sale-invoices/summary/$branchSync';
-    log('🌐 Fetching sale invoice summary from: $url');
+    dLog('🌐 Fetching sale invoice summary from: $url');
 
     try {
       final token = AuthRepository.token;
@@ -128,7 +128,7 @@ class SaleInvoiceService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(Uri.parse(url), headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -141,7 +141,7 @@ class SaleInvoiceService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching sale invoice summary: $e');
+      dLog('💥 Error fetching sale invoice summary: $e');
       rethrow;
     }
   }
@@ -187,7 +187,7 @@ class SaleInvoiceService {
     try {
       return DateTime.parse(dateString);
     } catch (e) {
-      log('💥 Error parsing date: $dateString');
+      dLog('💥 Error parsing date: $dateString');
       return null;
     }
   }
@@ -197,7 +197,7 @@ class SaleInvoiceService {
     String? startDate,
     String? endDate,
   }) async {
-    log('📊 Fetching dashboard sale invoice data...');
+    dLog('📊 Fetching dashboard sale invoice data...');
 
     try {
       final response = await getAllSaleInvoices(
@@ -279,7 +279,7 @@ class SaleInvoiceService {
         'sale_invoices': saleInvoices,
       };
     } catch (e) {
-      log('💥 Error fetching dashboard sale invoice data: $e');
+      dLog('💥 Error fetching dashboard sale invoice data: $e');
       rethrow;
     }
   }

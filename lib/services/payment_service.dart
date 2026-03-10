@@ -1,5 +1,5 @@
-import 'dart:convert';
-import 'dart:developer';
+﻿import 'dart:convert';
+import '../utils/app_logger.dart';
 import 'package:http/http.dart' as http;
 import 'auth_repository.dart';
 import '../models/payment.dart';
@@ -33,7 +33,7 @@ class PaymentService {
     final uri = Uri.parse(
       '$baseUrl/payments',
     ).replace(queryParameters: queryParams);
-    log('🌐 Fetching payments from: $uri');
+    dLog('🌐 Fetching payments from: $uri');
 
     try {
       final token = AuthRepository.token;
@@ -41,11 +41,11 @@ class PaymentService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(uri, headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
-        log('✅ Successfully parsed payments data');
+        dLog('✅ Successfully parsed payments data');
 
         // Handle API response structure
         if (data['success'] == true && data['data'] != null) {
@@ -66,7 +66,7 @@ class PaymentService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching payments: $e');
+      dLog('💥 Error fetching payments: $e');
       rethrow;
     }
   }
@@ -74,7 +74,7 @@ class PaymentService {
   /// GET /api/payments/:id - Get payment by ID
   static Future<Payment?> getPaymentById(int id) async {
     final url = '$baseUrl/payments/$id';
-    log('🌐 Fetching payment by ID from: $url');
+    dLog('🌐 Fetching payment by ID from: $url');
 
     try {
       final token = AuthRepository.token;
@@ -82,7 +82,7 @@ class PaymentService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(Uri.parse(url), headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -95,7 +95,7 @@ class PaymentService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching payment by ID: $e');
+      dLog('💥 Error fetching payment by ID: $e');
       rethrow;
     }
   }
@@ -122,7 +122,7 @@ class PaymentService {
     String branchSync,
   ) async {
     final url = '$baseUrl/payments/summary/$branchSync';
-    log('🌐 Fetching payment summary from: $url');
+    dLog('🌐 Fetching payment summary from: $url');
 
     try {
       final token = AuthRepository.token;
@@ -130,7 +130,7 @@ class PaymentService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(Uri.parse(url), headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -143,7 +143,7 @@ class PaymentService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching payment summary: $e');
+      dLog('💥 Error fetching payment summary: $e');
       rethrow;
     }
   }
@@ -175,7 +175,7 @@ class PaymentService {
     try {
       return DateTime.parse(dateString);
     } catch (e) {
-      log('💥 Error parsing date: $dateString');
+      dLog('💥 Error parsing date: $dateString');
       return null;
     }
   }
@@ -185,7 +185,7 @@ class PaymentService {
     String? startDate,
     String? endDate,
   }) async {
-    log('📊 Fetching dashboard payment data...');
+    dLog('📊 Fetching dashboard payment data...');
 
     try {
       final response = await getAllPayments(
@@ -266,7 +266,7 @@ class PaymentService {
         'payments': payments,
       };
     } catch (e) {
-      log('💥 Error fetching dashboard payment data: $e');
+      dLog('💥 Error fetching dashboard payment data: $e');
       rethrow;
     }
   }

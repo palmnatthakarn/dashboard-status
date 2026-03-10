@@ -1,5 +1,5 @@
-import 'dart:convert';
-import 'dart:developer';
+﻿import 'dart:convert';
+import '../utils/app_logger.dart';
 import 'package:http/http.dart' as http;
 import 'auth_repository.dart';
 import 'multi_shop_service.dart';
@@ -175,6 +175,9 @@ class TaskItem {
 
   /// Cancelled count (status 2)
   int get cancelledCount => getStatusCount(2);
+
+  /// Not required approval count (status 6)
+  int get notRequiredApprovalCount => getStatusCount(6);
 }
 
 /// Pagination info for task response
@@ -236,13 +239,13 @@ class TaskResponse {
 
 /// Service to fetch task data from the cloud API
 class TaskService {
-  static const String baseUrl = 'https://smlaicloudapi.dev.dedepos.com';
+  static const String baseUrl = AuthRepository.baseUrl;
 
   /// Fetch tasks with optional filters
   /// status: 1=อัปโหลด, 2=รอบันทึกบัญชี, 3=รอแก้ไข, 4=รอตรวจสอบ
   static Future<TaskResponse> fetchTasks({
     int limit = 20,
-    List<int> status = const [1, 2, 3, 4],
+    List<int> status = const [1, 2, 3, 4, 6],
     int page = 1,
     bool isRetry = false,
     bool skipShopSelection = false,
@@ -250,13 +253,13 @@ class TaskService {
     final token = AuthRepository.token;
 
     if (token == null || token.isEmpty) {
-      log('❌ No auth token available for task API');
+      dLog('❌ No auth token available for task API');
       throw Exception('ไม่พบ Token กรุณาเข้าสู่ระบบใหม่');
     }
 
     // Check if token is expired before making request
     if (AuthRepository.isTokenExpired && !isRetry) {
-      log('⏰ Token is expiring soon, refreshing before request...');
+      dLog('⏰ Token is expiring soon, refreshing before request...');
       final authRepo = AuthRepository();
       final refreshed = await authRepo.refreshTokenWithCredentials();
       if (!refreshed) {
@@ -266,22 +269,22 @@ class TaskService {
 
     // Only select shop if not already selected (skipShopSelection = false)
     if (!skipShopSelection) {
-      log('🏪 Ensuring shop is selected before fetching tasks...');
+      dLog('🏪 Ensuring shop is selected before fetching tasks...');
       final shopSelected = await MultiShopService.selectShop();
       if (!shopSelected) {
-        log('⚠️ Could not select shop, continuing anyway...');
+        dLog('⚠️ Could not select shop, continuing anyway...');
       }
     } else {
-      log('⏭️ Skipping shop selection (already selected)');
+      dLog('⏭️ Skipping shop selection (already selected)');
     }
 
     // Build URL with query parameters
     final statusParam = status.join(',');
     final url = '$baseUrl/task?limit=$limit&status=$statusParam&page=$page';
-    log('🌐 Fetching tasks from: $url');
+    dLog('🌐 Fetching tasks from: $url');
 
     try {
-      log(
+      dLog(
         '🔑 Using token for API: ${token.substring(0, token.length > 30 ? 30 : token.length)}...',
       );
 
@@ -294,24 +297,24 @@ class TaskService {
         },
       );
 
-      log('📡 Response status: ${response.statusCode}');
-      log(
+      dLog('📡 Response status: ${response.statusCode}');
+      dLog(
         '📄 Response body: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}...',
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        log('✅ Successfully fetched tasks');
+        dLog('✅ Successfully fetched tasks');
         return TaskResponse.fromJson(data);
       } else if (response.statusCode == 401) {
-        log('❌ Unauthorized - attempting token refresh...');
+        dLog('❌ Unauthorized - attempting token refresh...');
 
         if (!isRetry) {
           final authRepo = AuthRepository();
           final refreshed = await authRepo.refreshTokenWithCredentials();
 
           if (refreshed) {
-            log('✅ Token refreshed, retrying request...');
+            dLog('✅ Token refreshed, retrying request...');
             return fetchTasks(
               limit: limit,
               status: status,
@@ -324,11 +327,11 @@ class TaskService {
 
         throw Exception('Token หมดอายุ กรุณาเข้าสู่ระบบใหม่');
       } else {
-        log('❌ Failed to fetch tasks: ${response.statusCode}');
+        dLog('❌ Failed to fetch tasks: ${response.statusCode}');
         throw Exception('เกิดข้อผิดพลาด: ${response.statusCode}');
       }
     } catch (e) {
-      log('💥 Error fetching tasks: $e');
+      dLog('💥 Error fetching tasks: $e');
       rethrow;
     }
   }
@@ -337,11 +340,11 @@ class TaskService {
   static Future<TaskResponse> fetchTasksForShop({
     required String shopId,
     int limit = 20,
-    List<int> status = const [1, 2, 3, 4],
+    List<int> status = const [1, 2, 3, 4, 6],
     int page = 1,
   }) async {
     // Select the specific shop first
-    log('🏪 Selecting shop $shopId before fetching tasks...');
+    dLog('🏪 Selecting shop $shopId before fetching tasks...');
     final shopSelected = await MultiShopService.selectShop(shopId: shopId);
     if (!shopSelected) {
       throw Exception('ไม่สามารถเลือกร้านได้');

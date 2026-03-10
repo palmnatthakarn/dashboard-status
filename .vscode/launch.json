@@ -1,0 +1,45 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "🛠 Dev (default)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": [
+        "--dart-define=BASE_URL=https://smlaicloudapi.dev.dedepos.com"
+      ]
+    },
+    {
+      "name": "🚀 Production",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": [
+        "--dart-define=BASE_URL=https://smlaicloudapi.dedepos.com",
+        "--release"
+      ]
+    },
+    {
+      "name": "🌐 Web - Dev",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": [
+        "-d", "chrome",
+        "--dart-define=BASE_URL=https://smlaicloudapi.dev.dedepos.com"
+      ]
+    },
+    {
+      "name": "🌐 Web - Production",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": [
+        "-d", "chrome",
+        "--dart-define=BASE_URL=https://smlaicloudapi.dedepos.com",
+        "--release"
+      ]
+    }
+  ]
+}

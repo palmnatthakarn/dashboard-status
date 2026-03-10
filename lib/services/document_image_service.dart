@@ -1,5 +1,5 @@
-import 'dart:convert';
-import 'dart:developer';
+﻿import 'dart:convert';
+import '../utils/app_logger.dart';
 import 'package:http/http.dart' as http;
 import 'auth_repository.dart';
 
@@ -93,7 +93,7 @@ class DocumentImageGroup {
 
 /// Service to fetch document image group data
 class DocumentImageService {
-  static const String baseUrl = 'https://smlaicloudapi.dev.dedepos.com';
+  static const String baseUrl = AuthRepository.baseUrl;
 
   /// Fetch document images for a specific shop
   static Future<List<DocumentImage>> fetchShopImages({
@@ -103,13 +103,13 @@ class DocumentImageService {
     final token = AuthRepository.token;
 
     if (token == null || token.isEmpty) {
-      print('❌ No auth token available for documentimage');
+      dLog('❌ No auth token available for documentimage');
       return [];
     }
 
     final url = '$baseUrl/documentimage?shopid=$shopId&limit=$limit';
-    print('📸 Fetching shop images for ID: "$shopId"');
-    print('📸 Full URL: $url');
+    dLog('📸 Fetching shop images for ID: "$shopId"');
+    dLog('📸 Full URL: $url');
 
     try {
       final response = await http.get(
@@ -120,52 +120,52 @@ class DocumentImageService {
         },
       );
 
-      print('📡 Document image response status: ${response.statusCode}');
-      print('📦 Response body: ${response.body}'); // Debug: see full response
+      dLog('📡 Document image response status: ${response.statusCode}');
+      dLog('📦 Response body: ${response.body}'); // Debug: see full response
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
 
-        print('✨ Decoded data: $data'); // Debug: see decoded data
-        print('✨ Success field: ${data['success']}'); // Debug
-        print('✨ Data field type: ${data['data']?.runtimeType}'); // Debug
-        print('✨ Data field: ${data['data']}'); // Debug
+        dLog('✨ Decoded data: $data'); // Debug: see decoded data
+        dLog('✨ Success field: ${data['success']}'); // Debug
+        dLog('✨ Data field type: ${data['data']?.runtimeType}'); // Debug
+        dLog('✨ Data field: ${data['data']}'); // Debug
 
         if (data['success'] == true && data['data'] != null) {
           if (data['data'] is List) {
             final images = (data['data'] as List).map((item) {
-              print('🖼️ Processing image item: $item'); // Debug each item
+              dLog('🖼️ Processing image item: $item'); // Debug each item
               return DocumentImage.fromJson(item);
             }).toList();
 
-            print('✅ Loaded ${images.length} images for shop $shopId');
+            dLog('✅ Loaded ${images.length} images for shop $shopId');
 
             // Debug: log first image details
             if (images.isNotEmpty) {
               final first = images.first;
-              print(
+              dLog(
                 '🔍 First image: id=${first.imageId}, url=${first.imageUrl}, category=${first.category}',
               );
             }
 
             return images;
           } else {
-            print('⚠️ Data is not a List, it is: ${data['data'].runtimeType}');
+            dLog('⚠️ Data is not a List, it is: ${data['data'].runtimeType}');
           }
         } else {
-          print('⚠️ Success is false or data is null');
+          dLog('⚠️ Success is false or data is null');
         }
       } else if (response.statusCode == 401) {
-        print('❌ Unauthorized - token may be expired');
+        dLog('❌ Unauthorized - token may be expired');
       } else {
-        print('❌ Unexpected status code: ${response.statusCode}');
+        dLog('❌ Unexpected status code: ${response.statusCode}');
       }
 
-      print('❌ Failed to get document images for shop $shopId');
+      dLog('❌ Failed to get document images for shop $shopId');
       return [];
     } catch (e, stackTrace) {
-      print('💥 Error fetching document images: $e');
-      print('📍 Stack trace: $stackTrace');
+      dLog('💥 Error fetching document images: $e');
+      dLog('📍 Stack trace: $stackTrace');
       return [];
     }
   }
@@ -178,12 +178,12 @@ class DocumentImageService {
     final token = AuthRepository.token;
 
     if (token == null || token.isEmpty) {
-      log('❌ No auth token available for documentimagegroup');
+      dLog('❌ No auth token available for documentimagegroup');
       return {};
     }
 
     final url = '$baseUrl/documentimagegroup?limit=$limit';
-    log('📸 Fetching document images from: $url');
+    dLog('📸 Fetching document images from: $url');
 
     try {
       final response = await http.get(
@@ -194,7 +194,7 @@ class DocumentImageService {
         },
       );
 
-      log('📡 Document image response status: ${response.statusCode}');
+      dLog('📡 Document image response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -211,25 +211,25 @@ class DocumentImageService {
             for (var group in groups) {
               if (group.shopId.isNotEmpty) {
                 billCountMap[group.shopId] = group.billCount;
-                log(
+                dLog(
                   '  📋 Shop ${group.shopId}: billCount=${group.billCount}, imageCount=${group.imageCount}',
                 );
               }
             }
 
-            log('✅ Loaded bill counts for ${billCountMap.length} shops');
+            dLog('✅ Loaded bill counts for ${billCountMap.length} shops');
           }
 
           return billCountMap;
         }
       } else if (response.statusCode == 401) {
-        log('❌ Unauthorized - token may be expired');
+        dLog('❌ Unauthorized - token may be expired');
       }
 
-      log('❌ Failed to get document images');
+      dLog('❌ Failed to get document images');
       return {};
     } catch (e) {
-      log('💥 Error fetching document images: $e');
+      dLog('💥 Error fetching document images: $e');
       return {};
     }
   }

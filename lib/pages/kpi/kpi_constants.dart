@@ -10,6 +10,7 @@ class KpiColors {
   static const Color waitingVerify = Color(0xFFF59E0B); // รอตรวจสอบ - Orange
   static const Color completed = Color(0xFF10B981); // สมบูรณ์ - Green
   static const Color cancelled = Color(0xFFEF4444); // ยกเลิก - Red
+  static const Color baseColor = Color(0xFF1E293B); // black
 
   // UI colors
   static const Color cardBackground = Colors.white;
@@ -43,6 +44,20 @@ class KpiColors {
   // Incentive colors
   static const Color incentivePass = Color(0xFF10B981); // ✅ ผ่าน - Green
   static const Color incentiveFail = Color(0xFFEF4444); // ❌ ไม่ผ่าน - Red
+
+  // Section background colors
+  static const Color section1Background = Color(
+    0xFFE0F2FE,
+  ); // Light blue - จำนวน
+  static const Color section2Background = Color(
+    0xFFFEF9C3,
+  ); // Light yellow - รอตรวจสอบ/ผ่าน/ไม่ผ่าน/ไม่บันทึก
+  static const Color section3Background = Color(
+    0xFFDCFCE7,
+  ); // Light green - เอกสารที่ต้องบันทึก/บันทึก/คงเหลือ/บันทึกบัญชีเสร็จ
+  static const Color sectionDivider = Color(
+    0xFF94A3B8,
+  ); // Thick divider between sections
 }
 
 /// Dimension constants for KPI dashboard

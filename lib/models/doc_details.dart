@@ -1,3 +1,4 @@
+﻿import 'dart:developer';
 import 'package:json_annotation/json_annotation.dart';
 import 'daily_images.dart';
 
@@ -115,7 +116,7 @@ class DocDetails {
 
   int get imageCount {
     if (dailyImages == null || dailyImages!.isEmpty) {
-      print('🔍 No daily images for shop $shopid');
+      log('🔍 No daily images for shop $shopid');
       return 0;
     }
 
@@ -123,7 +124,7 @@ class DocDetails {
         .where((image) => image.imageUrl?.isNotEmpty == true)
         .length;
 
-    print(
+    log(
       '🔢 Shop $shopid has $count images with valid URLs out of ${dailyImages!.length} total',
     );
     return count;

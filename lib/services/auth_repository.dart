@@ -1,14 +1,19 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:developer';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'google_auth_service.dart';
 import 'multi_shop_service.dart';
 
 class AuthRepository {
-  // Base URL provided by the user
-  static const String baseUrl = 'https://smlaicloudapi.dev.dedepos.com';
+  // Base URL: set via --dart-define=BASE_URL=... at build time
+  // Falls back to dev URL if not specified (e.g. during flutter run)
+  static const String baseUrl = String.fromEnvironment(
+    'BASE_URL',
+    defaultValue: 'https://smlaicloudapi.dev.dedepos.com',
+  );
 
   // Static token storage for use by other services
   static String? _authToken;
@@ -22,10 +27,12 @@ class AuthRepository {
   // Refresh token storage
   static String? _refreshToken;
 
-  // Password storage for re-authentication (encrypted in production)
-  static String? _password;
-
   final GoogleAuthService _googleAuthService = GoogleAuthService();
+
+  /// Secure storage for sensitive data (iOS Keychain / Android Keystore)
+  static const _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
 
   /// Get the current auth token
   static String? get token => _authToken;
@@ -71,25 +78,31 @@ class AuthRepository {
   // Endpoints
   static const String loginEndpoint = '/login';
   static const String logoutEndpoint = '/logout';
-  static const String _tokenKey = 'auth_token';
+  static const String _refreshEndpoint = '/refresh';
+
+  // SharedPreferences keys (non-sensitive)
   static const String _usernameKey = 'auth_username';
-  static const String _refreshTokenKey = 'refresh_token';
-  static const String _passwordKey = 'auth_password';
+  static const String _rememberMeKey = 'remember_me';
+
+  // SecureStorage keys (sensitive — stored in iOS Keychain / Android Keystore / Web localStorage)
+  static const String _tokenKey = 'secure_auth_token';
+  static const String _refreshTokenKey = 'secure_refresh_token';
+  static const String _savedPasswordKey = 'saved_password';
 
   /// Check for existing session
   Future<bool> checkSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(_tokenKey);
+      // Access token now lives in secure storage
+      final token = await _secureStorage.read(key: _tokenKey);
       final username = prefs.getString(_usernameKey);
-      final refreshToken = prefs.getString(_refreshTokenKey);
-      final password = prefs.getString(_passwordKey);
+      // Refresh token is stored in secure storage (Keychain/Keystore)
+      final refreshToken = await _secureStorage.read(key: _refreshTokenKey);
 
       if (token != null && token.isNotEmpty) {
         _authToken = token;
         _username = username;
         _refreshToken = refreshToken;
-        _password = password;
         _extractTokenExpiry(token);
         log('🔐 Session restored for user: $_username');
 
@@ -116,13 +129,25 @@ class AuthRepository {
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_tokenKey, token);
+      // Store non-sensitive data in SharedPreferences
       await prefs.setString(_usernameKey, username);
+
+      // Store access token in secure storage (NOT SharedPreferences)
+      await _secureStorage.write(key: _tokenKey, value: token);
+
       if (refreshToken != null) {
-        await prefs.setString(_refreshTokenKey, refreshToken);
+        // Store refresh_token in secure encrypted storage
+        await _secureStorage.write(key: _refreshTokenKey, value: refreshToken);
       }
-      if (password != null) {
-        await prefs.setString(_passwordKey, password);
+
+      // If "Remember Me" is active, persist the password securely too
+      final rememberMe = prefs.getBool(_rememberMeKey) ?? false;
+      if (rememberMe && password != null && password.isNotEmpty) {
+        await _secureStorage.write(key: _savedPasswordKey, value: password);
+        log('🔐 Password saved securely for Remember Me');
+      } else {
+        // Clear any previously saved password if Remember Me is off
+        await _secureStorage.delete(key: _savedPasswordKey);
       }
     } catch (e) {
       log('💥 Error persisting session: $e');
@@ -134,28 +159,20 @@ class AuthRepository {
       log('🧹 Clearing session from SharedPreferences...');
       final prefs = await SharedPreferences.getInstance();
 
-      // Remove all auth-related keys
-      final tokenRemoved = await prefs.remove(_tokenKey);
+      // Remove non-sensitive keys from SharedPreferences
       final usernameRemoved = await prefs.remove(_usernameKey);
-      final refreshTokenRemoved = await prefs.remove(_refreshTokenKey);
-      final passwordRemoved = await prefs.remove(_passwordKey);
 
-      log('🧹 Token removed: $tokenRemoved');
+      // Remove both tokens and saved password from secure storage
+      await _secureStorage.delete(key: _tokenKey);
+      await _secureStorage.delete(key: _refreshTokenKey);
+      await _secureStorage.delete(key: _savedPasswordKey);
+
       log('🧹 Username removed: $usernameRemoved');
-      log('🧹 Refresh token removed: $refreshTokenRemoved');
-      log('🧹 Password removed: $passwordRemoved');
+      log('🧹 Tokens removed from secure storage');
 
-      // Verify all keys are removed
-      final verifyToken = prefs.getString(_tokenKey);
       final verifyUsername = prefs.getString(_usernameKey);
-      final verifyRefreshToken = prefs.getString(_refreshTokenKey);
-      final verifyPassword = prefs.getString(_passwordKey);
-
-      if (verifyToken == null &&
-          verifyUsername == null &&
-          verifyRefreshToken == null &&
-          verifyPassword == null) {
-        log('✅ All session data successfully cleared from SharedPreferences');
+      if (verifyUsername == null) {
+        log('✅ All session data successfully cleared');
       } else {
         log(
           '⚠️ Warning: Some session data may still exist in SharedPreferences',
@@ -188,33 +205,54 @@ class AuthRepository {
     }
   }
 
-  /// Refresh token using stored credentials
+  /// Refresh access token using stored refresh_token via POST /refresh.
+  /// Returns true if a new token was obtained, false → caller should force re-login.
   Future<bool> refreshTokenWithCredentials() async {
-    if (_refreshToken == null && _password == null) {
-      log('❌ No refresh token or password available');
+    if (_refreshToken == null) {
+      log('❌ No refresh token available — user must re-login');
       return false;
     }
 
-    log('🔄 Attempting to refresh token...');
+    log('🔄 Calling POST $baseUrl$_refreshEndpoint to get new access token...');
 
     try {
-      // Since API doesn't have /auth/refresh endpoint,
-      // we'll re-login with stored credentials
-      if (_username != null && _password != null) {
-        final newToken = await login(_username!, _password!);
-        return newToken.isNotEmpty;
-      } else if (_refreshToken != null) {
-        // If we have refresh_token but no password,
-        // we can't re-authenticate
-        log('⚠️ Have refresh_token but no password for re-auth');
+      final url = '$baseUrl$_refreshEndpoint';
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'token': _refreshToken}),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      log('📡 Refresh response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+
+        if (data['success'] == true && data['token'] != null) {
+          final newToken = data['token'] as String;
+
+          // Update access token in secure storage
+          _authToken = newToken;
+          _extractTokenExpiry(newToken);
+
+          await _secureStorage.write(key: _tokenKey, value: newToken);
+
+          log('✅ Token refreshed successfully (${newToken.length} chars)');
+          return true;
+        } else {
+          log('⚠️ Refresh failed: ${data['message'] ?? 'Unknown error'}');
+          return false;
+        }
+      } else {
+        log('❌ Refresh failed with status: ${response.statusCode}');
         return false;
       }
     } catch (e) {
-      log('💥 Token refresh failed: $e');
+      log('💥 Token refresh error: $e');
       return false;
     }
-
-    return false;
   }
 
   Future<String> login(String username, String password) async {
@@ -229,18 +267,18 @@ class AuthRepository {
     _username = username;
 
     try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'username': username, 'password': password}),
-      );
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'username': username, 'password': password}),
+          )
+          .timeout(const Duration(seconds: 15));
 
       log('📡 Login response status: ${response.statusCode}');
-      log('📄 Login response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        log('📄 Full login response: $data');
 
         if (data['success'] == true) {
           // Assuming the token is in 'token' or 'data.token'
@@ -272,7 +310,6 @@ class AuthRepository {
           _authToken = extractedToken;
           _username = username;
           _refreshToken = refreshToken;
-          _password = password; // Store for re-authentication
 
           // Extract token expiry
           if (extractedToken != null) {
@@ -283,7 +320,7 @@ class AuthRepository {
             extractedToken ?? '',
             username,
             refreshToken: refreshToken,
-            password: password,
+            password: null, // password is passed separately via login_page
           );
 
           log('🔑 Stored token (${extractedToken?.length ?? 0} chars)');
@@ -341,18 +378,18 @@ class AuthRepository {
       };
       log('📤 Request body: $requestBody');
 
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(requestBody),
-      );
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(requestBody),
+          )
+          .timeout(const Duration(seconds: 15));
 
       log('📡 Login/email response status: ${response.statusCode}');
-      log('📄 Login/email response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        log('📄 Full login/email response: $data');
 
         if (data['success'] == true) {
           // Extract backend token
@@ -426,13 +463,15 @@ class AuthRepository {
     try {
       if (token != null && token.isNotEmpty) {
         log('🔓 Calling logout API with token...');
-        final response = await http.post(
-          Uri.parse(url),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-        );
+        final response = await http
+            .post(
+              Uri.parse(url),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+            )
+            .timeout(const Duration(seconds: 10));
         log('📡 Logout response status: ${response.statusCode}');
         if (response.statusCode == 200) {
           log('✅ Logout API call successful');
@@ -453,7 +492,6 @@ class AuthRepository {
     _authToken = null;
     _username = null;
     _refreshToken = null;
-    _password = null;
     _tokenExpiry = null;
     log('✅ All static variables cleared');
 

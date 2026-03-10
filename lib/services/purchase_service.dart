@@ -1,5 +1,5 @@
-import 'dart:convert';
-import 'dart:developer';
+﻿import 'dart:convert';
+import '../utils/app_logger.dart';
 import 'package:http/http.dart' as http;
 import 'auth_repository.dart';
 import '../models/purchase.dart';
@@ -31,7 +31,7 @@ class PurchaseService {
     final uri = Uri.parse(
       '$baseUrl/purchases',
     ).replace(queryParameters: queryParams);
-    log('🌐 Fetching purchases from: $uri');
+    dLog('🌐 Fetching purchases from: $uri');
 
     try {
       final token = AuthRepository.token;
@@ -39,11 +39,11 @@ class PurchaseService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(uri, headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
-        log('✅ Successfully parsed purchases data');
+        dLog('✅ Successfully parsed purchases data');
 
         // Handle API response structure
         if (data['success'] == true && data['data'] != null) {
@@ -64,7 +64,7 @@ class PurchaseService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching purchases: $e');
+      dLog('💥 Error fetching purchases: $e');
       rethrow;
     }
   }
@@ -72,7 +72,7 @@ class PurchaseService {
   /// GET /api/purchases/:id - Get purchase by ID
   static Future<Purchase?> getPurchaseById(int id) async {
     final url = '$baseUrl/purchases/$id';
-    log('🌐 Fetching purchase by ID from: $url');
+    dLog('🌐 Fetching purchase by ID from: $url');
 
     try {
       final token = AuthRepository.token;
@@ -80,7 +80,7 @@ class PurchaseService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(Uri.parse(url), headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -93,7 +93,7 @@ class PurchaseService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching purchase by ID: $e');
+      dLog('💥 Error fetching purchase by ID: $e');
       rethrow;
     }
   }
@@ -120,7 +120,7 @@ class PurchaseService {
     String branchSync,
   ) async {
     final url = '$baseUrl/purchases/summary/$branchSync';
-    log('🌐 Fetching purchase summary from: $url');
+    dLog('🌐 Fetching purchase summary from: $url');
 
     try {
       final token = AuthRepository.token;
@@ -128,7 +128,7 @@ class PurchaseService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(Uri.parse(url), headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -141,7 +141,7 @@ class PurchaseService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching purchase summary: $e');
+      dLog('💥 Error fetching purchase summary: $e');
       rethrow;
     }
   }
@@ -173,7 +173,7 @@ class PurchaseService {
     try {
       return DateTime.parse(dateString);
     } catch (e) {
-      log('💥 Error parsing date: $dateString');
+      dLog('💥 Error parsing date: $dateString');
       return null;
     }
   }
@@ -183,7 +183,7 @@ class PurchaseService {
     String? startDate,
     String? endDate,
   }) async {
-    log('📊 Fetching dashboard purchase data...');
+    dLog('📊 Fetching dashboard purchase data...');
 
     try {
       final response = await getAllPurchases(
@@ -247,7 +247,7 @@ class PurchaseService {
         'purchases': purchases,
       };
     } catch (e) {
-      log('💥 Error fetching dashboard purchase data: $e');
+      dLog('💥 Error fetching dashboard purchase data: $e');
       rethrow;
     }
   }

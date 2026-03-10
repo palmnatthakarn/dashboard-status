@@ -24,6 +24,9 @@ Journal _$JournalFromJson(Map<String, dynamic> json) => Journal(
   branchCode: json['branchcode'] as String?,
   branchName: json['branchname'] as String?,
   description: json['accountdescription'] as String?,
+  documentRef: json['documentref'] as String?,
+  createdBy: json['createdby'] as String?,
+  exDocRefNo: json['exdocrefno'] as String?,
 );
 
 Map<String, dynamic> _$JournalToJson(Journal instance) => <String, dynamic>{
@@ -44,6 +47,9 @@ Map<String, dynamic> _$JournalToJson(Journal instance) => <String, dynamic>{
   'branchcode': instance.branchCode,
   'branchname': instance.branchName,
   'accountdescription': instance.description,
+  'documentref': instance.documentRef,
+  'createdby': instance.createdBy,
+  'exdocrefno': instance.exDocRefNo,
 };
 
 JournalSummary _$JournalSummaryFromJson(Map<String, dynamic> json) =>

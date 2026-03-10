@@ -1,11 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'blocs/auth/auth_bloc.dart';
 import 'dashboard_screen.dart';
+import 'firebase_options.dart';
 import 'pages/login_page.dart';
 import 'services/auth_repository.dart';
 
@@ -14,19 +16,12 @@ void main() async {
 
   Object? initError;
   try {
-    if (const bool.fromEnvironment('dart.library.js_util')) {
+    if (kIsWeb) {
       await Firebase.initializeApp(
-        options: const FirebaseOptions(
-          apiKey: "AIzaSyDKin_0NxIRwAI9v3rBV6HSAYJ0BgaIvA0",
-          authDomain: "account-seaandhill.firebaseapp.com",
-          projectId: "account-seaandhill",
-          storageBucket: "account-seaandhill.firebasestorage.app",
-          messagingSenderId: "157985041664",
-          appId: "1:157985041664:web:8b0be72ead7b1aa695d7e5",
-          measurementId: "G-63Z87H44Y3",
-        ),
+        options: DefaultFirebaseOptions.currentPlatform,
       );
     } else {
+      // Android/iOS: reads config from google-services.json / GoogleService-Info.plist
       await Firebase.initializeApp();
     }
   } catch (e) {
@@ -107,6 +102,15 @@ class MyApp extends StatelessWidget {
             builder: (context, state) {
               if (state is AuthSuccess) {
                 return const DashboardScreen();
+              }
+              // Show splash/loading while checking session on startup
+              if (state is AuthLoading) {
+                return const Scaffold(
+                  backgroundColor: Colors.white,
+                  body: Center(
+                    child: CircularProgressIndicator(color: Color(0xFF4A6CF7)),
+                  ),
+                );
               }
               return const LoginPage();
             },

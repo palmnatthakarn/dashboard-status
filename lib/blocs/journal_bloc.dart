@@ -1,3 +1,4 @@
+﻿import 'dart:developer';
 import 'package:bloc/bloc.dart';
 import 'package:flutter/foundation.dart';
 import '../models/journal.dart';
@@ -46,7 +47,7 @@ class JournalBloc extends Bloc<JournalEvent, JournalState> {
           }
         } catch (e) {
           // หาก account_type ใดไม่มีข้อมูล ก็ข้ามไป
-          print('No data for account_type: $accountType - $e');
+          log('No data for account_type: $accountType - $e');
         }
       }
 
@@ -94,7 +95,7 @@ class JournalBloc extends Bloc<JournalEvent, JournalState> {
           }
         } catch (e) {
           // หาก account_type ใดไม่มีข้อมูล ก็ข้ามไป
-          print('No data for account_type: $accountType - $e');
+          log('No data for account_type: $accountType - $e');
         }
       }
 
@@ -142,7 +143,7 @@ class JournalBloc extends Bloc<JournalEvent, JournalState> {
               totalPages = response.pagination!.totalPages!;
             }
           } catch (e) {
-            print('No data for account_type: $accountType - $e');
+            log('No data for account_type: $accountType - $e');
           }
         }
 

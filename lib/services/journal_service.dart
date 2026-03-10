@@ -1,5 +1,5 @@
-import 'dart:convert';
-import 'dart:developer';
+﻿import 'dart:convert';
+import '../utils/app_logger.dart';
 import 'package:http/http.dart' as http;
 import 'auth_repository.dart';
 import '../models/journal.dart';
@@ -38,14 +38,14 @@ class JournalService {
     final uri = Uri.parse(
       '$baseUrl/journals',
     ).replace(queryParameters: queryParams);
-    log('🌐 Fetching journals from: $uri');
+    dLog('🌐 Fetching journals from: $uri');
 
     try {
       final token = AuthRepository.token;
 
       // Check if token is expired before making request
       if (AuthRepository.isTokenExpired && !isRetry) {
-        log('⏰ Token is expiring soon, refreshing before request...');
+        dLog('⏰ Token is expiring soon, refreshing before request...');
         final authRepo = AuthRepository();
         final refreshed = await authRepo.refreshTokenWithCredentials();
         if (!refreshed) {
@@ -57,14 +57,14 @@ class JournalService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(uri, headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
-        log('✅ Successfully parsed journals data');
+        dLog('✅ Successfully parsed journals data');
         return JournalResponse.fromJson(data);
       } else if (response.statusCode == 401) {
-        log('❌ Unauthorized - attempting token refresh...');
+        dLog('❌ Unauthorized - attempting token refresh...');
 
         if (!isRetry) {
           // Try to refresh token
@@ -72,7 +72,7 @@ class JournalService {
           final refreshed = await authRepo.refreshTokenWithCredentials();
 
           if (refreshed) {
-            log('✅ Token refreshed, retrying request...');
+            dLog('✅ Token refreshed, retrying request...');
             return getAllJournals(
               page: page,
               limit: limit,
@@ -94,7 +94,7 @@ class JournalService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching journals: $e');
+      dLog('💥 Error fetching journals: $e');
       rethrow;
     }
   }
@@ -102,7 +102,7 @@ class JournalService {
   /// GET /api/journals/:id - Get journal by ID
   static Future<Journal?> getJournalById(int id) async {
     final url = '$baseUrl/journals/$id';
-    log('🌐 Fetching journal by ID from: $url');
+    dLog('🌐 Fetching journal by ID from: $url');
 
     try {
       final token = AuthRepository.token;
@@ -110,7 +110,7 @@ class JournalService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(Uri.parse(url), headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -123,7 +123,7 @@ class JournalService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching journal by ID: $e');
+      dLog('💥 Error fetching journal by ID: $e');
       rethrow;
     }
   }
@@ -148,7 +148,7 @@ class JournalService {
   /// GET /api/journals/summary/:branch_sync - Get journal summary by branch
   static Future<JournalSummary?> getJournalSummaryByShop(String shopId) async {
     final url = '$baseUrl/journals/summary/$shopId';
-    log('🌐 Fetching journal summary from: $url');
+    dLog('🌐 Fetching journal summary from: $url');
 
     try {
       final token = AuthRepository.token;
@@ -156,7 +156,7 @@ class JournalService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(Uri.parse(url), headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -169,7 +169,7 @@ class JournalService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching journal summary: $e');
+      dLog('💥 Error fetching journal summary: $e');
       rethrow;
     }
   }
@@ -177,7 +177,7 @@ class JournalService {
   /// GET /api/journals/balance/:account_id - Get account balance
   static Future<double> getAccountBalance(String accountId) async {
     final url = '$baseUrl/journals/balance/$accountId';
-    log('🌐 Fetching account balance from: $url');
+    dLog('🌐 Fetching account balance from: $url');
 
     try {
       final token = AuthRepository.token;
@@ -185,7 +185,7 @@ class JournalService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(Uri.parse(url), headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -196,7 +196,7 @@ class JournalService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching account balance: $e');
+      dLog('💥 Error fetching account balance: $e');
       rethrow;
     }
   }
@@ -228,7 +228,7 @@ class JournalService {
     try {
       return DateTime.parse(dateString);
     } catch (e) {
-      log('💥 Error parsing date: $dateString');
+      dLog('💥 Error parsing date: $dateString');
       return null;
     }
   }
@@ -238,7 +238,7 @@ class JournalService {
     String? startDate,
     String? endDate,
   }) async {
-    log('📊 Fetching dashboard journal data...');
+    dLog('📊 Fetching dashboard journal data...');
 
     try {
       final response = await getAllJournals(
@@ -286,7 +286,7 @@ class JournalService {
         'journals': journals,
       };
     } catch (e) {
-      log('💥 Error fetching dashboard journal data: $e');
+      dLog('💥 Error fetching dashboard journal data: $e');
       rethrow;
     }
   }
@@ -296,6 +296,7 @@ class JournalService {
     int page = 1,
     int limit = 1000,
     String? shopId,
+    String? task,
   }) async {
     final queryParams = <String, String>{
       'page': page.toString(),
@@ -304,11 +305,12 @@ class JournalService {
 
     if (shopId != null)
       queryParams['shopids'] = shopId; // Changed from branch_sync to shopids
+    if (task != null) queryParams['task'] = task; // Add task filter
 
     final uri = Uri.parse(
-      'https://smlaicloudapi.dev.dedepos.com/gl/journal',
+      '$baseUrl/gl/journal',
     ).replace(queryParameters: queryParams);
-    log('🌐 Fetching GL journals from: $uri');
+    dLog('🌐 Fetching GL journals from: $uri');
 
     try {
       final token = AuthRepository.token;
@@ -316,20 +318,20 @@ class JournalService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(uri, headers: headers);
-      log('📡 Response status: ${response.statusCode}');
-      log(
+      dLog('📡 Response status: ${response.statusCode}');
+      dLog(
         '📄 Response body preview: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}',
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
-        log('✅ Successfully parsed JSON. Data keys: ${data.keys.toList()}');
+        dLog('✅ Successfully parsed JSON. Data keys: ${data.keys.toList()}');
 
         if (data['data'] != null) {
           final list = data['data'] as List;
-          log('📊 Found ${list.length} items in data');
+          dLog('📊 Found ${list.length} items in data');
           if (list.isNotEmpty) {
-            log('Example item: ${list.first}');
+            dLog('Example item: ${list.first}');
           }
         }
 
@@ -340,15 +342,15 @@ class JournalService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching GL journals: $e');
+      dLog('💥 Error fetching GL journals: $e');
       rethrow;
     }
   }
 
   /// GET /gl/journal/docno/{docno} - Get journal detail by document number
   static Future<JournalDetail> getJournalDetailByDocNo(String docNo) async {
-    final url = 'https://smlaicloudapi.dev.dedepos.com/gl/journal/docno/$docNo';
-    log('🌐 Fetching journal detail from: $url');
+    final url = '$baseUrl/gl/journal/docno/$docNo';
+    dLog('🌐 Fetching journal detail from: $url');
 
     try {
       final token = AuthRepository.token;
@@ -356,7 +358,7 @@ class JournalService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(Uri.parse(url), headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -372,15 +374,15 @@ class JournalService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching journal detail: $e');
+      dLog('💥 Error fetching journal detail: $e');
       rethrow;
     }
   }
 
   /// GET /gl/journalbook - Get journal books
   static Future<List<JournalBook>> getJournalBooks() async {
-    const url = 'https://smlaicloudapi.dev.dedepos.com/gl/journalbook';
-    log('🌐 Fetching journal books from: $url');
+    final url = '$baseUrl/gl/journalbook';
+    dLog('🌐 Fetching journal books from: $url');
 
     try {
       final token = AuthRepository.token;
@@ -388,7 +390,7 @@ class JournalService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(Uri.parse(url), headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -399,7 +401,7 @@ class JournalService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching journal books: $e');
+      dLog('💥 Error fetching journal books: $e');
       rethrow;
     }
   }

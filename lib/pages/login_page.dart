@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../blocs/auth/auth_bloc.dart';
 import '../components/common/app_logo.dart';
+import '../components/common/login_left_panel.dart';
 import '../dashboard_screen.dart';
 
 class LoginPage extends StatefulWidget {
@@ -18,18 +21,20 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   bool _obscurePassword = true;
   bool _rememberMe = false;
 
+  static const _rememberMeKey = 'remember_me';
+  static const _savedUsernameKey = 'saved_username';
+  static const _savedPasswordKey = 'saved_password';
+
+  static const _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
+
   // Form animations
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-  // Left panel animations
-  late AnimationController _floatController;
-  late AnimationController _pulseController;
-  late AnimationController _rotateController;
-  late Animation<double> _floatAnimation;
-  late Animation<double> _pulseAnimation;
-  late Animation<double> _rotateAnimation;
+  // Left-panel animations are now owned by LoginLeftPanel widget
 
   @override
   void initState() {
@@ -52,33 +57,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
         );
     _animationController.forward();
 
-    // Floating animation (up and down)
-    _floatController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 3000),
-    )..repeat(reverse: true);
-    _floatAnimation = Tween<double>(begin: -10, end: 10).animate(
-      CurvedAnimation(parent: _floatController, curve: Curves.easeInOut),
-    );
-
-    // Pulse animation
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    )..repeat(reverse: true);
-    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-
-    // Rotation animation
-    _rotateController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 8000),
-    )..repeat();
-    _rotateAnimation = Tween<double>(
-      begin: 0,
-      end: 1,
-    ).animate(CurvedAnimation(parent: _rotateController, curve: Curves.linear));
+    _loadRememberMe();
   }
 
   @override
@@ -86,14 +65,43 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     _usernameController.dispose();
     _passwordController.dispose();
     _animationController.dispose();
-    _floatController.dispose();
-    _pulseController.dispose();
-    _rotateController.dispose();
     super.dispose();
+  }
+
+  // ─── Remember-Me persistence ─────────────────────────────────────────────
+
+  Future<void> _loadRememberMe() async {
+    final prefs = await SharedPreferences.getInstance();
+    final remember = prefs.getBool(_rememberMeKey) ?? false;
+    if (remember) {
+      final savedUsername = prefs.getString(_savedUsernameKey) ?? '';
+      final savedPassword =
+          await _secureStorage.read(key: _savedPasswordKey) ?? '';
+      if (mounted) {
+        setState(() {
+          _rememberMe = true;
+          _usernameController.text = savedUsername;
+          _passwordController.text = savedPassword;
+        });
+      }
+    }
+  }
+
+  Future<void> _saveRememberMe(String username, String password) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_rememberMeKey, _rememberMe);
+    if (_rememberMe) {
+      await prefs.setString(_savedUsernameKey, username);
+      await _secureStorage.write(key: _savedPasswordKey, value: password);
+    } else {
+      await prefs.remove(_savedUsernameKey);
+      await _secureStorage.delete(key: _savedPasswordKey);
+    }
   }
 
   void _onLoginPressed() {
     if (_formKey.currentState!.validate()) {
+      _saveRememberMe(_usernameController.text, _passwordController.text);
       context.read<AuthBloc>().add(
         LoginRequested(
           username: _usernameController.text,
@@ -150,9 +158,9 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
               if (constraints.maxWidth >= 800) {
                 return Row(
                   children: [
-                    // Left Side - Blue Panel with Decorations
-                    Expanded(flex: 5, child: _buildLeftPanel()),
-                    // Right Side - Login Form
+                    // Left Side — extracted to LoginLeftPanel
+                    const Expanded(flex: 5, child: LoginLeftPanel()),
+                    // Right Side — Login Form
                     Expanded(flex: 5, child: _buildRightPanel(state)),
                   ],
                 );
@@ -163,506 +171,6 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
             },
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildLeftPanel() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF4A6CF7), Color(0xFF5B7EF9), Color(0xFF4A6CF7)],
-        ),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return Stack(
-            children: [
-              // Decorative shapes - distributed better
-              ..._buildDecorativeShapes(constraints),
-              // Main content - centered illustration
-              Center(child: _buildCenterIllustration(constraints)),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  List<Widget> _buildDecorativeShapes(BoxConstraints constraints) {
-    final height = constraints.maxHeight;
-    final width = constraints.maxWidth;
-
-    return [
-      // Top left - orange dot
-      Positioned(
-        top: height * 0.05,
-        left: width * 0.1,
-        child: _buildAnimatedShape(const Color(0xFFFF9F43), 16, 0),
-      ),
-      // Top center-right - coral/salmon dot
-      Positioned(
-        top: height * 0.08,
-        right: width * 0.15,
-        child: _buildAnimatedShape(const Color(0xFFFF6B6B), 14, 1),
-      ),
-      // Top right corner - yellow
-      Positioned(
-        top: height * 0.12,
-        right: width * 0.05,
-        child: _buildAnimatedShape(const Color(0xFFFFD93D), 12, 2),
-      ),
-      // Left side - cyan teardrop
-      Positioned(
-        top: height * 0.25,
-        left: width * 0.08,
-        child: _buildTeardrop(const Color(0xFF4ECDC4), 24, -0.5),
-      ),
-      // Left mid - green dot
-      Positioned(
-        top: height * 0.45,
-        left: width * 0.03,
-        child: _buildAnimatedShape(const Color(0xFF6BCB77), 18, 3),
-      ),
-      // Right side - purple teardrop
-      Positioned(
-        top: height * 0.35,
-        right: width * 0.05,
-        child: _buildTeardrop(const Color(0xFFA66CFF), 20, 0.5),
-      ),
-      // Right mid - orange dot
-      Positioned(
-        top: height * 0.55,
-        right: width * 0.1,
-        child: _buildAnimatedShape(const Color(0xFFFFB347), 15, 4),
-      ),
-      // Bottom left - pink bar
-      Positioned(
-        bottom: height * 0.15,
-        left: width * 0.1,
-        child: Transform.rotate(
-          angle: 0.4,
-          child: Container(
-            width: 50,
-            height: 8,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF69B4),
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-        ),
-      ),
-      // Bottom center-left - cyan bar
-      Positioned(
-        bottom: height * 0.08,
-        left: width * 0.3,
-        child: Transform.rotate(
-          angle: -0.3,
-          child: Container(
-            width: 35,
-            height: 6,
-            decoration: BoxDecoration(
-              color: const Color(0xFF4ECDC4),
-              borderRadius: BorderRadius.circular(3),
-            ),
-          ),
-        ),
-      ),
-      // Bottom right - yellow dot
-      Positioned(
-        bottom: height * 0.1,
-        right: width * 0.12,
-        child: _buildAnimatedShape(const Color(0xFFFFE066), 20, 5),
-      ),
-      // Bottom right corner - coral
-      Positioned(
-        bottom: height * 0.2,
-        right: width * 0.05,
-        child: _buildAnimatedShape(const Color(0xFFFF7675), 12, 6),
-      ),
-    ];
-  }
-
-  Widget _buildAnimatedShape(Color color, double size, int index) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.0, end: 1.0),
-      duration: Duration(milliseconds: 800 + (index * 100)),
-      curve: Curves.easeOutBack,
-      builder: (context, value, child) {
-        return AnimatedBuilder(
-          animation: _pulseAnimation,
-          builder: (context, child) {
-            // Alternate pulse direction based on index
-            final pulseValue = index.isEven
-                ? _pulseAnimation.value
-                : 2 - _pulseAnimation.value;
-            return Transform.scale(scale: value * pulseValue, child: child);
-          },
-          child: Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(size * 0.35),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.4),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildTeardrop(Color color, double size, double baseAngle) {
-    return AnimatedBuilder(
-      animation: _rotateAnimation,
-      builder: (context, child) {
-        // Slow subtle rotation
-        final rotationAngle = baseAngle + (_rotateAnimation.value * 0.3);
-        return Transform.rotate(angle: rotationAngle, child: child);
-      },
-      child: Container(
-        width: size,
-        height: size * 1.4,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(size),
-            topRight: Radius.circular(size),
-            bottomLeft: Radius.circular(size * 0.3),
-            bottomRight: Radius.circular(size * 0.3),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCenterIllustration(BoxConstraints constraints) {
-    final size = constraints.maxWidth * 0.7;
-    return AnimatedBuilder(
-      animation: _floatAnimation,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, _floatAnimation.value),
-          child: child,
-        );
-      },
-      child: Container(
-        width: size.clamp(280.0, 450.0),
-        height: size.clamp(280.0, 450.0),
-        padding: const EdgeInsets.all(24),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Animated background glow with pulse
-            AnimatedBuilder(
-              animation: _pulseAnimation,
-              builder: (context, child) {
-                return Transform.scale(
-                  scale: _pulseAnimation.value,
-                  child: Container(
-                    width: size * 0.6,
-                    height: size * 0.6,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          Colors.white.withValues(alpha: 0.2),
-                          Colors.white.withValues(alpha: 0.0),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-            // Main dashboard illustration
-            _buildDashboardIllustration(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDashboardIllustration() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Main card with chart
-        Container(
-          width: 260,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.15),
-                blurRadius: 30,
-                offset: const Offset(0, 15),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              // Header row
-              Row(
-                children: [
-                  const AppLogo.small(),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Dashboard',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2D3748),
-                          ),
-                        ),
-                        Text(
-                          'Monitor your KPI',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF718096),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              // Chart bars
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  _buildChartBar(45, const Color(0xFF4A6CF7)),
-                  _buildChartBar(70, const Color(0xFF6BCB77)),
-                  _buildChartBar(55, const Color(0xFFFFB347)),
-                  _buildChartBar(85, const Color(0xFF4A6CF7)),
-                  _buildChartBar(40, const Color(0xFFA66CFF)),
-                  _buildChartBar(65, const Color(0xFF6BCB77)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // Stats row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildStatItem('Revenue', '฿2.5M', const Color(0xFF6BCB77)),
-                  _buildStatItem('Orders', '1,240', const Color(0xFF4A6CF7)),
-                  _buildStatItem('Growth', '+12%', const Color(0xFFFFB347)),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        // Floating badges
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildFloatingBadge(
-              Icons.trending_up,
-              'Analytics',
-              const Color(0xFF6BCB77),
-            ),
-            const SizedBox(width: 12),
-            _buildFloatingBadge(Icons.people, 'Teams', const Color(0xFFA66CFF)),
-            const SizedBox(width: 12),
-            _buildFloatingBadge(
-              Icons.assessment,
-              'Reports',
-              const Color(0xFFFF9F43),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildChartBar(double height, Color color) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: height),
-      duration: const Duration(milliseconds: 800),
-      curve: Curves.easeOutCubic,
-      builder: (context, value, child) {
-        return Container(
-          width: 24,
-          height: value,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(6),
-            boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: 0.3),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildStatItem(String label, String value, Color color) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 10, color: Color(0xFF718096)),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFloatingBadge(IconData icon, String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF2D3748),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildIconCard(IconData icon, Color color) {
-    return Container(
-      width: 50,
-      height: 50,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Icon(icon, color: color, size: 26),
-    );
-  }
-
-  Widget _buildProfileBadge(String text, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 8),
-          Text(
-            text,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF2D3748),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPlayButton() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: const BoxDecoration(
-              color: Color(0xFF4A6CF7),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.play_arrow, size: 18, color: Colors.white),
-          ),
-          const SizedBox(width: 10),
-          const Text(
-            'Shooting calories correctly',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF2D3748),
-            ),
-          ),
-        ],
       ),
     );
   }

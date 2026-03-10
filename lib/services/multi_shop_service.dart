@@ -1,5 +1,5 @@
-import 'dart:convert';
-import 'dart:developer';
+﻿import 'dart:convert';
+import '../utils/app_logger.dart';
 import 'package:http/http.dart' as http;
 import 'auth_repository.dart';
 
@@ -113,7 +113,7 @@ class MultiShopSummaryResponse {
 
 /// Service to fetch multi-shop summary data from the cloud API
 class MultiShopService {
-  static const String baseUrl = 'https://smlaicloudapi.dev.dedepos.com';
+  static const String baseUrl = AuthRepository.baseUrl;
 
   // Track if shop has been selected in this session
   static bool _shopSelected = false;
@@ -126,12 +126,12 @@ class MultiShopService {
     final token = AuthRepository.token;
 
     if (token == null || token.isEmpty) {
-      log('❌ No auth token available for list-shop');
+      dLog('❌ No auth token available for list-shop');
       return [];
     }
 
     final url = '$baseUrl/list-shop';
-    log('📋 Fetching shop list from: $url');
+    dLog('📋 Fetching shop list from: $url');
 
     try {
       final response = await http.get(
@@ -142,13 +142,13 @@ class MultiShopService {
         },
       );
 
-      log('📡 List shop response status: ${response.statusCode}');
+      dLog('📡 List shop response status: ${response.statusCode}');
 
       // Log full response for debugging (can be removed later)
       if (response.statusCode == 200) {
-        log('📄 Full list shop response: ${response.body}');
+        dLog('📄 Full list shop response: ${response.body}');
       } else {
-        log('❌ Error response: ${response.body}');
+        dLog('❌ Error response: ${response.body}');
       }
 
       if (response.statusCode == 200) {
@@ -159,7 +159,7 @@ class MultiShopService {
               .toList();
           _availableShops = shops;
 
-          log('✅ Found ${shops.length} shops');
+          dLog('✅ Found ${shops.length} shops');
 
           // Log details of each shop for verification
           for (var i = 0; i < shops.length; i++) {
@@ -167,14 +167,14 @@ class MultiShopService {
             final shopId = shop['shopid'] ?? shop['shop_id'] ?? shop['id'];
             final hasNames = shop['names'] != null;
             final namesCount = hasNames ? (shop['names'] as List).length : 0;
-            log(
+            dLog(
               '  Shop $i: ID=$shopId, hasNames=$hasNames, namesCount=$namesCount',
             );
 
             if (hasNames && namesCount > 0) {
               final names = shop['names'] as List;
               for (var name in names) {
-                log('    - code: ${name['code']}, name: ${name['name']}');
+                dLog('    - code: ${name['code']}, name: ${name['name']}');
               }
             }
           }
@@ -183,10 +183,10 @@ class MultiShopService {
         }
       }
 
-      log('❌ Failed to get shop list');
+      dLog('❌ Failed to get shop list');
       return [];
     } catch (e) {
-      log('💥 Error fetching shop list: $e');
+      dLog('💥 Error fetching shop list: $e');
       return [];
     }
   }
@@ -196,7 +196,7 @@ class MultiShopService {
     final token = AuthRepository.token;
 
     if (token == null || token.isEmpty) {
-      log('❌ No auth token available for select-shop');
+      dLog('❌ No auth token available for select-shop');
       return false;
     }
 
@@ -213,17 +213,17 @@ class MultiShopService {
             firstShop['shopid']?.toString() ??
             firstShop['shop_id']?.toString() ??
             firstShop['id']?.toString();
-        log('🏪 Using first shop: $selectedShopId');
+        dLog('🏪 Using first shop: $selectedShopId');
       }
     }
 
     if (selectedShopId == null || selectedShopId.isEmpty) {
-      log('❌ No shop ID available to select');
+      dLog('❌ No shop ID available to select');
       return false;
     }
 
     final url = '$baseUrl/select-shop';
-    log('🏪 Selecting shop $selectedShopId from: $url');
+    dLog('🏪 Selecting shop $selectedShopId from: $url');
 
     try {
       final response = await http.post(
@@ -235,22 +235,22 @@ class MultiShopService {
         body: json.encode({'shopid': selectedShopId}),
       );
 
-      log('📡 Select shop response status: ${response.statusCode}');
-      log('📄 Select shop response body: ${response.body}');
+      dLog('📡 Select shop response status: ${response.statusCode}');
+      dLog('📄 Select shop response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
           _shopSelected = true;
-          log('✅ Shop selected successfully');
+          dLog('✅ Shop selected successfully');
           return true;
         }
       }
 
-      log('❌ Failed to select shop');
+      dLog('❌ Failed to select shop');
       return false;
     } catch (e) {
-      log('💥 Error selecting shop: $e');
+      dLog('💥 Error selecting shop: $e');
       return false;
     }
   }
@@ -264,13 +264,13 @@ class MultiShopService {
     final token = AuthRepository.token;
 
     if (token == null || token.isEmpty) {
-      log('❌ No auth token available for multi-shop API');
+      dLog('❌ No auth token available for multi-shop API');
       throw Exception('ไม่พบ Token กรุณาเข้าสู่ระบบใหม่');
     }
 
     // Check if token is expired before making request
     if (AuthRepository.isTokenExpired && !isRetry) {
-      log('⏰ Token is expiring soon, refreshing before request...');
+      dLog('⏰ Token is expiring soon, refreshing before request...');
       final authRepo = AuthRepository();
       final refreshed = await authRepo.refreshTokenWithCredentials();
       if (!refreshed) {
@@ -280,19 +280,19 @@ class MultiShopService {
 
     // Select shop first if not already selected
     if (!_shopSelected) {
-      log('🏪 Shop not selected, calling select-shop first...');
+      dLog('🏪 Shop not selected, calling select-shop first...');
       final shopSelected = await selectShop();
       if (!shopSelected) {
-        log('⚠️ Could not select shop, continuing anyway...');
+        dLog('⚠️ Could not select shop, continuing anyway...');
       }
     }
 
     final url =
         '$baseUrl/gl/dashboard/multi-shop-summary?startdate=$startDate&enddate=$endDate';
-    log('🌐 Fetching multi-shop summary from: $url');
+    dLog('🌐 Fetching multi-shop summary from: $url');
 
     try {
-      log(
+      dLog(
         '🔑 Using token for API: ${token.substring(0, token.length > 30 ? 30 : token.length)}...',
       );
 
@@ -304,8 +304,8 @@ class MultiShopService {
         },
       );
 
-      log('📡 Response status: ${response.statusCode}');
-      log(
+      dLog('📡 Response status: ${response.statusCode}');
+      dLog(
         '📄 Response body: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}...',
       );
 
@@ -317,15 +317,15 @@ class MultiShopService {
             data['message']?.toString().contains('Shop not selected') == true) {
           // Reset flag and retry once
           _shopSelected = false;
-          log('⚠️ Shop selection expired, retrying...');
+          dLog('⚠️ Shop selection expired, retrying...');
           await selectShop();
           return fetchMultiShopSummary(startDate: startDate, endDate: endDate);
         }
 
-        log('✅ Successfully fetched multi-shop summary');
+        dLog('✅ Successfully fetched multi-shop summary');
         return MultiShopSummaryResponse.fromJson(data);
       } else if (response.statusCode == 401) {
-        log('❌ Unauthorized - attempting token refresh...');
+        dLog('❌ Unauthorized - attempting token refresh...');
 
         if (!isRetry) {
           // Try to refresh token
@@ -333,7 +333,7 @@ class MultiShopService {
           final refreshed = await authRepo.refreshTokenWithCredentials();
 
           if (refreshed) {
-            log('✅ Token refreshed, retrying request...');
+            dLog('✅ Token refreshed, retrying request...');
             return fetchMultiShopSummary(
               startDate: startDate,
               endDate: endDate,
@@ -344,11 +344,11 @@ class MultiShopService {
 
         throw Exception('Token หมดอายุ กรุณาเข้าสู่ระบบใหม่');
       } else {
-        log('❌ Failed to fetch multi-shop summary: ${response.statusCode}');
+        dLog('❌ Failed to fetch multi-shop summary: ${response.statusCode}');
         throw Exception('เกิดข้อผิดพลาด: ${response.statusCode}');
       }
     } catch (e) {
-      log('💥 Error fetching multi-shop summary: $e');
+      dLog('💥 Error fetching multi-shop summary: $e');
       rethrow;
     }
   }
@@ -356,7 +356,7 @@ class MultiShopService {
   /// Reset shop selection (call on logout)
   static void resetShopSelection() {
     _shopSelected = false;
-    log('🔄 Shop selection reset');
+    dLog('🔄 Shop selection reset');
   }
 
   /// Get date range for current year

@@ -1,5 +1,5 @@
-import 'dart:convert';
-import 'dart:developer';
+﻿import 'dart:convert';
+import '../utils/app_logger.dart';
 import 'package:http/http.dart' as http;
 import 'auth_repository.dart';
 import '../models/journal.dart';
@@ -16,7 +16,7 @@ class DashboardJournalService {
     String? startDate,
     String? endDate,
   }) async {
-    log('📊 Fetching dashboard data using Journal API...');
+    dLog('📊 Fetching dashboard data using Journal API...');
 
     try {
       // ดึงข้อมูลแบบ parallel
@@ -67,7 +67,7 @@ class DashboardJournalService {
         dailyImages: dailyImages,
       );
     } catch (e) {
-      log('💥 Error fetching dashboard data: $e');
+      dLog('💥 Error fetching dashboard data: $e');
       rethrow;
     }
   }
@@ -75,7 +75,7 @@ class DashboardJournalService {
   /// ดึงข้อมูล summary (ใช้ API เดิม)
   static Future<DashboardSummary> _fetchSummary() async {
     final url = '$baseUrl/dashboard/summary';
-    log('🌐 Fetching summary from: $url');
+    dLog('🌐 Fetching summary from: $url');
 
     try {
       final token = AuthRepository.token;
@@ -83,11 +83,11 @@ class DashboardJournalService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(Uri.parse(url), headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        log('✅ Successfully parsed summary data');
+        dLog('✅ Successfully parsed summary data');
         return DashboardSummary.fromJson(data);
       } else {
         throw Exception(
@@ -95,7 +95,7 @@ class DashboardJournalService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching summary: $e');
+      dLog('💥 Error fetching summary: $e');
       rethrow;
     }
   }
@@ -103,7 +103,7 @@ class DashboardJournalService {
   /// ดึงข้อมูล daily images (ใช้ API เดิม)
   static Future<List<DailyImage>> _fetchDailyImages() async {
     final url = '$baseUrl/dashboard/daily-images';
-    log('🌐 Fetching daily images from: $url');
+    dLog('🌐 Fetching daily images from: $url');
 
     try {
       final token = AuthRepository.token;
@@ -111,20 +111,20 @@ class DashboardJournalService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(Uri.parse(url), headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body) as Map<String, dynamic>;
-        log('✅ Successfully parsed daily images response');
+        dLog('✅ Successfully parsed daily images response');
 
         final imagesList = responseData['images'] as List<dynamic>;
-        log('🔍 Found ${imagesList.length} images in response');
+        dLog('🔍 Found ${imagesList.length} images in response');
 
         final images = imagesList.map((item) {
           return DailyImage.fromJson(item as Map<String, dynamic>);
         }).toList();
 
-        log('🎉 Created ${images.length} DailyImage objects');
+        dLog('🎉 Created ${images.length} DailyImage objects');
         return images;
       } else {
         throw Exception(
@@ -132,14 +132,14 @@ class DashboardJournalService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching daily images: $e');
+      dLog('💥 Error fetching daily images: $e');
       rethrow;
     }
   }
 
   /// ดึงข้อมูล journal สำหรับร้านเฉพาะ
   static Future<ShopJournalDetail> fetchShopJournalDetail(String shopId) async {
-    log('🏪 Fetching journal detail for shop: $shopId');
+    dLog('🏪 Fetching journal detail for shop: $shopId');
 
     try {
       final results = await Future.wait([
@@ -161,7 +161,7 @@ class DashboardJournalService {
         pagination: journalResponse.pagination,
       );
     } catch (e) {
-      log('💥 Error fetching shop journal detail: $e');
+      dLog('💥 Error fetching shop journal detail: $e');
       rethrow;
     }
   }
@@ -169,7 +169,7 @@ class DashboardJournalService {
   /// ดึงข้อมูลรูปภาพสำหรับร้านเฉพาะ
   static Future<List<DailyImage>> _fetchShopDailyImages(String shopId) async {
     final url = '$baseUrl/dashboard/shops/$shopId/daily';
-    log('🌐 Fetching shop daily images from: $url');
+    dLog('🌐 Fetching shop daily images from: $url');
 
     try {
       final token = AuthRepository.token;
@@ -177,7 +177,7 @@ class DashboardJournalService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(Uri.parse(url), headers: headers);
-      log('📡 Response status: ${response.statusCode}');
+      dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
@@ -193,7 +193,7 @@ class DashboardJournalService {
         }
         return [];
       } else if (response.statusCode == 404) {
-        log('📭 No daily images found for shop $shopId');
+        dLog('📭 No daily images found for shop $shopId');
         return [];
       } else {
         throw Exception(
@@ -201,7 +201,7 @@ class DashboardJournalService {
         );
       }
     } catch (e) {
-      log('💥 Error fetching shop daily images: $e');
+      dLog('💥 Error fetching shop daily images: $e');
       return [];
     }
   }

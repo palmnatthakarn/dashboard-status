@@ -9,7 +9,6 @@ import '../../services/journal_service.dart';
 import '../../pages/journal_page.dart';
 import 'branch_detail_dialog.dart';
 import 'image_gallery_dialog.dart';
-import '../../pages/gl_journal_page.dart';
 
 class BranchDataSource extends DataTableSource {
   final Map<String, List<DocDetails>> branchData;
@@ -35,7 +34,6 @@ class BranchDataSource extends DataTableSource {
     final dailyAmount = _getDailyAmount(shops);
     final monthlyAmount = _getMonthlyAmount(shops);
     final yearlyAmount = _getYearlyAmount(shops);
-    final totalIncome = _getTotalIncome(shops);
 
     return DataRow2(
       color: WidgetStateProperty.resolveWith<Color?>((states) {
@@ -187,25 +185,6 @@ class BranchDataSource extends DataTableSource {
     );
   }
 
-  Widget _buildBranchCodeCell(String shopId) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      /*decoration: BoxDecoration(
-        color: const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(6),
-      ),*/
-      child: Text(
-        shopId,
-        style: const TextStyle(
-          fontFamily: 'monospace',
-          color: Color(0xFF6B7280),
-          fontWeight: FontWeight.w500,
-          fontSize: 12,
-        ),
-      ),
-    );
-  }
-
   Widget _buildAmountChip(double amount, Color color, IconData icon) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -228,92 +207,6 @@ class BranchDataSource extends DataTableSource {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildJournalCell(
-    String shopId,
-    List<DocDetails> shops,
-    double totalIncome,
-  ) {
-    final isPositive = totalIncome >= 0;
-    final primaryColor = isPositive
-        ? const Color(0xFF10B981)
-        : const Color(0xFFEF4444);
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Journal 1 Button
-        InkWell(
-          onTap: () {
-            HapticFeedback.mediumImpact();
-            _showJournalDialogForBranch(shopId, shops);
-          },
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: BoxDecoration(
-              color: primaryColor,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.account_balance_wallet_rounded,
-                  size: 14,
-                  color: Colors.white.withValues(alpha: 0.9),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '1', // Label for Journal 1
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        // Journal 2 Button
-        InkWell(
-          onTap: () {
-            HapticFeedback.mediumImpact();
-            _showJournal2DialogForBranch(shopId, shops);
-          },
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFF8B5CF6), // Different color for Journal 2
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.receipt_long_rounded,
-                  size: 14,
-                  color: Colors.white.withValues(alpha: 0.9),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '2', // Label for Journal 2
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -398,35 +291,7 @@ class BranchDataSource extends DataTableSource {
     );
   }
 
-  Widget _buildResponsibleCell() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      /*decoration: BoxDecoration(
-        color: const Color(0xFF6366F1).withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
-      ),*/
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          //Icon(Icons.smart_toy, size: 14, color: Color(0xFF6366F1)),
-          //SizedBox(width: 6),
-          Text(
-            'สมชาย ใจดี',
-            style: TextStyle(
-              color: Color(0xFF6366F1),
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // Data calculation methods
-  double _getTotalIncome(List<DocDetails> shops) {
-    return shops.fold(0.0, (total, shop) => total + shop.totalDeposit);
-  }
 
   double _getDailyAmount(List<DocDetails> shops) {
     // Use API data if available
@@ -568,44 +433,6 @@ class BranchDataSource extends DataTableSource {
           MaterialPageRoute(
             builder: (context) => JournalPage(
               branchSync: shopId,
-              journals: journalResponse.journals ?? [],
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) Navigator.of(context).pop();
-      if (context.mounted) {
-        _showErrorDialog(e.toString());
-      }
-    }
-  }
-
-  void _showJournal2DialogForBranch(
-    String shopId,
-    List<DocDetails> shops,
-  ) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const _JournalLoadingDialog(),
-    );
-
-    try {
-      // Extract shop name
-      final shopName = _extractShopName(shops, shopId);
-
-      final journalResponse = await JournalService.getAllGLJournals(
-        shopId: shopId,
-        limit: 1000,
-      );
-      if (context.mounted) Navigator.of(context).pop();
-      if (context.mounted) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => GLJournalPage(
-              shopids: shopId, // Changed from branchSync
-              shopName: shopName, // Pass shop name
               journals: journalResponse.journals ?? [],
             ),
           ),
