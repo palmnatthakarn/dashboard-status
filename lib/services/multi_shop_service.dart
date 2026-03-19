@@ -130,7 +130,7 @@ class MultiShopService {
       return [];
     }
 
-    final url = '$baseUrl/list-shop';
+    final url = '$baseUrl/list-shop?limit=9999';
     dLog('📋 Fetching shop list from: $url');
 
     try {

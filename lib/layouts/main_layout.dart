@@ -8,6 +8,7 @@ import '../pages/financial_statements_page.dart';
 import '../components/app_sidebar.dart';
 import '../dashboard_content.dart';
 import '../pages/kpi/kpi_page.dart';
+import '../pages/kpi/kpi_journal_page.dart';
 
 import '../pages/settings_page.dart';
 import '../blocs/auth/auth_bloc.dart';
@@ -97,6 +98,7 @@ class _MainLayoutState extends State<MainLayout> {
   final List<Widget> _pages = [
     const DashboardContent(),
     const KpiPage(),
+    const KpiJournalPage(),
 
     const ReportPage(title: 'รายงานภาพรวม'),
     const FinancialStatementsPage(),

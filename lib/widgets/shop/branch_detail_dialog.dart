@@ -19,8 +19,11 @@ class BranchDetailDialog extends StatefulWidget {
   State<BranchDetailDialog> createState() => _BranchDetailDialogState();
 }
 
+enum ChartMode { daily, monthly }
+
 class _BranchDetailDialogState extends State<BranchDetailDialog> {
   Offset _offset = Offset.zero;
+  ChartMode _chartMode = ChartMode.daily;
 
   @override
   Widget build(BuildContext context) {
@@ -31,12 +34,12 @@ class _BranchDetailDialogState extends State<BranchDetailDialog> {
         // Background overlay
         GestureDetector(
           onTap: () => Navigator.of(context).pop(),
-          child: Container(color: Colors.black.withValues(alpha: 0.5)),
+          child: Container(color: Colors.black.withValues(alpha: 0.4)),
         ),
         // Draggable dialog
         Positioned(
-          left: (screenSize.width - 800) / 2 + _offset.dx,
-          top: (screenSize.height - 600) / 2 + _offset.dy,
+          left: (screenSize.width - 850) / 2 + _offset.dx,
+          top: (screenSize.height - 650) / 2 + _offset.dy,
           child: GestureDetector(
             onPanUpdate: (details) {
               setState(() {
@@ -46,24 +49,23 @@ class _BranchDetailDialogState extends State<BranchDetailDialog> {
             child: Material(
               color: Colors.transparent,
               child: Container(
-                width: 800,
-                constraints: const BoxConstraints(maxHeight: 600),
+                width: 850,
+                height: 650, // Fixed height for a robust layout
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+                  color: const Color(0xFFF8FAFC), // Slight pleasant off-white
+                  borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.15),
-                      blurRadius: 30,
-                      offset: const Offset(0, 10),
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 40,
+                      offset: const Offset(0, 20),
                     ),
                   ],
                 ),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildHeader(context),
-                    Flexible(child: _buildContent()),
+                    Expanded(child: _buildContent()),
                   ],
                 ),
               ),
@@ -104,30 +106,38 @@ class _BranchDetailDialogState extends State<BranchDetailDialog> {
     return MouseRegion(
       cursor: SystemMouseCursors.move,
       child: Container(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
+                  colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: const Icon(
-                Icons.store_rounded,
+                Icons.store_mall_directory_rounded,
                 color: Colors.white,
-                size: 24,
+                size: 28,
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 20),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,26 +145,46 @@ class _BranchDetailDialogState extends State<BranchDetailDialog> {
                   Text(
                     shopName,
                     style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF111827),
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
                       letterSpacing: -0.5,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'ID: ${widget.shopId}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       Icon(
-                        Icons.access_time_rounded,
+                        Icons.update_rounded,
                         size: 14,
-                        color: Colors.grey[500],
+                        color: Colors.grey[400],
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        'อัปเดต: ${_getLatestDate()}',
+                        'อัปเดตล่าสุด: ${_getLatestDate()}',
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey[600],
+                          color: Colors.grey[500],
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -165,11 +195,12 @@ class _BranchDetailDialogState extends State<BranchDetailDialog> {
             ),
             IconButton(
               onPressed: () => Navigator.of(context).pop(),
-              icon: Icon(Icons.close_rounded, color: Colors.grey[400]),
+              icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
               style: IconButton.styleFrom(
-                backgroundColor: Colors.grey[100],
+                backgroundColor: const Color(0xFFF1F5F9),
+                padding: const EdgeInsets.all(12),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
             ),
@@ -180,7 +211,7 @@ class _BranchDetailDialogState extends State<BranchDetailDialog> {
   }
 
   Widget _buildContent() {
-    // Calculate financial data
+    // Calculate static financial totals for the top cards
     double dailyTotal = 0.0;
     double monthlyTotal = 0.0;
     double yearlyTotal = 0.0;
@@ -190,16 +221,12 @@ class _BranchDetailDialogState extends State<BranchDetailDialog> {
       monthlyTotal = widget.shops.first.monthlyAverage ?? 0.0;
       yearlyTotal = widget.shops.first.yearlyAverage ?? 0.0;
     } else {
-      // Fallback calculation
       if (widget.shops.isNotEmpty && widget.selectedDate != null) {
-        final targetDate = DateFormat(
-          'yyyy-MM-dd',
-        ).format(widget.selectedDate!);
+        final targetDate = DateFormat('yyyy-MM-dd').format(widget.selectedDate!);
         for (final shop in widget.shops) {
           if (shop.daily != null) {
             for (final tx in shop.daily!) {
-              if (tx.timestamp != null &&
-                  tx.timestamp!.startsWith(targetDate)) {
+              if (tx.timestamp != null && tx.timestamp!.startsWith(targetDate)) {
                 dailyTotal += tx.deposit ?? 0;
               }
             }
@@ -208,8 +235,7 @@ class _BranchDetailDialogState extends State<BranchDetailDialog> {
       }
 
       if (widget.selectedDate != null) {
-        final monthStr =
-            '${widget.selectedDate!.year}-${widget.selectedDate!.month.toString().padLeft(2, '0')}';
+        final monthStr = '${widget.selectedDate!.year}-${widget.selectedDate!.month.toString().padLeft(2, '0')}';
         for (final shop in widget.shops) {
           if (shop.monthlySummary != null) {
             for (final entry in shop.monthlySummary!.entries) {
@@ -225,83 +251,122 @@ class _BranchDetailDialogState extends State<BranchDetailDialog> {
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      padding: const EdgeInsets.all(32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Summary Cards
+          // KPI Summary Cards
           Row(
             children: [
               Expanded(
-                child: _buildSummaryCard(
-                  'รายวัน',
+                child: _buildKpiCard(
+                  'ยอดขายรายวัน',
                   dailyTotal,
                   Icons.today_rounded,
-                  const Color(0xFF06B6D4),
+                  const Color(0xFF0EA5E9), // Light Blue
+                  const Color(0xFFE0F2FE),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               Expanded(
-                child: _buildSummaryCard(
-                  'รายเดือน',
+                child: _buildKpiCard(
+                  'ยอดขายเดือนนี้',
                   monthlyTotal,
                   Icons.calendar_month_rounded,
-                  const Color(0xFF8B5CF6),
+                  const Color(0xFF8B5CF6), // Purple
+                  const Color(0xFFEDE9FE),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               Expanded(
-                child: _buildSummaryCard(
-                  'รายปี',
+                child: _buildKpiCard(
+                  'ยอดขายทั้งปี',
                   yearlyTotal,
-                  Icons.trending_up_rounded,
-                  const Color(0xFF10B981),
+                  Icons.auto_graph_rounded,
+                  const Color(0xFF10B981), // Emerald Green
+                  const Color(0xFFD1FAE5),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
 
-          // Chart Section
+          // Interactive Chart Section
           Container(
-            height: 300,
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: const Color(0xFFFAFBFC),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+              border: Border.all(color: const Color(0xFFF1F5F9)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.bar_chart_rounded,
-                        size: 16,
-                        color: Color(0xFF3B82F6),
-                      ),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.insights_rounded,
+                            size: 20,
+                            color: Color(0xFF475569),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'แนวโน้มยอดขาย',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'กราฟเปรียบเทียบรายได้',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF111827),
+                    // Toggle Switch Daily/Monthly
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildToggleButton(
+                            title: 'รายวัน',
+                            mode: ChartMode.daily,
+                            icon: Icons.calendar_view_day_rounded,
+                          ),
+                          _buildToggleButton(
+                            title: 'รายเดือน',
+                            mode: ChartMode.monthly,
+                            icon: Icons.calendar_view_month_rounded,
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: _buildChart(dailyTotal, monthlyTotal, yearlyTotal),
+                const SizedBox(height: 32),
+                SizedBox(
+                  height: 250,
+                  width: double.infinity,
+                  child: _buildTrendChart(),
                 ),
               ],
             ),
@@ -311,18 +376,72 @@ class _BranchDetailDialogState extends State<BranchDetailDialog> {
     );
   }
 
-  Widget _buildSummaryCard(
+  Widget _buildToggleButton({required String title, required ChartMode mode, required IconData icon}) {
+    final isSelected = _chartMode == mode;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _chartMode = mode;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  )
+                ]
+              : null,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? const Color(0xFF3B82F6) : const Color(0xFF64748B),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKpiCard(
     String title,
     double value,
     IconData icon,
     Color color,
+    Color bgColor,
   ) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -330,34 +449,35 @@ class _BranchDetailDialogState extends State<BranchDetailDialog> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: color, size: 16),
+                child: Icon(icon, color: color, size: 20),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Text(
-            _formatAmount(value),
-            style: TextStyle(
-              color: color,
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.5,
+            _formatAmountFull(value),
+            style: const TextStyle(
+              color: Color(0xFF0F172A),
+              fontSize: 28,
+              fontFamily: 'Roboto', // Ensures nice number rendering
+              fontWeight: FontWeight.w800,
+              letterSpacing: -1,
             ),
           ),
         ],
@@ -365,94 +485,148 @@ class _BranchDetailDialogState extends State<BranchDetailDialog> {
     );
   }
 
-  Widget _buildChart(double daily, double monthly, double yearly) {
-    final calculatedMax = [
-      daily,
-      monthly,
-      yearly,
-    ].reduce((a, b) => a > b ? a : b);
-    final maxValue = calculatedMax > 0 ? calculatedMax : 100.0;
+  // --- CHART DATA EXTRACTION ---
 
-    return BarChart(
-      BarChartData(
-        alignment: BarChartAlignment.spaceEvenly,
-        maxY: maxValue * 1.15,
-        barTouchData: BarTouchData(
-          enabled: true,
-          touchTooltipData: BarTouchTooltipData(
-            getTooltipColor: (group) => const Color(0xFF1F2937),
-            tooltipRoundedRadius: 8,
-            tooltipPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 8,
-            ),
-            tooltipMargin: 8,
-            getTooltipItem: (group, groupIndex, rod, rodIndex) {
-              String label;
-              switch (group.x.toInt()) {
-                case 0:
-                  label = 'รายวัน';
-                  break;
-                case 1:
-                  label = 'รายเดือน';
-                  break;
-                case 2:
-                  label = 'รายปี';
-                  break;
-                default:
-                  label = '';
-              }
-              return BarTooltipItem(
-                '$label\n',
-                const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                ),
-                children: [
-                  TextSpan(
-                    text: _formatAmount(rod.toY),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              );
-            },
+  Widget _buildTrendChart() {
+    if (_chartMode == ChartMode.daily) {
+      return _buildLineChartDaily();
+    } else {
+      return _buildBarChartMonthly();
+    }
+  }
+
+  // Parses last 7 days from `widget.shops[].daily`
+  List<FlSpot> _getDailySpots(outDateLabels) {
+    if (widget.shops.isEmpty) return [];
+    
+    // Attempt to aggregate by date
+    Map<String, double> aggregatedDaily = {};
+    for (final shop in widget.shops) {
+      if (shop.daily != null) {
+        for (final tx in shop.daily!) {
+          if (tx.timestamp != null) {
+            try {
+              final DateTime dt = DateTime.parse(tx.timestamp!);
+              final dateStr = DateFormat('yyyy-MM-dd').format(dt);
+              aggregatedDaily[dateStr] = (aggregatedDaily[dateStr] ?? 0) + (tx.deposit ?? 0);
+            } catch (e) {
+              // Ignore invalid dates
+            }
+          }
+        }
+      }
+    }
+
+    // Sort by date descending
+    final sortedKeys = aggregatedDaily.keys.toList()..sort((a, b) => b.compareTo(a));
+    // Take last 7 days max
+    final last7 = sortedKeys.take(7).toList()..sort(); // ascending order for chart
+    
+    List<FlSpot> spots = [];
+    outDateLabels.clear();
+
+    for (int i = 0; i < last7.length; i++) {
+      final dateValue = last7[i];
+      final dt = DateTime.parse(dateValue);
+      outDateLabels.add(DateFormat('dd MMM').format(dt));
+      spots.add(FlSpot(i.toDouble(), aggregatedDaily[dateValue]!));
+    }
+
+    return spots;
+  }
+
+  // Parses last 6 months from `widget.shops[].monthlySummary`
+  List<BarChartGroupData> _getMonthlyBars(outMonthLabels, double width, Color color) {
+    if (widget.shops.isEmpty) return [];
+
+    Map<String, double> aggregatedMonthly = {};
+    for (final shop in widget.shops) {
+      if (shop.monthlySummary != null) {
+        shop.monthlySummary!.forEach((monthKey, data) {
+           aggregatedMonthly[monthKey] = (aggregatedMonthly[monthKey] ?? 0) + (data.deposit ?? 0);
+        });
+      }
+    }
+
+    final sortedKeys = aggregatedMonthly.keys.toList()..sort((a, b) => b.compareTo(a));
+    final last6 = sortedKeys.take(6).toList()..sort();
+
+    List<BarChartGroupData> bars = [];
+    outMonthLabels.clear();
+
+    final now = DateTime.now();
+
+    for (int i = 0; i < last6.length; i++) {
+        final mKey = last6[i]; // e.g., "2026-03"
+        try {
+            final parts = mKey.split('-');
+            final year = int.parse(parts[0]);
+            final month = int.parse(parts[1]);
+            final dt = DateTime(year, month);
+            outMonthLabels.add(DateFormat('MMM yy').format(dt));
+        } catch(e) {
+            outMonthLabels.add(mKey);
+        }
+        bars.add(
+            BarChartGroupData(
+                x: i,
+                barRods: [
+                    BarChartRodData(
+                      toY: aggregatedMonthly[mKey] ?? 0,
+                      color: color,
+                      width: width,
+                      borderRadius: BorderRadius.circular(4),
+                    )
+                ]
+            )
+        );
+    }
+    return bars;
+  }
+
+  Widget _buildLineChartDaily() {
+    List<String> dateLabels = [];
+    final spots = _getDailySpots(dateLabels);
+
+    if (spots.isEmpty) {
+        return const Center(
+          child: Text('ไม่มีข้อมูลย้อนหลัง 7 วัน', style: TextStyle(color: Colors.grey)),
+        );
+    }
+
+    double maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
+    if (maxY == 0) maxY = 100;
+
+    return LineChart(
+      LineChartData(
+        minY: 0,
+        maxY: maxY * 1.2,
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: (maxY * 1.2) / 4 > 0 ? (maxY * 1.2) / 4 : 25,
+          getDrawingHorizontalLine: (value) => FlLine(
+            color: const Color(0xFFF1F5F9),
+            strokeWidth: 1.5,
+            dashArray: [5, 5],
           ),
         ),
         titlesData: FlTitlesData(
-          show: true,
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
               getTitlesWidget: (value, meta) {
-                const style = TextStyle(
-                  color: Color(0xFF6B7280),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                );
-                String text;
-                switch (value.toInt()) {
-                  case 0:
-                    text = 'รายวัน';
-                    break;
-                  case 1:
-                    text = 'รายเดือน';
-                    break;
-                  case 2:
-                    text = 'รายปี';
-                    break;
-                  default:
-                    text = '';
-                }
-                return SideTitleWidget(
-                  axisSide: meta.axisSide,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(text, style: style),
+                final idx = value.toInt();
+                if (idx < 0 || idx >= dateLabels.length) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(
+                    dateLabels[idx],
+                    style: const TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 );
               },
@@ -461,73 +635,215 @@ class _BranchDetailDialogState extends State<BranchDetailDialog> {
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 48,
+              reservedSize: 50,
               getTitlesWidget: (value, meta) {
-                return Text(
-                  _formatAmount(value),
-                  style: const TextStyle(
-                    color: Color(0xFF9CA3AF),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                  ),
-                );
+                 if (value == 0 || value == maxY * 1.2) return const SizedBox.shrink(); 
+                 return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Text(
+                      _formatAmountK(value),
+                      style: const TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                 );
               },
             ),
           ),
-          topTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          rightTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-        ),
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: maxValue > 0 ? maxValue / 4 : 25.0,
-          getDrawingHorizontalLine: (value) {
-            return FlLine(
-              color: const Color(0xFFE5E7EB),
-              strokeWidth: 1,
-              dashArray: [5, 5],
-            );
-          },
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         ),
         borderData: FlBorderData(show: false),
-        barGroups: [
-          _buildBarGroup(0, daily, const Color(0xFF06B6D4)),
-          _buildBarGroup(1, monthly, const Color(0xFF8B5CF6)),
-          _buildBarGroup(2, yearly, const Color(0xFF10B981)),
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+             getTooltipColor: (spot) => const Color(0xFF1E293B),
+             tooltipRoundedRadius: 8,
+             getTooltipItems: (touchedSpots) {
+                return touchedSpots.map((spot) {
+                  return LineTooltipItem(
+                    '${_formatAmountFull(spot.y)}\n',
+                    const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                    children: [
+                       TextSpan(
+                         text: dateLabels[spot.x.toInt()],
+                         style: const TextStyle(
+                           color: Color(0xFF94A3B8),
+                           fontSize: 12,
+                           fontWeight: FontWeight.w500,
+                         )
+                       )
+                    ]
+                  );
+                }).toList();
+             }
+          ),
+        ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            curveSmoothness: 0.35,
+            color: const Color(0xFF0EA5E9),
+            barWidth: 4,
+            isStrokeCapRound: true,
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (spot, percent, barData, index) {
+                return FlDotCirclePainter(
+                  radius: 5,
+                  color: Colors.white,
+                  strokeWidth: 3,
+                  strokeColor: const Color(0xFF0EA5E9),
+                );
+              },
+            ),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF0EA5E9).withValues(alpha: 0.2),
+                  const Color(0xFF0EA5E9).withValues(alpha: 0.0),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  BarChartGroupData _buildBarGroup(int x, double value, Color color) {
-    return BarChartGroupData(
-      x: x,
-      barRods: [
-        BarChartRodData(
-          toY: value > 0 ? value : 0.5,
-          width: 48,
-          color: color,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-          gradient: LinearGradient(
-            colors: [color, color.withValues(alpha: 0.7)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+  Widget _buildBarChartMonthly() {
+    List<String> monthLabels = [];
+    final bars = _getMonthlyBars(monthLabels, 32, const Color(0xFF8B5CF6));
+
+     if (bars.isEmpty) {
+        return const Center(
+          child: Text('ไม่มีข้อมูลย้อนหลังรายเดือน', style: TextStyle(color: Colors.grey)),
+        );
+    }
+
+    double maxY = 0;
+    for(var b in bars) {
+        if(b.barRods.isNotEmpty && b.barRods[0].toY > maxY) {
+            maxY = b.barRods[0].toY;
+        }
+    }
+    if (maxY == 0) maxY = 100;
+
+     return BarChart(
+      BarChartData(
+        alignment: BarChartAlignment.spaceAround,
+        maxY: maxY * 1.2,
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: (maxY * 1.2) / 4 > 0 ? (maxY * 1.2) / 4 : 25,
+          getDrawingHorizontalLine: (value) => FlLine(
+            color: const Color(0xFFF1F5F9),
+            strokeWidth: 1.5,
+            dashArray: [5, 5],
           ),
         ),
-      ],
-    );
+         titlesData: FlTitlesData(
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              getTitlesWidget: (value, meta) {
+                final idx = value.toInt();
+                if (idx < 0 || idx >= monthLabels.length) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(
+                    monthLabels[idx],
+                    style: const TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 50,
+              getTitlesWidget: (value, meta) {
+                 if (value == 0 || value == maxY * 1.2) return const SizedBox.shrink(); 
+                 return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Text(
+                      _formatAmountK(value),
+                      style: const TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                 );
+              },
+            ),
+          ),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        borderData: FlBorderData(show: false),
+        barTouchData: BarTouchData(
+             touchTooltipData: BarTouchTooltipData(
+             getTooltipColor: (spot) => const Color(0xFF1E293B),
+             tooltipRoundedRadius: 8,
+             getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                  return BarTooltipItem(
+                    '${_formatAmountFull(rod.toY)}\n',
+                    const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                    children: [
+                       TextSpan(
+                         text: monthLabels[group.x.toInt()],
+                         style: const TextStyle(
+                           color: Color(0xFF94A3B8),
+                           fontSize: 12,
+                           fontWeight: FontWeight.w500,
+                         )
+                       )
+                    ]
+                  );
+             }
+          ),
+        ),
+        barGroups: bars,
+      )
+     );
   }
 
-  String _formatAmount(double amount) {
+  // --- FORMATTERS ---
+
+  String _formatAmountFull(double amount) {
+    if (amount == 0) return '฿0';
+    final formatter = NumberFormat('#,##0.00');
+    return '฿${formatter.format(amount)}';
+  }
+
+  String _formatAmountK(double amount) {
     if (amount >= 1000000) {
-      return '${(amount / 1000000).toStringAsFixed(2)}M';
+      return '${(amount / 1000000).toStringAsFixed(1)}M';
     }
     if (amount >= 1000) {
-      return '${(amount / 1000).toStringAsFixed(2)}K';
+      return '${(amount / 1000).toStringAsFixed(0)}K';
     }
     return amount.toStringAsFixed(0);
   }
@@ -545,7 +861,7 @@ class _BranchDetailDialogState extends State<BranchDetailDialog> {
     if (latestDate != null) {
       try {
         final date = DateTime.parse(latestDate);
-        return DateFormat('dd/MM/yyyy').format(date);
+        return DateFormat('dd MMM yyyy HH:mm').format(date);
       } catch (e) {
         return latestDate;
       }
@@ -553,3 +869,4 @@ class _BranchDetailDialogState extends State<BranchDetailDialog> {
     return 'N/A';
   }
 }
+

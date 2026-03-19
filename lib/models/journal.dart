@@ -48,15 +48,27 @@ class Journal {
   @JsonKey(name: 'accountdescription')
   final String? description;
 
-  // Task Mapping Fields
+  // Task Mapping Fields - jobguidfixed directly links GL Journal to its parent task!
   @JsonKey(name: 'documentref')
   final String? documentRef;
   @JsonKey(name: 'createdby')
   final String? createdBy;
+  @JsonKey(name: 'checkedby')
+  final String? checkedBy;
+  @JsonKey(name: 'checkedat')
+  final String? checkedAt;
+  @JsonKey(name: 'updatedby')
+  final String? updatedBy;
+  @JsonKey(name: 'jobguidfixed')
+  final String? jobGuidfixed; // ← LINKS directly to task.guidfixed
 
   // Additional Fields
   @JsonKey(name: 'exdocrefno')
   final String? exDocRefNo;
+  @JsonKey(name: 'createdat')
+  final String? createdAt;
+  @JsonKey(name: 'updatedat')
+  final String? updatedAt;
 
   Journal({
     this.id,
@@ -78,7 +90,13 @@ class Journal {
     this.description,
     this.documentRef,
     this.createdBy,
+    this.checkedBy,
+    this.checkedAt,
+    this.updatedBy,
+    this.jobGuidfixed,
     this.exDocRefNo,
+    this.createdAt,
+    this.updatedAt,
   });
 
   // Helper getters

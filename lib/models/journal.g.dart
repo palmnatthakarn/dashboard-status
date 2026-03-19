@@ -26,7 +26,13 @@ Journal _$JournalFromJson(Map<String, dynamic> json) => Journal(
   description: json['accountdescription'] as String?,
   documentRef: json['documentref'] as String?,
   createdBy: json['createdby'] as String?,
+  checkedBy: json['checkedby'] as String?,
+  checkedAt: json['checkedat'] as String?,
+  updatedBy: json['updatedby'] as String?,
+  jobGuidfixed: json['jobguidfixed'] as String?,
   exDocRefNo: json['exdocrefno'] as String?,
+  createdAt: json['createdat'] as String?,
+  updatedAt: json['updatedat'] as String?,
 );
 
 Map<String, dynamic> _$JournalToJson(Journal instance) => <String, dynamic>{
@@ -49,7 +55,13 @@ Map<String, dynamic> _$JournalToJson(Journal instance) => <String, dynamic>{
   'accountdescription': instance.description,
   'documentref': instance.documentRef,
   'createdby': instance.createdBy,
+  'checkedby': instance.checkedBy,
+  'checkedat': instance.checkedAt,
+  'updatedby': instance.updatedBy,
+  'jobguidfixed': instance.jobGuidfixed,
   'exdocrefno': instance.exDocRefNo,
+  'createdat': instance.createdAt,
+  'updatedat': instance.updatedAt,
 };
 
 JournalSummary _$JournalSummaryFromJson(Map<String, dynamic> json) =>
@@ -126,10 +138,15 @@ Map<String, dynamic> _$JournalResponseToJson(JournalResponse instance) =>
 Pagination _$PaginationFromJson(Map<String, dynamic> json) => Pagination(
   page: (json['page'] as num?)?.toInt(),
   limit: (json['limit'] as num?)?.toInt(),
-  currentPage: (json['current_page'] as num?)?.toInt(),
-  perPage: (json['per_page'] as num?)?.toInt(),
+  currentPage: (json['current_page'] as num?)?.toInt() ??
+      (json['currentPage'] as num?)?.toInt(),
+  perPage: (json['per_page'] as num?)?.toInt() ??
+      (json['perPage'] as num?)?.toInt(),
   total: (json['total'] as num?)?.toInt(),
-  totalPages: (json['total_pages'] as num?)?.toInt(),
+  // API may return total_pages (snake), totalPages or totalPage (camelCase)
+  totalPages: (json['total_pages'] as num?)?.toInt() ??
+      (json['totalPages'] as num?)?.toInt() ??
+      (json['totalPage'] as num?)?.toInt(),
 );
 
 Map<String, dynamic> _$PaginationToJson(Pagination instance) =>

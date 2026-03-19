@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:developer';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,8 +8,9 @@ import 'google_auth_service.dart';
 import 'multi_shop_service.dart';
 
 class AuthRepository {
-  // Base URL: set via --dart-define=BASE_URL=... at build time
-  // Falls back to dev URL if not specified (e.g. during flutter run)
+  // Base URL is injected via --dart-define=BASE_URL=...
+  // Dev launch config:  --dart-define=BASE_URL=https://api.dev.dedepos.com
+  // Prod launch config: --dart-define=BASE_URL=https://api.dedepos.com
   static const String baseUrl = String.fromEnvironment(
     'BASE_URL',
     defaultValue: 'https://smlaicloudapi.dev.dedepos.com',
@@ -82,12 +83,10 @@ class AuthRepository {
 
   // SharedPreferences keys (non-sensitive)
   static const String _usernameKey = 'auth_username';
-  static const String _rememberMeKey = 'remember_me';
 
-  // SecureStorage keys (sensitive — stored in iOS Keychain / Android Keystore / Web localStorage)
+  // SecureStorage keys (sensitive — stored in iOS Keychain / Android Keystore)
   static const String _tokenKey = 'secure_auth_token';
   static const String _refreshTokenKey = 'secure_refresh_token';
-  static const String _savedPasswordKey = 'saved_password';
 
   /// Check for existing session
   Future<bool> checkSession() async {
@@ -125,29 +124,17 @@ class AuthRepository {
     String token,
     String username, {
     String? refreshToken,
-    String? password,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      // Store non-sensitive data in SharedPreferences
+      await prefs.setString(_tokenKey, token);
       await prefs.setString(_usernameKey, username);
-
-      // Store access token in secure storage (NOT SharedPreferences)
-      await _secureStorage.write(key: _tokenKey, value: token);
-
       if (refreshToken != null) {
         // Store refresh_token in secure encrypted storage
-        await _secureStorage.write(key: _refreshTokenKey, value: refreshToken);
-      }
-
-      // If "Remember Me" is active, persist the password securely too
-      final rememberMe = prefs.getBool(_rememberMeKey) ?? false;
-      if (rememberMe && password != null && password.isNotEmpty) {
-        await _secureStorage.write(key: _savedPasswordKey, value: password);
-        log('🔐 Password saved securely for Remember Me');
-      } else {
-        // Clear any previously saved password if Remember Me is off
-        await _secureStorage.delete(key: _savedPasswordKey);
+        await _secureStorage.write(
+          key: _refreshTokenKey,
+          value: refreshToken,
+        );
       }
     } catch (e) {
       log('💥 Error persisting session: $e');
@@ -162,10 +149,9 @@ class AuthRepository {
       // Remove non-sensitive keys from SharedPreferences
       final usernameRemoved = await prefs.remove(_usernameKey);
 
-      // Remove both tokens and saved password from secure storage
+      // Remove both tokens from secure storage
       await _secureStorage.delete(key: _tokenKey);
       await _secureStorage.delete(key: _refreshTokenKey);
-      await _secureStorage.delete(key: _savedPasswordKey);
 
       log('🧹 Username removed: $usernameRemoved');
       log('🧹 Tokens removed from secure storage');
@@ -174,9 +160,7 @@ class AuthRepository {
       if (verifyUsername == null) {
         log('✅ All session data successfully cleared');
       } else {
-        log(
-          '⚠️ Warning: Some session data may still exist in SharedPreferences',
-        );
+        log('⚠️ Warning: Some session data may still exist in SharedPreferences');
       }
     } catch (e) {
       log('💥 Error clearing session: $e');
@@ -320,7 +304,6 @@ class AuthRepository {
             extractedToken ?? '',
             username,
             refreshToken: refreshToken,
-            password: null, // password is passed separately via login_page
           );
 
           log('🔑 Stored token (${extractedToken?.length ?? 0} chars)');

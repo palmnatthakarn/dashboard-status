@@ -29,6 +29,11 @@ class AppSidebar extends StatefulWidget {
       icon: Icons.analytics_outlined,
       selectedIcon: Icons.analytics_rounded,
     ),
+    SidebarMenuItem(
+      title: 'KPI Journal',
+      icon: Icons.edit_note_outlined,
+      selectedIcon: Icons.edit_note_rounded,
+    ),
 
     SidebarMenuItem(
       title: 'Reports',

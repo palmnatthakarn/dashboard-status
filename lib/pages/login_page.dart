@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../blocs/auth/auth_bloc.dart';
 import '../components/common/app_logo.dart';
@@ -23,11 +22,6 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
 
   static const _rememberMeKey = 'remember_me';
   static const _savedUsernameKey = 'saved_username';
-  static const _savedPasswordKey = 'saved_password';
-
-  static const _secureStorage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-  );
 
   // Form animations
   late AnimationController _animationController;
@@ -74,34 +68,29 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     final prefs = await SharedPreferences.getInstance();
     final remember = prefs.getBool(_rememberMeKey) ?? false;
     if (remember) {
-      final savedUsername = prefs.getString(_savedUsernameKey) ?? '';
-      final savedPassword =
-          await _secureStorage.read(key: _savedPasswordKey) ?? '';
+      final saved = prefs.getString(_savedUsernameKey) ?? '';
       if (mounted) {
         setState(() {
           _rememberMe = true;
-          _usernameController.text = savedUsername;
-          _passwordController.text = savedPassword;
+          _usernameController.text = saved;
         });
       }
     }
   }
 
-  Future<void> _saveRememberMe(String username, String password) async {
+  Future<void> _saveRememberMe(String username) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_rememberMeKey, _rememberMe);
     if (_rememberMe) {
       await prefs.setString(_savedUsernameKey, username);
-      await _secureStorage.write(key: _savedPasswordKey, value: password);
     } else {
       await prefs.remove(_savedUsernameKey);
-      await _secureStorage.delete(key: _savedPasswordKey);
     }
   }
 
   void _onLoginPressed() {
     if (_formKey.currentState!.validate()) {
-      _saveRememberMe(_usernameController.text, _passwordController.text);
+      _saveRememberMe(_usernameController.text);
       context.read<AuthBloc>().add(
         LoginRequested(
           username: _usernameController.text,

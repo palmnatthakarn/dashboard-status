@@ -1,5 +1,20 @@
 {
   "projects": {
-    "default": "account-seaandhill"
-  }
+    "default": "account-seaandhill",
+    "prod": "account-seaandhill",
+    "dev": "account-seaandhill-dev"
+  },
+  "targets": {
+    "account-seaandhill": {
+      "hosting": {
+        "prod": [
+          "account-seaandhill"
+        ],
+        "dev": [
+          "account-seaandhill-dev"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

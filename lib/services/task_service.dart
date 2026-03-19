@@ -244,8 +244,8 @@ class TaskService {
   /// Fetch tasks with optional filters
   /// status: 1=อัปโหลด, 2=รอบันทึกบัญชี, 3=รอแก้ไข, 4=รอตรวจสอบ
   static Future<TaskResponse> fetchTasks({
-    int limit = 20,
-    List<int> status = const [1, 2, 3, 4, 6],
+    int limit = 10,
+    List<int> status = const [0, 1, 2, 3, 4, 5, 6],
     int page = 1,
     bool isRetry = false,
     bool skipShopSelection = false,
@@ -280,7 +280,8 @@ class TaskService {
 
     // Build URL with query parameters
     final statusParam = status.join(',');
-    final url = '$baseUrl/task?limit=$limit&status=$statusParam&page=$page';
+    final url =
+        '$baseUrl/task?limit=$limit&status=$statusParam&page=$page&sort=ownerat:-1';
     dLog('🌐 Fetching tasks from: $url');
 
     try {
@@ -339,8 +340,8 @@ class TaskService {
   /// Fetch tasks for a specific shop
   static Future<TaskResponse> fetchTasksForShop({
     required String shopId,
-    int limit = 20,
-    List<int> status = const [1, 2, 3, 4, 6],
+    int limit = 10,
+    List<int> status = const [0, 1, 2, 3, 4, 5, 6],
     int page = 1,
   }) async {
     // Select the specific shop first

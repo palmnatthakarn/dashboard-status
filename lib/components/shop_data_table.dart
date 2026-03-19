@@ -34,12 +34,40 @@ class _ShopDataTableState extends State<ShopDataTable>
   // Pagination state
   int _currentPage = 1;
   int _rowsPerPage = 8;
+  bool _rowsPerPageInitialized = false;
+
+  // Layout constants for row calculation
+  static const double _dataRowHeight = 52.0;
+  static const double _headingRowHeight = 44.0;
+  // ShopHeader (~100) + Divider (1) + Padding (24) + Pagination (~60) + extra padding (20)
+  static const double _fixedOverhead = 205.0;
+
+  /// Calculate how many rows fit in the given container height
+  int _calcRowsForHeight(double containerHeight) {
+    final available = containerHeight - _fixedOverhead - _headingRowHeight;
+    final rows = (available / _dataRowHeight).floor();
+    return rows.clamp(3, 50); // minimum 3, max 50
+  }
 
   @override
   void initState() {
     super.initState();
     _initAnimations();
     _animationController.forward();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_rowsPerPageInitialized) {
+      final screenHeight = MediaQuery.of(context).size.height;
+      final containerHeight = (screenHeight - 390.0).clamp(
+        400.0,
+        double.infinity,
+      );
+      _rowsPerPage = _calcRowsForHeight(containerHeight);
+      _rowsPerPageInitialized = true;
+    }
   }
 
   void _initAnimations() {
@@ -117,18 +145,7 @@ class _ShopDataTableState extends State<ShopDataTable>
   }
 
   Widget _buildContainer(BranchDataSource dataSource) {
-    // Calculate height: Screen Height - Header (approx 420px)
-    // You can adjust the padding value (420) to fit your layout
-    final double screenHeight = MediaQuery.of(context).size.height;
-    final double headerOffset = 390.0;
-    final double containerHeight = (screenHeight - headerOffset).clamp(
-      400.0,
-      double.infinity,
-    );
-
     return Container(
-      //width: double.infinity,
-      height: containerHeight,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -149,20 +166,27 @@ class _ShopDataTableState extends State<ShopDataTable>
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Column(
-          // mainAxisSize: MainAxisSize.min, // Remove min to allow expansion
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header
             ShopHeader(
               selectedDateRange: widget.selectedDateRange,
               onDateRangeChanged: widget.onDateRangeChanged,
             ),
             const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: _buildDataTable(dataSource),
+
+            // Table content (height based on number of rows)
+            _buildDataTable(dataSource),
+
+            // Pagination
+            if (dataSource.rowCount > 0) ...[
+              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: _buildPagination(dataSource.rowCount),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -183,38 +207,60 @@ class _ShopDataTableState extends State<ShopDataTable>
       (index) => dataSource.getRow(start + index),
     ).whereType<DataRow>().toList();
 
-    return Column(
-      children: [
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: DataTable2(
-              columnSpacing: 8,
-              horizontalMargin: 12,
-              minWidth: 1000,
-              headingRowHeight: 44,
-              dataRowHeight: 52,
-              headingRowColor: WidgetStateProperty.all(const Color(0xFFF9FAFB)),
-              showCheckboxColumn: false,
-              columns: _buildColumns(),
-              rows: currentPageRows,
-            ),
+    // Calculate height based on row count (like KPI table)
+    // heading row (44) + data rows (52 each) + padding (24)
+    final tableHeight =
+        _headingRowHeight + (currentPageRows.length * _dataRowHeight) + 24.0;
+
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: SizedBox(
+        height: tableHeight.clamp(150.0, 1200.0),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: DataTable2(
+            columnSpacing: 8,
+            horizontalMargin: 12,
+            minWidth: 1000,
+            headingRowHeight: _headingRowHeight,
+            dataRowHeight: _dataRowHeight,
+            headingRowColor: WidgetStateProperty.all(const Color(0xFFF9FAFB)),
+            showCheckboxColumn: false,
+            columns: _buildColumns(),
+            rows: currentPageRows,
           ),
         ),
-        const SizedBox(height: 10),
-        CustomPagination(
-          currentPage: _currentPage,
-          totalItems: totalRows,
-          rowsPerPage: _rowsPerPage,
-          rowsPerPageOptions: const [8, 16, 24],
-          onPageChanged: (page) => setState(() => _currentPage = page),
-          onRowsPerPageChanged: (rows) => setState(() {
-            _rowsPerPage = rows;
-            _currentPage = 1;
-          }),
-        ),
-      ],
+      ),
     );
+  }
+
+  Widget _buildPagination(int totalRows) {
+    return CustomPagination(
+      currentPage: _currentPage,
+      totalItems: totalRows,
+      rowsPerPage: _rowsPerPage,
+      rowsPerPageOptions: _buildRowsPerPageOptions(),
+      onPageChanged: (page) => setState(() => _currentPage = page),
+      onRowsPerPageChanged: (rows) => setState(() {
+        _rowsPerPage = rows;
+        _currentPage = 1;
+      }),
+    );
+  }
+
+  /// Build dynamic dropdown options: 1x, 2x, 3x of the auto-calculated base
+  List<int> _buildRowsPerPageOptions() {
+    final base = _calcRowsForHeight(
+      (MediaQuery.of(context).size.height - 390.0).clamp(
+        400.0,
+        double.infinity,
+      ),
+    );
+    final options = <int>{base, base * 2, base * 3};
+    // Ensure current value is always in the list
+    options.add(_rowsPerPage);
+    final sorted = options.toList()..sort();
+    return sorted;
   }
 
   List<DataColumn2> _buildColumns() {
@@ -251,7 +297,7 @@ class _ShopDataTableState extends State<ShopDataTable>
         label: Text('บิล', style: headerStyle),
         size: ColumnSize.S,
       ),
-     /* DataColumn2(
+      /* DataColumn2(
         label: Text('ผู้รับผิดชอบ', style: headerStyle),
         size: ColumnSize.S,
       ),*/

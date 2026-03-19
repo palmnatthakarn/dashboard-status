@@ -103,15 +103,6 @@ class MyApp extends StatelessWidget {
               if (state is AuthSuccess) {
                 return const DashboardScreen();
               }
-              // Show splash/loading while checking session on startup
-              if (state is AuthLoading) {
-                return const Scaffold(
-                  backgroundColor: Colors.white,
-                  body: Center(
-                    child: CircularProgressIndicator(color: Color(0xFF4A6CF7)),
-                  ),
-                );
-              }
               return const LoginPage();
             },
           ),

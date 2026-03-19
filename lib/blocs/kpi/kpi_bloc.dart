@@ -12,12 +12,19 @@ import '../../services/journal_service.dart';
 class TaskWithShop {
   final TaskItem task;
   final String shopName;
-  final String?
-  journalCreatedBy; // Added for GL Journal specific owner override
+  final String? journalCreatedBy; // GL Journal createdBy override for the KPI owner
+  final int keyedDocumentCount; // Number of documents keyed by journalCreatedBy (For Row B)
+  int totalKeyedByOthers; // Number of documents keyed by anyone else (For Row A)
 
-  TaskWithShop(this.task, this.shopName, {this.journalCreatedBy});
+  TaskWithShop(
+    this.task,
+    this.shopName, {
+    this.journalCreatedBy,
+    this.keyedDocumentCount = 0,
+    this.totalKeyedByOthers = 0,
+  });
 
-  // Helper getter to get the effective owner (journalCreatedBy takes precedence if task is a GL Journal task)
+  // effectiveOwner: use the GL Journal keyer if available, else the task owner
   String get effectiveOwner => journalCreatedBy ?? task.ownerBy;
 }
 
@@ -84,14 +91,17 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
 
               try {
                 final List<TaskWithShop> allTasks = [];
+                // Combined map: taskGuid → { createdBy → keyedCount } across all shops
+                final Map<String, Map<String, int>> allJournalCountMap = {};
 
-                // Fetch tasks for ALL shops on initial load
+                // Fetch tasks AND GL Journals for each shop in the same shop context
                 for (final shop in shops) {
                   try {
+                    // fetchTasksForShop calls selectShop(shopId) first, then /task
                     final response = await TaskService.fetchTasksForShop(
                       shopId: shop.shopId,
                       limit: 20,
-                      status: [0, 1, 2, 3, 4],
+                      status: [0, 1, 2, 3, 4, 5, 6],
                     );
 
                     if (response.success && response.tasks.isNotEmpty) {
@@ -101,51 +111,150 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
                         ),
                       );
                     }
+
+                    // Fetch GL Journals for this shop IMMEDIATELY after selectShop
+                    // so the server returns journals in the correct shop context
+                    try {
+                      final glResp = await JournalService.getAllGLJournals(
+                        task: 'GL Journal',
+                      );
+                      print('[KPI-DEBUG] 📋 GL Journals for shop ${shop.shopName}: ${glResp.journals?.length ?? 0}');
+                      if (glResp.success == true && glResp.journals != null) {
+                        // Debug: print first entry jobGuidfixed to confirm the link
+                        if (glResp.journals!.isNotEmpty) {
+                          final first = glResp.journals!.first;
+                          print('[KPI-DEBUG] 🔑 First GL Journal: jobGuidfixed="${first.jobGuidfixed}", createdBy="${first.createdBy}"');
+                        }
+                        // Use jobGuidfixed (links directly to task.guidfixed) for matching
+                        for (final journal in glResp.journals!) {
+                          if (journal.jobGuidfixed != null &&
+                              journal.jobGuidfixed!.isNotEmpty &&
+                              journal.createdBy != null) {
+                            allJournalCountMap
+                                .putIfAbsent(journal.jobGuidfixed!, () => {})
+                                .update(
+                                  journal.createdBy!,
+                                  (c) => c + 1,
+                                  ifAbsent: () => 1,
+                                );
+                          }
+                        }
+                      }
+                    } catch (e) {
+                      dLog('⚠️ Failed to fetch GL Journals for shop ${shop.shopName}: $e');
+                    }
                   } catch (e) {
                     dLog(
                       '⚠️ Failed to load tasks for shop ${shop.shopName}: $e',
                     );
                   }
-                }
+                } // end for (shop in shops)
+
+                print('[KPI-DEBUG] 📊 Tasks: ${allTasks.length}, JournalMap keys: ${allJournalCountMap.length}');
+                print('[KPI-DEBUG] 🔍 Sample documentRef keys: ${allJournalCountMap.keys.take(5).toList()}');
+                print('[KPI-DEBUG] 🔍 Task guidfixed (first 5): ${allTasks.map((t) => t.task.guidfixed).take(5).toList()}');
 
                 if (allTasks.isNotEmpty) {
-                  // Attempt to fetch GL Journals for owner mapping
-                  try {
-                    final glJournalsResp =
-                        await JournalService.getAllGLJournals(
-                          task: 'GL Journal',
-                        );
-                    if (glJournalsResp.success == true &&
-                        glJournalsResp.journals != null) {
-                      final journals = glJournalsResp.journals!;
+                  // Build maps for child→parent resolution
+                  // GL Journal documentRef = child task guidfixed
+                  // We need to walk up: documentRef → child task → parent task (for KPI row)
+                  final Map<String, TaskWithShop> guidToTask = {};
+                  final Map<String, List<String>> parentToChildren = {};
 
-                      final Map<String, String> journalOwnerMap = {};
-                      for (final journal in journals) {
-                        if (journal.documentRef != null &&
-                            journal.documentRef!.isNotEmpty &&
-                            journal.createdBy != null) {
-                          journalOwnerMap[journal.documentRef!] =
-                              journal.createdBy!;
+                  for (final item in allTasks) {
+                    guidToTask[item.task.guidfixed] = item;
+                    if (item.task.parentGuidfixed.isNotEmpty) {
+                      parentToChildren
+                          .putIfAbsent(item.task.parentGuidfixed, () => [])
+                          .add(item.task.guidfixed);
+                    }
+                  }
+
+                  // Debug: check how many documentRefs can be resolved through children
+                  int directMatchCount = 0;
+                  int childMatchCount = 0;
+                  for (final docRef in allJournalCountMap.keys) {
+                    final matchedTask = guidToTask[docRef];
+                    if (matchedTask != null) {
+                      if (matchedTask.task.parentGuidfixed.isEmpty) {
+                        directMatchCount++;
+                      } else {
+                        childMatchCount++;
+                      }
+                    }
+                  }
+                  print('[KPI-DEBUG] 🔗 documentRef matches: direct=$directMatchCount, via-child=$childMatchCount out of ${allJournalCountMap.length}');
+
+                  // Add extra TaskWithShop rows for each GL Journal keyer B:
+                  // For each parent (top-level) task, accumulate keyers from:
+                  //   1. Direct match (documentRef == parent task.guidfixed)
+                  //   2. Child match (documentRef == child.guidfixed, child.parentGuidfixed == parent.guidfixed)
+                  if (allJournalCountMap.isNotEmpty) {
+                    final List<TaskWithShop> extras = [];
+
+                    for (final item in allTasks) {
+                      // Only process top-level tasks (parent tasks) for KPI rows
+                      if (item.task.parentGuidfixed.isNotEmpty) continue;
+
+                      // Collect combined keyer counts for this parent task
+                      final Map<String, int> combinedKeyerMap = {};
+
+                      // 1. Direct match: parent task.guidfixed in GL Journal
+                      final directMatch = allJournalCountMap[item.task.guidfixed];
+                      if (directMatch != null) {
+                        for (final e in directMatch.entries) {
+                          combinedKeyerMap.update(e.key, (c) => c + e.value, ifAbsent: () => e.value);
                         }
                       }
 
-                      if (journalOwnerMap.isNotEmpty) {
-                        for (int i = 0; i < allTasks.length; i++) {
-                          final task = allTasks[i].task;
-                          if (journalOwnerMap.containsKey(task.guidfixed)) {
-                            allTasks[i] = TaskWithShop(
-                              task,
-                              allTasks[i].shopName,
-                              journalCreatedBy: journalOwnerMap[task.guidfixed],
-                            );
+                      // 2. Child-task match: each child's guidfixed in GL Journal
+                      final children = parentToChildren[item.task.guidfixed] ?? [];
+                      for (final childGuid in children) {
+                        final childMatch = allJournalCountMap[childGuid];
+                        if (childMatch != null) {
+                          for (final e in childMatch.entries) {
+                            combinedKeyerMap.update(e.key, (c) => c + e.value, ifAbsent: () => e.value);
                           }
                         }
                       }
+
+                      // 3. taskChild.guidfixed match (if API exposes a single child GUID)
+                      if (item.task.taskChild != null && item.task.taskChild!.guidfixed.isNotEmpty) {
+                        final taskChildMatch = allJournalCountMap[item.task.taskChild!.guidfixed];
+                        if (taskChildMatch != null) {
+                          for (final e in taskChildMatch.entries) {
+                            combinedKeyerMap.update(e.key, (c) => c + e.value, ifAbsent: () => e.value);
+                          }
+                        }
+                      }
+
+                      if (combinedKeyerMap.isNotEmpty) {
+                        print('[KPI-DEBUG] ✅ MATCH: task "${item.task.name}" ownerBy="${item.task.ownerBy}" keyers=${combinedKeyerMap.keys.toList()}');
+                        int keyedByOthersSum = 0;
+                        for (final entry in combinedKeyerMap.entries) {
+                          final keyer = entry.key;
+                          final count = entry.value;
+                          if (keyer != item.task.ownerBy) {
+                            keyedByOthersSum += count;
+                            print('[KPI-DEBUG] ➕ Adding B row: keyer=$keyer count=$count');
+                            extras.add(
+                              TaskWithShop(
+                                item.task,
+                                item.shopName,
+                                journalCreatedBy: keyer,
+                                keyedDocumentCount: count,
+                              ),
+                            );
+                          }
+                        }
+                        item.totalKeyedByOthers = keyedByOthersSum;
+                      }
                     }
-                  } catch (e) {
-                    dLog(
-                      '⚠️ Failed to fetch GL Journals for owner mapping: $e',
-                    );
+
+                    print('[KPI-DEBUG] 📊 B extras added: ${extras.length}');
+                    allTasks.addAll(extras);
+                  } else {
+                    dLog('⚠️ allJournalCountMap EMPTY — no documentRef/createdBy found');
                   }
 
                   employees = _groupTasksByOwner(allTasks);
@@ -239,25 +348,51 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
     try {
       List<KpiEmployee> employees = [];
       List<TaskWithShop> allTasks = [];
+      final Map<String, Map<String, int>> allJournalCountMap = {};
 
       if (event.shopId == null ||
           event.shopId!.isEmpty ||
           event.shopId == 'all') {
         dLog('🏪 Fetching tasks for ALL shops...');
 
-        // Iterate all shops
+        // Iterate all shops — fetch tasks AND GL Journals per shop context
         for (final shop in currentState.shops) {
           try {
+            // fetchTasksForShop calls selectShop(shopId) first, then /task
             final response = await TaskService.fetchTasksForShop(
               shopId: shop.shopId,
               limit: 20,
-              status: [0, 1, 2, 3, 4],
+              status: [0, 1, 2, 3, 4, 5, 6],
             );
 
             if (response.success && response.tasks.isNotEmpty) {
               allTasks.addAll(
                 response.tasks.map((t) => TaskWithShop(t, shop.shopName)),
               );
+            }
+
+            // Fetch GL Journals immediately after shop is selected
+            try {
+              final glResp = await JournalService.getAllGLJournals(
+                task: 'GL Journal',
+              );
+              if (glResp.success == true && glResp.journals != null) {
+                for (final journal in glResp.journals!) {
+                  if (journal.jobGuidfixed != null &&
+                      journal.jobGuidfixed!.isNotEmpty &&
+                      journal.createdBy != null) {
+                    allJournalCountMap
+                        .putIfAbsent(journal.jobGuidfixed!, () => {})
+                        .update(
+                          journal.createdBy!,
+                          (c) => c + 1,
+                          ifAbsent: () => 1,
+                        );
+                  }
+                }
+              }
+            } catch (e) {
+              dLog('⚠️ Failed to fetch GL Journals for shop ${shop.shopName}: $e');
             }
           } catch (e) {
             dLog('⚠️ Failed to load tasks for shop ${shop.shopName}: $e');
@@ -269,7 +404,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         final response = await TaskService.fetchTasksForShop(
           shopId: event.shopId!,
           limit: 20,
-          status: [0, 1, 2, 3, 4],
+          status: [0, 1, 2, 3, 4, 5, 6],
         );
 
         if (response.success && response.tasks.isNotEmpty) {
@@ -277,10 +412,34 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
             response.tasks.map((t) => TaskWithShop(t, event.shopName!)),
           );
         }
+
+        // Fetch GL Journals for this single shop (already selected above)
+        try {
+          final glResp = await JournalService.getAllGLJournals(
+            task: 'GL Journal',
+          );
+          if (glResp.success == true && glResp.journals != null) {
+            for (final journal in glResp.journals!) {
+              if (journal.jobGuidfixed != null &&
+                  journal.jobGuidfixed!.isNotEmpty &&
+                  journal.createdBy != null) {
+                allJournalCountMap
+                    .putIfAbsent(journal.jobGuidfixed!, () => {})
+                    .update(
+                      journal.createdBy!,
+                      (c) => c + 1,
+                      ifAbsent: () => 1,
+                    );
+              }
+            }
+          }
+        } catch (e) {
+          dLog('⚠️ Failed to fetch GL Journals for shop ${event.shopId}: $e');
+        }
       }
 
       if (allTasks.isNotEmpty) {
-        // Filter tasks by ownerAt
+        // Filter tasks by ownerAt date range
         List<TaskWithShop> filteredTasks = allTasks;
 
         if (event.startDate != null && event.endDate != null) {
@@ -306,39 +465,33 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
           }).toList();
         }
 
-        // Apply GL Journal owner override before grouping
-        try {
-          final glJournalsResp = await JournalService.getAllGLJournals(
-            task: 'GL Journal',
-          );
-          if (glJournalsResp.success == true &&
-              glJournalsResp.journals != null) {
-            final journals = glJournalsResp.journals!;
-
-            final Map<String, String> journalOwnerMap = {};
-            for (final journal in journals) {
-              if (journal.documentRef != null &&
-                  journal.documentRef!.isNotEmpty &&
-                  journal.createdBy != null) {
-                journalOwnerMap[journal.documentRef!] = journal.createdBy!;
-              }
-            }
-
-            if (journalOwnerMap.isNotEmpty) {
-              for (int i = 0; i < filteredTasks.length; i++) {
-                final task = filteredTasks[i].task;
-                if (journalOwnerMap.containsKey(task.guidfixed)) {
-                  filteredTasks[i] = TaskWithShop(
-                    task,
-                    filteredTasks[i].shopName,
-                    journalCreatedBy: journalOwnerMap[task.guidfixed],
+        // Add extra TaskWithShop rows for GL Journal keyers (B)
+        // while keeping original ownerBy (A) entries
+        if (allJournalCountMap.isNotEmpty) {
+          final List<TaskWithShop> extras = [];
+          for (final item in filteredTasks) {
+            final keyerMap = allJournalCountMap[item.task.guidfixed];
+            if (keyerMap != null) {
+              int keyedByOthersSum = 0;
+              for (final entry in keyerMap.entries) {
+                final keyer = entry.key;
+                final count = entry.value;
+                if (keyer != item.task.ownerBy) {
+                  keyedByOthersSum += count;
+                  extras.add(
+                    TaskWithShop(
+                      item.task,
+                      item.shopName,
+                      journalCreatedBy: keyer,
+                      keyedDocumentCount: count,
+                    ),
                   );
                 }
               }
+              item.totalKeyedByOthers = keyedByOthersSum;
             }
           }
-        } catch (e) {
-          dLog('⚠️ Failed to fetch GL Journals for owner mapping: $e');
+          filteredTasks.addAll(extras);
         }
 
         // Group tasks by ownerBy (or effectively journalCreatedBy)
@@ -390,99 +543,109 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
     }
   }
 
-  /// Helper class to associate task with shop name
+  /// Group tasks by the person who actually keyed the documents (createdBy from GL Journal).
+  /// If a task has no GL Journal entries yet (not yet keyed), falls back to task.ownerBy.
   List<KpiEmployee> _groupTasksByOwner(List<TaskWithShop> tasks) {
-    // Group tasks by ownerBy
+    // --- Step 1: Build a map: taskGuid → List<Journal> keyed by createdBy ---
+    // `effectiveOwner` is already set from GL Journal in the calling code (journalOwnerMap).
+    // We use it directly as the KPI grouping key.
+
+    // Group TaskWithShop items by effectiveOwner (createdBy if available, else ownerBy)
     final Map<String, List<TaskWithShop>> groupedTasks = {};
     for (final item in tasks) {
       final owner = item.effectiveOwner;
-      if (!groupedTasks.containsKey(owner)) {
-        groupedTasks[owner] = [];
-      }
-      groupedTasks[owner]!.add(item);
+      groupedTasks.putIfAbsent(owner, () => []).add(item);
     }
 
-    // Convert grouped tasks to KpiEmployee list
+    // --- Step 2: Build a KpiEmployee per owner ---
     return groupedTasks.entries.map((entry) {
       final ownerBy = entry.key;
       final ownerItems = entry.value;
       final ownerTasks = ownerItems.map((e) => e.task).toList();
 
       // Aggregate totals from all tasks for this owner
-      int totalDocCount = 0; // จำนวน - from totalDocument
-      int totalRefBalance = 0; // referenceBalance
-      int totalRefCount = 0; // referenceCount
-
-      int totalPending = 0; // Pending Record (status 3)
-      int totalWaitingVerify = 0; // Waiting Verify (status 1)
-      int totalCompleted = 0; // Completed (status 4)
-      int totalPassed = 0; // Passed (Status 1 from totaldocumentstatus)
-      int totalRemaining = 0; // Remaining (Status 0 from totaldocumentstatus)
-      int totalNotRecorded =
-          0; // Not Recorded (Status 3 from totaldocumentstatus)
-      int totalCancelled = 0; // Cancelled (status 2 from totaldocumentstatus)
-      int totalNotRequiredApproval =
-          0; // Not Required Approval (status 6 from totaldocumentstatus)
+      int totalDocCount = 0;
+      int totalRefBalance = 0;
+      int totalRefCount = 0;
+      int totalPending = 0;
+      int totalWaitingVerify = 0;
+      int totalCompleted = 0;
+      int totalPassed = 0;
+      int totalRemaining = 0;
+      int totalNotRecorded = 0;
+      int totalCancelled = 0;
+      int totalNotRequiredApproval = 0;
       DateTime? latestActive;
 
       // Create companyDetails from each task
       final companyDetails = ownerItems.map((item) {
         final task = item.task;
         final shopName = item.shopName;
+        final bool isContributorRow = item.journalCreatedBy != null;
+        
+        // --- CUSTOM KPI DISPLAY LOGIC (REQ 2026-03-11 #2) --- 
+        // Row A (Owner): Shows full task context for all columns EXCEPT "Recorded" (which is 0)
+        // Row B (Keyer): Shows full task context for all columns EXCEPT "Recorded" (which is their keyed amount)
+        
+        // Both rows see the full document count
+        final int docCount = task.totalDocument;
+        // Only B gets a recorded count, A gets 0
+        final int taskRefCount = isContributorRow ? item.keyedDocumentCount : 0;
+        
+        // In the overall Employee summary (Main Row A), we accumulate the full counts.
+        // We only add to the Employee total if it's NOT a contributor row, to avoid double-counting
+        // the same task repeatedly in the Employee aggregated row.
+        if (!isContributorRow) {
+          totalDocCount += docCount;
+          totalRefBalance += task.referenceBalance;
+          totalRefCount += taskRefCount; // A's taskRefCount is 0, so employee recorded count comes from B separately
+        } else {
+          // Add B's recorded count to the master employee total
+          totalRefCount += taskRefCount;
+        }
 
-        totalDocCount += task.totalDocument; // Use totalDocument for "จำนวน"
-        totalRefBalance += task.referenceBalance;
-        totalRefCount += task.referenceCount;
-
-        // Count based on status
-        // status 1 = รอตรวจสอบ, status 3 = รอบันทึก, status 4 = เสร็จสิ้น, status 6 = ไม่ต้องอนุมัติ
-        // Cancelled always from granular status 2
+        // Both A and B sub-rows show the full context of the task
         int taskWaitingVerify = 0;
         int taskPending = 0;
         int taskCompleted = 0;
-        int taskPassed = task.getStatusCount(
-          1,
-        ); // Status 1 = Passed/Uploaded/Correct
-        int taskRemaining =
-            task.referenceBalance; // Use referenceBalance for remaining
-        int taskNotRecorded = task.getStatusCount(
-          3,
-        ); // Status 3 = Not Recorded/Waiting Fix
+        
+        int taskPassed = task.getStatusCount(1);
+        int taskRemaining = task.referenceBalance;
+        int taskNotRecorded = task.getStatusCount(3);
         int taskCancelled = task.cancelledCount;
         int taskNotRequiredApproval = task.notRequiredApprovalCount;
-
-        totalPassed += taskPassed;
-        totalRemaining += taskRemaining;
-        totalNotRecorded += taskNotRecorded;
-        totalCancelled += task.cancelledCount;
-        totalNotRequiredApproval += taskNotRequiredApproval;
 
         switch (task.status) {
           case 4: // Completed
             taskCompleted = task.totalDocument;
-            // If status is 4, we assume it's fully completed
-            totalCompleted += taskCompleted;
             break;
           case 3: // Pending Record
             taskPending = task.totalDocument;
-            totalPending += taskPending;
             break;
           case 1: // Waiting Verify
             taskWaitingVerify = task.totalDocument;
-            totalWaitingVerify += taskWaitingVerify;
             break;
           default:
-            // Other statuses if needed
             break;
         }
 
-        // Calculate delay step
-        String taskDelayStep = 'none';
-
-        if (latestActive == null || (task.ownerAt.isAfter(latestActive!))) {
-          latestActive = task.ownerAt;
+        // Only add to the Employee master totals if it's the A row to prevent double counting
+        if (!isContributorRow) {
+          totalPassed += taskPassed;
+          totalRemaining += taskRemaining;
+          totalNotRecorded += taskNotRecorded;
+          totalCancelled += taskCancelled;
+          totalNotRequiredApproval += taskNotRequiredApproval;
+          totalCompleted += taskCompleted;
+          totalPending += taskPending;
+          totalWaitingVerify += taskWaitingVerify;
         }
 
+        // Delay step
+        String taskDelayStep = 'none';
+        if (latestActive == null || task.ownerAt.isAfter(latestActive!)) {
+          latestActive = task.ownerAt;
+        }
         if (taskWaitingVerify > 0) {
           taskDelayStep = 'รอตรวจสอบ';
         } else if (taskPending > 0) {
@@ -491,20 +654,18 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
           taskDelayStep = 'รออัปโหลด';
         }
 
-        // Calculate delay only for specific steps
         final now = DateTime.now();
         int daysDiff = 0;
-
         if (['รอตรวจสอบ', 'รอบันทึก', 'รออัปโหลด'].contains(taskDelayStep)) {
           daysDiff = now.difference(task.ownerAt).inDays;
         }
 
+        // Both rows show full task context, except for referenceCount
         return KpiCompanyDetail(
           company: task.name,
-          employee: item.effectiveOwner,
+          employee: ownerBy,
           recordingDate: task.ownerAt,
-          totalBillCount: task
-              .totalDocument, // Use totalDocument for "จำนวน" column in sub-table
+          totalBillCount: task.totalDocument, // Full job count for both A and B
           assigned: task.billCount,
           completed: taskCompleted,
           cancelled: taskCancelled,
@@ -516,7 +677,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
           passed: taskPassed,
           remaining: taskRemaining,
           notRecorded: taskNotRecorded,
-          referenceCount: task.referenceCount,
+          referenceCount: taskRefCount, // 0 for A, keyed amount for B
           status: task.status.toString(),
           lastActive: task.ownerAt,
           delayStep: taskDelayStep,
@@ -533,14 +694,10 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         overallStatus = 'pending';
       }
 
-      // Calculate delay step and days
+      // Determine delay
       String delayStep = 'none';
       int delayDays = 0;
       final now = DateTime.now();
-      // Will determine days after step is picked
-
-      // Determine which step has delay (priority: Verify > Record)
-      // Determine which step has delay (priority: Verify > Record > Completed)
       if (totalWaitingVerify > 0) {
         delayStep = 'รอตรวจสอบ';
       } else if (totalPending > 0) {
@@ -548,13 +705,11 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
       } else if (totalRemaining > 0) {
         delayStep = 'รออัปโหลด';
       }
-
       if (['รอตรวจสอบ', 'รอบันทึก', 'รออัปโหลด'].contains(delayStep) &&
           latestActive != null) {
         delayDays = now.difference(latestActive!).inDays;
       }
 
-      // Calculate incentive status
       final int billsNeeded = totalDocCount - totalCompleted;
       final bool incentivePassed = billsNeeded <= 0 && totalDocCount > 0;
 
@@ -565,7 +720,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         documentStartDate: latestActive ?? DateTime.now(),
         documentEndDate: latestActive ?? DateTime.now(),
         dueDate: (latestActive ?? DateTime.now()).add(const Duration(days: 30)),
-        totalDocuments: totalDocCount, // Use totalDocument for "จำนวน" column
+        totalDocuments: totalDocCount,
         assignedDocuments: 0,
         pendingDocuments: totalPending,
         completedDocuments: totalCompleted,

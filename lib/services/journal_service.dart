@@ -297,15 +297,22 @@ class JournalService {
     int limit = 1000,
     String? shopId,
     String? task,
+    String sort = 'docdate:-1',
+    String timezone = '+07',
+    String? startDate, // yyyy-MM-dd
+    String? endDate, // yyyy-MM-dd
   }) async {
     final queryParams = <String, String>{
       'page': page.toString(),
       'limit': limit.toString(),
+      'sort': sort,
+      'timezone': timezone,
     };
 
-    if (shopId != null)
-      queryParams['shopids'] = shopId; // Changed from branch_sync to shopids
-    if (task != null) queryParams['task'] = task; // Add task filter
+    if (shopId != null && shopId.isNotEmpty) queryParams['shopids'] = shopId;
+    if (task != null) queryParams['task'] = task;
+    if (startDate != null) queryParams['start_date'] = startDate;
+    if (endDate != null) queryParams['end_date'] = endDate;
 
     final uri = Uri.parse(
       '$baseUrl/gl/journal',
