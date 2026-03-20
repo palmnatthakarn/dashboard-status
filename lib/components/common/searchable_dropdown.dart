@@ -390,3 +390,443 @@ class _SearchableDropdownPanelState extends State<_SearchableDropdownPanel> {
     );
   }
 }
+
+// ─── Multi-select dropdown ────────────────────────────────────────────────────
+
+/// Like [SearchableDropdown] but allows checking multiple items at once.
+class SearchableMultiDropdown extends StatefulWidget {
+  final String fieldLabel;
+  final String allLabel;
+  final String searchHint;
+  final IconData icon;
+  final List<SearchableDropdownItem> items;
+  final List<String> selectedIds;
+  final void Function(List<String> ids, List<String> labels) onChanged;
+  final Color accentColor;
+  final double width;
+  final double dropdownWidth;
+
+  const SearchableMultiDropdown({
+    super.key,
+    required this.fieldLabel,
+    required this.allLabel,
+    required this.searchHint,
+    required this.icon,
+    required this.items,
+    required this.selectedIds,
+    required this.onChanged,
+    this.accentColor = const Color(0xFF3B82F6),
+    this.width = 200,
+    this.dropdownWidth = 280,
+  });
+
+  @override
+  State<SearchableMultiDropdown> createState() =>
+      _SearchableMultiDropdownState();
+}
+
+class _SearchableMultiDropdownState extends State<SearchableMultiDropdown> {
+  final _layerLink = LayerLink();
+  final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
+  bool _isOpen = false;
+  OverlayEntry? _overlay;
+  late List<String> _localSelected;
+
+  @override
+  void initState() {
+    super.initState();
+    _localSelected = List.from(widget.selectedIds);
+  }
+
+  @override
+  void didUpdateWidget(SearchableMultiDropdown oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_isOpen) _localSelected = List.from(widget.selectedIds);
+  }
+
+  @override
+  void dispose() {
+    _removeOverlay();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _removeOverlay() {
+    _overlay?.remove();
+    _overlay = null;
+    _isOpen = false;
+  }
+
+  void _toggle() {
+    if (_isOpen) {
+      _removeOverlay();
+      setState(() {});
+    } else {
+      _localSelected = List.from(widget.selectedIds);
+      _searchController.clear();
+      _overlay = _buildOverlay();
+      Overlay.of(context).insert(_overlay!);
+      _isOpen = true;
+      setState(() {});
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (_searchFocusNode.canRequestFocus) _searchFocusNode.requestFocus();
+      });
+    }
+  }
+
+  void _handleToggle(String id) {
+    if (_localSelected.contains(id)) {
+      _localSelected.remove(id);
+    } else {
+      _localSelected.add(id);
+    }
+    _overlay?.markNeedsBuild();
+    setState(() {});
+    final labels = _localSelected
+        .map((i) => widget.items.firstWhere((x) => x.id == i).label)
+        .toList();
+    widget.onChanged(List.from(_localSelected), labels);
+  }
+
+  void _clearAll() {
+    _localSelected.clear();
+    _overlay?.markNeedsBuild();
+    setState(() {});
+    widget.onChanged([], []);
+  }
+
+  OverlayEntry _buildOverlay() {
+    return OverlayEntry(
+      builder: (context) => GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () {
+          _removeOverlay();
+          setState(() {});
+        },
+        child: Stack(
+          children: [
+            CompositedTransformFollower(
+              link: _layerLink,
+              showWhenUnlinked: false,
+              offset: const Offset(0, 48),
+              child: GestureDetector(
+                onTap: () {},
+                child: Material(
+                  elevation: 8,
+                  shadowColor: Colors.black26,
+                  borderRadius: BorderRadius.circular(12),
+                  child: _MultiSelectPanel(
+                    items: widget.items,
+                    selectedIds: _localSelected,
+                    searchHint: widget.searchHint,
+                    searchController: _searchController,
+                    focusNode: _searchFocusNode,
+                    width: widget.dropdownWidth,
+                    accentColor: widget.accentColor,
+                    onToggle: _handleToggle,
+                    onClearAll: _clearAll,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasSelection = widget.selectedIds.isNotEmpty;
+    final displayLabel = !hasSelection
+        ? widget.allLabel
+        : widget.selectedIds.length == 1
+            ? (widget.items
+                    .where((i) => i.id == widget.selectedIds.first)
+                    .firstOrNull
+                    ?.label ??
+                widget.allLabel)
+            : '${widget.selectedIds.length} รายการ';
+
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: InkWell(
+        onTap: _toggle,
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: widget.width,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: (_isOpen || hasSelection)
+                ? widget.accentColor.withValues(alpha: 0.08)
+                : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: (_isOpen || hasSelection)
+                  ? widget.accentColor.withValues(alpha: 0.5)
+                  : const Color(0xFFE2E8F0),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                widget.icon,
+                size: 16,
+                color: (_isOpen || hasSelection)
+                    ? widget.accentColor
+                    : const Color(0xFF94A3B8),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.fieldLabel,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: (_isOpen || hasSelection)
+                            ? widget.accentColor
+                            : Colors.grey[500],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      displayLabel,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF334155),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              if (hasSelection)
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _clearAll,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 16,
+                      color: widget.accentColor,
+                    ),
+                  ),
+                )
+              else
+                AnimatedRotation(
+                  turns: _isOpen ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: (_isOpen || hasSelection)
+                        ? widget.accentColor
+                        : const Color(0xFF94A3B8),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Multi-select panel ───────────────────────────────────────────────────────
+
+class _MultiSelectPanel extends StatefulWidget {
+  final List<SearchableDropdownItem> items;
+  final List<String> selectedIds;
+  final String searchHint;
+  final TextEditingController searchController;
+  final FocusNode focusNode;
+  final double width;
+  final Color accentColor;
+  final void Function(String id) onToggle;
+  final VoidCallback onClearAll;
+
+  const _MultiSelectPanel({
+    required this.items,
+    required this.selectedIds,
+    required this.searchHint,
+    required this.searchController,
+    required this.focusNode,
+    required this.width,
+    required this.accentColor,
+    required this.onToggle,
+    required this.onClearAll,
+  });
+
+  @override
+  State<_MultiSelectPanel> createState() => _MultiSelectPanelState();
+}
+
+class _MultiSelectPanelState extends State<_MultiSelectPanel> {
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    widget.searchController.addListener(() {
+      if (mounted) {
+        setState(() => _query = widget.searchController.text.toLowerCase());
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _query.isEmpty
+        ? widget.items
+        : widget.items
+            .where((i) =>
+                i.label.toLowerCase().contains(_query) ||
+                (i.subtitle?.toLowerCase().contains(_query) ?? false))
+            .toList();
+    final selectedCount = widget.selectedIds.length;
+
+    return Container(
+      width: widget.width,
+      constraints: const BoxConstraints(maxHeight: 360),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (selectedCount > 0)
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: widget.accentColor.withValues(alpha: 0.06),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(12)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: widget.accentColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'เลือก $selectedCount รายการ',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: widget.onClearAll,
+                    child: Text(
+                      'ล้างทั้งหมด',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: widget.accentColor,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: TextField(
+              controller: widget.searchController,
+              focusNode: widget.focusNode,
+              style: const TextStyle(fontSize: 13),
+              decoration: InputDecoration(
+                hintText: widget.searchHint,
+                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+                prefixIcon: const Icon(Icons.search, size: 18),
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                isDense: true,
+              ),
+            ),
+          ),
+          const Divider(height: 1),
+          Flexible(
+            child: ListView.builder(
+              padding: EdgeInsets.zero,
+              shrinkWrap: true,
+              itemCount: filtered.length,
+              itemBuilder: (_, i) {
+                final item = filtered[i];
+                final isSelected = widget.selectedIds.contains(item.id);
+                return ListTile(
+                  dense: true,
+                  visualDensity: VisualDensity.compact,
+                  selected: isSelected,
+                  selectedTileColor:
+                      widget.accentColor.withValues(alpha: 0.07),
+                  leading: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? widget.accentColor
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: isSelected
+                            ? widget.accentColor
+                            : const Color(0xFFCBD5E1),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: isSelected
+                        ? const Icon(Icons.check_rounded,
+                            size: 14, color: Colors.white)
+                        : null,
+                  ),
+                  title: Text(
+                    item.label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.w500,
+                      color: isSelected
+                          ? widget.accentColor
+                          : const Color(0xFF334155),
+                    ),
+                  ),
+                  subtitle: item.subtitle != null
+                      ? Text(item.subtitle!,
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey[500]))
+                      : null,
+                  onTap: () => widget.onToggle(item.id),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

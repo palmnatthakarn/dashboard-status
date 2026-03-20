@@ -7,11 +7,11 @@ import '../../blocs/kpi_journal/kpi_journal_bloc.dart';
 import '../../blocs/kpi_journal/kpi_journal_event.dart';
 import '../../blocs/kpi_journal/kpi_journal_state.dart';
 import '../../components/common/custom_pagination.dart';
-import '../../components/common/searchable_dropdown.dart';
 import '../../components/common/user_avatar.dart';
 import '../../components/dashboard_loading_widgets.dart';
 import 'kpi_constants.dart';
 import 'kpi_text_styles.dart';
+import 'widgets/kpi_journal_filter_section.dart';
 
 class KpiJournalPage extends StatelessWidget {
   const KpiJournalPage({super.key});
@@ -33,41 +33,16 @@ class _KpiJournalPageContent extends StatefulWidget {
 }
 
 class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
-  final _searchController = TextEditingController();
-  final _searchFocusNode = FocusNode();
-  final List<KpiJournalEmployee> _selectedEmployees = [];
-  String? _selectedShopId;
-  String? _selectedShopName;
-  DateTime? _startDate;
-  DateTime? _endDate;
+  List<KpiJournalEmployee> _filterEmployees = [];
+  List<String> _filterBookCodes = [];
+  List<String> _filterShopNames = [];
   int _currentPage = 1;
   int _rowsPerPage = 10;
   double _fontScale = 1.0;
   final Set<String> _expandedIds = {};
-  String? _selectedBookCode;
-  String? _selectedChecker;
-  String? _selectedUpdater;
 
   static final _dateFmt = DateFormat('dd/MM/yy');
   static final _dtFmt = DateFormat('dd/MM/yy HH:mm ');
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    _searchFocusNode.dispose();
-    super.dispose();
-  }
-
-  void _search(BuildContext context) {
-    context.read<KpiJournalBloc>().add(
-      SelectShopAndSearchJournal(
-        shopId: _selectedShopId,
-        shopName: _selectedShopName,
-        startDate: _startDate,
-        endDate: _endDate,
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +76,34 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
                           children: [
                             _buildSummaryCards(state),
                             const SizedBox(height: 16),
-                            _buildFilterSection(ctx, state),
+                            KpiJournalFilterSection(
+                              employees: state.employees,
+                              shops: state.shops,
+                              onRefresh: () => ctx
+                                  .read<KpiJournalBloc>()
+                                  .add(LoadKpiJournalData()),
+                              onSearch: (shopIds, shopNames, startDate, endDate) {
+                                // 0 or 1 shop → server-side filter; 2+ → fetch all + client-side
+                                final shopId = shopIds.length == 1 ? shopIds.first : null;
+                                final shopName = shopNames.length == 1 ? shopNames.first : null;
+                                setState(() => _filterShopNames =
+                                    shopIds.length > 1 ? shopNames : []);
+                                ctx.read<KpiJournalBloc>().add(
+                                  SelectShopAndSearchJournal(
+                                    shopId: shopId,
+                                    shopName: shopName,
+                                    startDate: startDate,
+                                    endDate: endDate,
+                                  ),
+                                );
+                              },
+                              onLocalFilterChanged: (employees, bookCodes) {
+                                setState(() {
+                                  _filterEmployees = employees;
+                                  _filterBookCodes = bookCodes;
+                                });
+                              },
+                            ),
                             const SizedBox(height: 16),
                             _buildTable(state),
                           ],
@@ -174,560 +176,6 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
     );
   }
 
-  // ─── Filter Section ───────────────────────────────────────────────────────
-
-  Widget _buildFilterSection(BuildContext context, KpiJournalLoaded state) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF64748B).withValues(alpha: 0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Expanded(
-              flex: 3,
-              child: _buildSearchField(context, state.employees),
-            ),
-            const SizedBox(width: 12),
-            _buildFDivider(),
-            const SizedBox(width: 12),
-            _buildShopSelector(state.shops),
-            const SizedBox(width: 12),
-            _buildFDivider(),
-            const SizedBox(width: 12),
-            _buildBookCodeSelector(state.employees),
-            const SizedBox(width: 12),
-            _buildFDivider(),
-            const SizedBox(width: 12),
-            //_buildCheckerSelector(state.allCheckers),
-            //  const SizedBox(width: 12),
-            //  _buildFDivider(),
-            // const SizedBox(width: 12),
-            // _buildUpdaterSelector(state.allUpdaters),
-            //const SizedBox(width: 12),
-            // _buildFDivider(),
-            // const SizedBox(width: 12),
-            _buildDateRange(context),
-            const Spacer(),
-            _buildActionButtons(context),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFDivider() =>
-      Container(width: 1, height: 28, color: const Color(0xFFE2E8F0));
-
-  Widget _buildBookCodeSelector(List<KpiJournalEmployee> employees) {
-    final codes = <String>{};
-    for (final emp in employees) {
-      codes.addAll(emp.byBookCode.keys);
-    }
-    final items = (codes.toList()..sort())
-        .map((c) => SearchableDropdownItem(id: c, label: c))
-        .toList();
-    return SearchableDropdown(
-      fieldLabel: 'สมุดบัญชี',
-      allLabel: 'ทั้งหมด',
-      searchHint: 'ค้นหาสมุดบัญชี...',
-      icon: Icons.menu_book_rounded,
-      items: items,
-      selectedId: _selectedBookCode,
-      accentColor: const Color(0xFF6366F1),
-      width: 160,
-      onChanged: (id, _) => setState(() => _selectedBookCode = id),
-    );
-  }
-
-  Widget _buildCheckerSelector(List<String> checkers) {
-    final items = checkers
-        .map((c) => SearchableDropdownItem(id: c, label: c))
-        .toList();
-    return SearchableDropdown(
-      fieldLabel: 'ตรวจสอบโดย',
-      allLabel: 'ทั้งหมด',
-      searchHint: 'ค้นหาผู้ตรวจสอบ...',
-      icon: Icons.verified_user_rounded,
-      items: items,
-      selectedId: _selectedChecker,
-      accentColor: const Color(0xFF10B981),
-      width: 160,
-      onChanged: (id, _) => setState(() => _selectedChecker = id),
-    );
-  }
-
-  Widget _buildUpdaterSelector(List<String> updaters) {
-    final items = updaters
-        .map((u) => SearchableDropdownItem(id: u, label: u))
-        .toList();
-    return SearchableDropdown(
-      fieldLabel: 'แก้ไขโดย',
-      allLabel: 'ทั้งหมด',
-      searchHint: 'ค้นหาผู้แก้ไข...',
-      icon: Icons.edit_rounded,
-      items: items,
-      selectedId: _selectedUpdater,
-      accentColor: const Color(0xFFF59E0B),
-      width: 160,
-      onChanged: (id, _) => setState(() => _selectedUpdater = id),
-    );
-  }
-
-  Widget _buildSearchField(
-    BuildContext context,
-    List<KpiJournalEmployee> employees,
-  ) {
-    return RawAutocomplete<KpiJournalEmployee>(
-      textEditingController: _searchController,
-      focusNode: _searchFocusNode,
-      displayStringForOption: (e) => e.name,
-      optionsBuilder: (textEditingValue) {
-        if (textEditingValue.text.isEmpty) {
-          return const Iterable<KpiJournalEmployee>.empty();
-        }
-        final q = textEditingValue.text.toLowerCase();
-        return employees.where((e) {
-          if (_selectedEmployees.any((s) => s.name == e.name)) return false;
-          return e.name.toLowerCase().contains(q);
-        });
-      },
-      onSelected: (KpiJournalEmployee selection) {
-        _searchController.clear();
-        setState(() => _selectedEmployees.add(selection));
-      },
-      fieldViewBuilder:
-          (ctx, fieldController, fieldFocusNode, onFieldSubmitted) {
-            return GestureDetector(
-              onTap: () {
-                if (!fieldFocusNode.hasFocus) fieldFocusNode.requestFocus();
-              },
-              behavior: HitTestBehavior.opaque,
-              child: ListenableBuilder(
-                listenable: fieldFocusNode,
-                builder: (_, __) => AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  constraints: const BoxConstraints(minHeight: 44),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: fieldFocusNode.hasFocus
-                        ? Colors.white
-                        : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: fieldFocusNode.hasFocus
-                          ? const Color(0xFF93C5FD)
-                          : const Color(0xFFE2E8F0),
-                      width: fieldFocusNode.hasFocus ? 1.5 : 1,
-                    ),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.search_rounded,
-                        size: 18,
-                        color: fieldFocusNode.hasFocus
-                            ? const Color(0xFF3B82F6)
-                            : const Color(0xFF94A3B8),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            ..._selectedEmployees.map(
-                              (emp) => _buildEmployeeChip(emp, () {
-                                setState(
-                                  () => _selectedEmployees.removeWhere(
-                                    (e) => e.name == emp.name,
-                                  ),
-                                );
-                              }),
-                            ),
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(minWidth: 120),
-                              child: IntrinsicWidth(
-                                child: TextField(
-                                  controller: fieldController,
-                                  focusNode: fieldFocusNode,
-                                  style: const TextStyle(fontSize: 14),
-                                  onSubmitted: (_) {
-                                    _search(ctx);
-                                    onFieldSubmitted();
-                                  },
-                                  decoration: InputDecoration(
-                                    hintText: _selectedEmployees.isEmpty
-                                        ? 'ค้นหาชื่อพนักงาน...'
-                                        : 'เพิ่ม...',
-                                    hintStyle: TextStyle(
-                                      color: Colors.grey[400],
-                                      fontSize: 14,
-                                    ),
-                                    border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.only(
-                                      bottom: 12,
-                                    ),
-                                    isDense: true,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_selectedEmployees.isNotEmpty ||
-                          _searchController.text.isNotEmpty)
-                        InkWell(
-                          onTap: () {
-                            _searchController.clear();
-                            setState(() => _selectedEmployees.clear());
-                          },
-                          borderRadius: BorderRadius.circular(8),
-                          child: const Padding(
-                            padding: EdgeInsets.all(2),
-                            child: Icon(
-                              Icons.close_rounded,
-                              size: 16,
-                              color: Color(0xFF94A3B8),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-      optionsViewBuilder: (context, onSelected, options) {
-        return Align(
-          alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 8,
-            shadowColor: Colors.black26,
-            borderRadius: BorderRadius.circular(12),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 240, maxWidth: 320),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  shrinkWrap: true,
-                  itemCount: options.length,
-                  separatorBuilder: (_, __) =>
-                      const Divider(height: 1, indent: 16, endIndent: 16),
-                  itemBuilder: (context, index) {
-                    final option = options.elementAt(index);
-                    return ListTile(
-                      dense: true,
-                      visualDensity: VisualDensity.compact,
-                      leading: CircleAvatar(
-                        radius: 14,
-                        backgroundColor: const Color(0xFFEFF6FF),
-                        child: Text(
-                          option.name.isNotEmpty
-                              ? option.name[0].toUpperCase()
-                              : '?',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF3B82F6),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      title: Text(
-                        option.name,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF334155),
-                        ),
-                      ),
-                      subtitle: Text(
-                        '${option.totalJournals} รายการ',
-                        style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                      ),
-                      onTap: () => onSelected(option),
-                      hoverColor: const Color(0xFFF0F9FF),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildEmployeeChip(
-    KpiJournalEmployee employee,
-    VoidCallback onRemove,
-  ) {
-    return Container(
-      padding: const EdgeInsets.only(left: 8, right: 4, top: 2, bottom: 2),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFBFDBFE), width: 0.5),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircleAvatar(
-            radius: 8,
-            backgroundColor: Colors.white,
-            child: Text(
-              employee.name.isNotEmpty ? employee.name[0].toUpperCase() : '?',
-              style: const TextStyle(
-                fontSize: 8,
-                color: Color(0xFF3B82F6),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            employee.name,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF1E293B),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(width: 2),
-          InkWell(
-            onTap: onRemove,
-            borderRadius: BorderRadius.circular(10),
-            child: const Padding(
-              padding: EdgeInsets.all(2),
-              child: Icon(
-                Icons.close_rounded,
-                size: 13,
-                color: Color(0xFF64748B),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildShopSelector(List<KpiJournalShopItem> shops) {
-    final items = shops
-        .map((s) => SearchableDropdownItem(id: s.shopId, label: s.shopName))
-        .toList();
-    return SearchableDropdown(
-      fieldLabel: 'ร้าน',
-      allLabel: 'ทุกร้าน',
-      searchHint: 'ค้นหาร้าน...',
-      icon: Icons.store_rounded,
-      items: items,
-      selectedId: (_selectedShopId?.isEmpty ?? true) ? null : _selectedShopId,
-      onChanged: (id, label) => setState(() {
-        _selectedShopId = id;
-        _selectedShopName = label;
-      }),
-    );
-  }
-
-  Widget _buildDateRange(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildCompactDate(context, 'วันเริ่มต้น', _startDate, (d) {
-          setState(() => _startDate = d);
-          if (_endDate != null) _search(context);
-        }),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          child: Icon(
-            Icons.arrow_forward_rounded,
-            size: 12,
-            color: Colors.grey[300],
-          ),
-        ),
-        _buildCompactDate(context, 'วันสิ้นสุด', _endDate, (d) {
-          setState(() => _endDate = d);
-          if (_startDate != null) _search(context);
-        }),
-      ],
-    );
-  }
-
-  Widget _buildCompactDate(
-    BuildContext context,
-    String label,
-    DateTime? date,
-    Function(DateTime) onSelect,
-  ) {
-    final fmt = DateFormat('d MMM yy', 'th');
-    final hasDate = date != null;
-    return InkWell(
-      onTap: () async {
-        final picked = await showDatePicker(
-          context: context,
-          initialDate: date ?? DateTime.now(),
-          firstDate: DateTime(2020),
-          lastDate: DateTime(2030),
-          builder: (context, child) => Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400, maxHeight: 520),
-              child: Theme(
-                data: Theme.of(context).copyWith(
-                  colorScheme: const ColorScheme.light(
-                    primary: Color(0xFF3B82F6),
-                    onPrimary: Colors.white,
-                    surface: Colors.white,
-                    onSurface: Color(0xFF1E293B),
-                  ),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: child!,
-                ),
-              ),
-            ),
-          ),
-        );
-        if (picked != null) onSelect(picked);
-      },
-      borderRadius: BorderRadius.circular(10),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: hasDate ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: hasDate ? const Color(0xFFBFDBFE) : const Color(0xFFE2E8F0),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.calendar_today_rounded,
-              size: 13,
-              color: hasDate
-                  ? const Color(0xFF2563EB)
-                  : const Color(0xFF94A3B8),
-            ),
-            const SizedBox(width: 6),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: hasDate ? const Color(0xFF2563EB) : Colors.grey[500],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  hasDate ? fmt.format(date) : '- เลือก -',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: hasDate
-                        ? const Color(0xFF1E293B)
-                        : const Color(0xFF94A3B8),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButtons(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Tooltip(
-          message: 'รีเฟรชข้อมูล',
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () =>
-                  context.read<KpiJournalBloc>().add(LoadKpiJournalData()),
-              borderRadius: BorderRadius.circular(10),
-              child: const SizedBox(
-                width: 36,
-                height: 36,
-                child: Icon(
-                  Icons.refresh_rounded,
-                  size: 18,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => _search(context),
-            borderRadius: BorderRadius.circular(10),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
-                ),
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.search_rounded, size: 16, color: Colors.white),
-                  SizedBox(width: 6),
-                  Text(
-                    'ค้นหา',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   // ─── Table ─────────────────────────────────────────────────────────────────
 
   // scroll controllers for header↔body sync
@@ -740,6 +188,98 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
     _bodyScroll.addListener(() {
       if (_headerScroll.hasClients) _headerScroll.jumpTo(_bodyScroll.offset);
     });
+  }
+
+  /// Creates a new [KpiJournalEmployee] containing only journals whose
+  /// [KpiJournalDetail.bookCode] is in [codes]. Totals are recalculated.
+  KpiJournalEmployee _applyShopFilter(
+    KpiJournalEmployee emp,
+    List<String> shopNames,
+  ) {
+    if (shopNames.isEmpty) return emp;
+    final filteredStats = emp.shopStats
+        .where((stat) => shopNames.contains(stat.shopName))
+        .toList();
+    final allDetails = filteredStats.expand((s) => s.details).toList();
+    final mergedByBookCode = filteredStats.fold<Map<String, int>>(
+      {},
+      (map, stat) {
+        for (final entry in stat.byBookCode.entries) {
+          map[entry.key] = (map[entry.key] ?? 0) + entry.value;
+        }
+        return map;
+      },
+    );
+    return KpiJournalEmployee(
+      name: emp.name,
+      totalJournals: filteredStats.fold(0, (s, e) => s + e.count),
+      totalDebit: allDetails.fold<double>(0, (s, d) => s + d.debit),
+      totalCredit: allDetails.fold<double>(0, (s, d) => s + d.credit),
+      byBookCode: mergedByBookCode,
+      lastActive: emp.lastActive,
+      details: allDetails,
+      shopNames: filteredStats.map((s) => s.shopName).toList(),
+      shopStats: filteredStats,
+      totalChecked: filteredStats.fold(0, (s, e) => s + e.totalChecked),
+      totalUpdated: filteredStats.fold(0, (s, e) => s + e.totalUpdated),
+    );
+  }
+
+  KpiJournalEmployee _applyBookCodeFilter(
+    KpiJournalEmployee emp,
+    List<String> codes,
+  ) {
+    if (codes.isEmpty) return emp;
+    final filteredStats = emp.shopStats
+        .map((stat) {
+          final filteredDetails =
+              stat.details.where((d) => codes.contains(d.bookCode)).toList();
+          if (filteredDetails.isEmpty) return null;
+          return KpiJournalShopStat(
+            shopName: stat.shopName,
+            count: filteredDetails.length,
+            byBookCode: Map.fromEntries(
+                stat.byBookCode.entries.where((e) => codes.contains(e.key))),
+            lastActive: filteredDetails
+                .where((d) => d.createdAt != null)
+                .map((d) => d.createdAt!)
+                .fold<DateTime?>(null, (latest, d) =>
+                    latest == null || d.isAfter(latest) ? d : latest),
+            details: filteredDetails,
+            totalChecked: filteredDetails
+                .where((d) =>
+                    d.checkedBy != null && d.checkedBy!.isNotEmpty)
+                .length,
+            totalUpdated: filteredDetails
+                .where((d) =>
+                    d.updatedBy != null && d.updatedBy!.isNotEmpty)
+                .length,
+          );
+        })
+        .whereType<KpiJournalShopStat>()
+        .toList();
+    final totalJournals =
+        filteredStats.fold<int>(0, (s, e) => s + e.count);
+    return KpiJournalEmployee(
+      name: emp.name,
+      totalJournals: totalJournals,
+      totalDebit: filteredStats
+          .expand((s) => s.details)
+          .fold<double>(0, (s, d) => s + d.debit),
+      totalCredit: filteredStats
+          .expand((s) => s.details)
+          .fold<double>(0, (s, d) => s + d.credit),
+      byBookCode: Map.fromEntries(
+          emp.byBookCode.entries.where((e) => codes.contains(e.key))),
+      lastActive: emp.lastActive,
+      details: filteredStats.expand((s) => s.details).toList(),
+      shopNames: emp.shopNames,
+      shopStats: filteredStats,
+      totalChecked:
+          filteredStats.fold(0, (s, e) => s + e.totalChecked),
+      totalUpdated:
+          filteredStats.fold(0, (s, e) => s + e.totalUpdated),
+    );
   }
 
   List<DataRow> _buildDataRows(List<KpiJournalEmployee> pageEmployees) {
@@ -1189,22 +729,25 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
 
   Widget _buildTable(KpiJournalLoaded state) {
     // ── filters ──
-    final nameFiltered = _selectedEmployees.isEmpty
+    final nameFiltered = _filterEmployees.isEmpty
         ? state.filteredEmployees
         : state.filteredEmployees
-              .where((e) => _selectedEmployees.any((s) => s.name == e.name))
+              .where((e) => _filterEmployees.any((s) => s.name == e.name))
               .toList();
-    final bookFiltered = _selectedBookCode == null
+    // Multi-shop client-side filter (only active when 2+ shops selected)
+    final shopFiltered = _filterShopNames.isNotEmpty
         ? nameFiltered
-        : nameFiltered
-              .where((e) => e.byBookCode.containsKey(_selectedBookCode))
+              .map((e) => _applyShopFilter(e, _filterShopNames))
+              .where((e) => e.shopStats.isNotEmpty)
+              .toList()
+        : nameFiltered;
+    // Multi-book-code client-side filter — deep-filter details & recalc totals
+    final displayEmployees = _filterBookCodes.isEmpty
+        ? shopFiltered
+        : shopFiltered
+              .map((e) => _applyBookCodeFilter(e, _filterBookCodes))
+              .where((e) => e.totalJournals > 0)
               .toList();
-    final checkerFiltered = _selectedChecker == null
-        ? bookFiltered
-        : bookFiltered.where((e) => e.totalChecked > 0).toList();
-    final displayEmployees = _selectedUpdater == null
-        ? checkerFiltered
-        : checkerFiltered.where((e) => e.totalUpdated > 0).toList();
 
     final filteredJournalCount = displayEmployees.fold(
       0,

@@ -127,7 +127,8 @@ class AuthRepository {
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_tokenKey, token);
+      // Store access token in secure storage (same place checkSession reads from)
+      await _secureStorage.write(key: _tokenKey, value: token);
       await prefs.setString(_usernameKey, username);
       if (refreshToken != null) {
         // Store refresh_token in secure encrypted storage
