@@ -11,6 +11,10 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+.claude/settings.local.json
+hs_err_pid*.log
+replay_pid*.log
+test/manual/*.dart
 
 # IntelliJ related
 *.iml
@@ -32,6 +36,7 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/android/build/
 
 # Symbolication related
 app.*.symbols
@@ -46,3 +51,4 @@ app.*.map.json
 
 # Firebase config — contains API keys, do NOT commit
 lib/firebase_options.dart
+.firebase/hosting*.cache

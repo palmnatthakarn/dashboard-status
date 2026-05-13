@@ -18,6 +18,7 @@ class KpiJournalFilterSection extends StatefulWidget {
     List<KpiJournalEmployee> selectedEmployees,
     List<String> bookCodes,
   ) onLocalFilterChanged;
+  final Map<String, String>? nameMappings;
 
   const KpiJournalFilterSection({
     super.key,
@@ -26,6 +27,7 @@ class KpiJournalFilterSection extends StatefulWidget {
     required this.onRefresh,
     required this.onSearch,
     required this.onLocalFilterChanged,
+    this.nameMappings,
   });
 
   @override
@@ -172,7 +174,8 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
     return RawAutocomplete<KpiJournalEmployee>(
       textEditingController: _searchController,
       focusNode: _searchFocusNode,
-      displayStringForOption: (e) => e.name,
+      displayStringForOption: (e) =>
+          widget.nameMappings?[e.name] ?? e.name,
       optionsBuilder: (textEditingValue) {
         if (textEditingValue.text.isEmpty) {
           return const Iterable<KpiJournalEmployee>.empty();
@@ -180,7 +183,8 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
         final q = textEditingValue.text.toLowerCase();
         return widget.employees.where((e) {
           if (_selectedEmployees.any((s) => s.name == e.name)) return false;
-          return e.name.toLowerCase().contains(q);
+          final displayName = (widget.nameMappings?[e.name] ?? e.name).toLowerCase();
+          return e.name.toLowerCase().contains(q) || displayName.contains(q);
         });
       },
       onSelected: (KpiJournalEmployee selection) {
@@ -250,6 +254,7 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
                                   style: const TextStyle(fontSize: 14),
                                   onSubmitted: (_) {
                                     _triggerSearch();
+                                    _notifyLocal();
                                     onFieldSubmitted();
                                   },
                                   decoration: InputDecoration(
@@ -321,8 +326,9 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
                         radius: 14,
                         backgroundColor: const Color(0xFFEFF6FF),
                         child: Text(
-                          option.name.isNotEmpty
-                              ? option.name[0].toUpperCase()
+                          (widget.nameMappings?[option.name] ?? option.name).isNotEmpty
+                              ? (widget.nameMappings?[option.name] ?? option.name)[0]
+                                  .toUpperCase()
                               : '?',
                           style: const TextStyle(
                             fontSize: 12,
@@ -332,7 +338,7 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
                         ),
                       ),
                       title: Text(
-                        option.name,
+                        widget.nameMappings?[option.name] ?? option.name,
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
@@ -340,7 +346,9 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
                         ),
                       ),
                       subtitle: Text(
-                        '${option.totalJournals} รายการ',
+                        widget.nameMappings?.containsKey(option.name) == true
+                            ? '(${option.name}) · ${option.totalJournals} รายการ'
+                            : '${option.totalJournals} รายการ',
                         style: TextStyle(fontSize: 11, color: Colors.grey[500]),
                       ),
                       onTap: () => onSelected(option),
@@ -377,7 +385,10 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
             radius: 8,
             backgroundColor: Colors.white,
             child: Text(
-              employee.name.isNotEmpty ? employee.name[0].toUpperCase() : '?',
+              (widget.nameMappings?[employee.name] ?? employee.name).isNotEmpty
+                  ? (widget.nameMappings?[employee.name] ?? employee.name)[0]
+                      .toUpperCase()
+                  : '?',
               style: const TextStyle(
                 fontSize: 8,
                 color: Color(0xFF3B82F6),
@@ -387,7 +398,7 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
           ),
           const SizedBox(width: 4),
           Text(
-            employee.name,
+            widget.nameMappings?[employee.name] ?? employee.name,
             style: const TextStyle(
               fontSize: 12,
               color: Color(0xFF1E293B),
@@ -418,7 +429,7 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
       children: [
         _buildCompactDate('วันเริ่มต้น', _startDate, (d) {
           setState(() => _startDate = d);
-        }),
+        }, lastDate: _endDate),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Icon(
@@ -429,7 +440,7 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
         ),
         _buildCompactDate('วันสิ้นสุด', _endDate, (d) {
           setState(() => _endDate = d);
-        }),
+        }, firstDate: _startDate),
       ],
     );
   }
@@ -437,8 +448,10 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
   Widget _buildCompactDate(
     String label,
     DateTime? date,
-    Function(DateTime) onSelect,
-  ) {
+    Function(DateTime) onSelect, {
+    DateTime? firstDate,
+    DateTime? lastDate,
+  }) {
     final fmt = DateFormat('d MMM yy', 'th');
     final hasDate = date != null;
     return InkWell(
@@ -446,8 +459,8 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
         final picked = await showDatePicker(
           context: context,
           initialDate: date ?? DateTime.now(),
-          firstDate: DateTime(2020),
-          lastDate: DateTime(2030),
+          firstDate: firstDate ?? DateTime(2020),
+          lastDate: lastDate ?? DateTime(2030),
           builder: (context, child) => Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 400, maxHeight: 520),

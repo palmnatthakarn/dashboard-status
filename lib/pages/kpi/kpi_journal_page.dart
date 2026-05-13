@@ -12,6 +12,7 @@ import '../../components/dashboard_loading_widgets.dart';
 import 'kpi_constants.dart';
 import 'kpi_text_styles.dart';
 import 'widgets/kpi_journal_filter_section.dart';
+import '../../services/employee_mapping_service.dart';
 
 class KpiJournalPage extends StatelessWidget {
   const KpiJournalPage({super.key});
@@ -40,9 +41,10 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
   int _rowsPerPage = 10;
   double _fontScale = 1.0;
   final Set<String> _expandedIds = {};
+  Map<String, String> _nameMappings = {};
 
   static final _dateFmt = DateFormat('dd/MM/yy');
-  static final _dtFmt = DateFormat('dd/MM/yy HH:mm ');
+  static final _dtFmt = DateFormat('dd/MM/yy HH:mm');
 
   @override
   Widget build(BuildContext context) {
@@ -82,12 +84,16 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
                               onRefresh: () => ctx
                                   .read<KpiJournalBloc>()
                                   .add(LoadKpiJournalData()),
+                              nameMappings: _nameMappings,
                               onSearch: (shopIds, shopNames, startDate, endDate) {
                                 // 0 or 1 shop → server-side filter; 2+ → fetch all + client-side
                                 final shopId = shopIds.length == 1 ? shopIds.first : null;
                                 final shopName = shopNames.length == 1 ? shopNames.first : null;
-                                setState(() => _filterShopNames =
-                                    shopIds.length > 1 ? shopNames : []);
+                                setState(() {
+                                  _filterShopNames = shopIds.length > 1 ? shopNames : [];
+                                  _expandedIds.clear(); // reset expanded rows on new search
+                                  _currentPage = 1;
+                                });
                                 ctx.read<KpiJournalBloc>().add(
                                   SelectShopAndSearchJournal(
                                     shopId: shopId,
@@ -101,6 +107,8 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
                                 setState(() {
                                   _filterEmployees = employees;
                                   _filterBookCodes = bookCodes;
+                                  _expandedIds.clear(); // reset expanded rows on filter change
+                                  _currentPage = 1;
                                 });
                               },
                             ),
@@ -138,7 +146,7 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
           Icon(Icons.edit_note_rounded, color: Color(0xFF6366F1), size: 22),
           SizedBox(width: 8),
           Text(
-            'KPI Journal — ยอดคีย์พนักงาน',
+            'KPI — บันทึกบัญชีจากรูป',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
           ),
         ],
@@ -154,9 +162,9 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
         Expanded(
           child: _SummaryCard(
             data: _CardData(
-              title: 'Journal ทั้งหมด',
-              value: NumberFormat('#,###').format(state.grandTotalJournals),
-              icon: Icons.description_rounded,
+              title: 'รายการบันทึกบัญชีจากรูปภาพทั้งหมด',
+              value: NumberFormat('#,###').format(state.filteredTotalLinkedJournals),
+              icon: Icons.image_rounded,
               color: const Color(0xFF6366F1),
             ),
           ),
@@ -165,8 +173,19 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
         Expanded(
           child: _SummaryCard(
             data: _CardData(
-              title: 'จำนวนพนักงาน',
-              value: '${state.grandTotalEmployees} คน',
+              title: 'รายการบันทึกบัญชีทั้งหมด',
+              value: NumberFormat('#,###').format(state.filteredTotalJournals),
+              icon: Icons.description_rounded,
+              color: const Color(0xFF10B981),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _SummaryCard(
+            data: _CardData(
+              title: 'จำนวนพนักงานทั้งหมด',
+              value: '${state.filteredTotalEmployees} คน',
               icon: Icons.people_rounded,
               color: const Color(0xFFF59E0B),
             ),
@@ -185,9 +204,26 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
   @override
   void initState() {
     super.initState();
+    _loadMappings();
     _bodyScroll.addListener(() {
       if (_headerScroll.hasClients) _headerScroll.jumpTo(_bodyScroll.offset);
     });
+  }
+
+  @override
+  void dispose() {
+    _headerScroll.dispose();
+    _bodyScroll.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadMappings() async {
+    final mappings = await EmployeeMappingService.getAllMappings();
+    if (mounted) {
+      setState(() {
+        _nameMappings = mappings;
+      });
+    }
   }
 
   /// Creates a new [KpiJournalEmployee] containing only journals whose
@@ -213,6 +249,7 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
     return KpiJournalEmployee(
       name: emp.name,
       totalJournals: filteredStats.fold(0, (s, e) => s + e.count),
+      totalLinkedJournals: allDetails.where((d) => d.taskName != null && d.taskName != '(ไม่ได้บันทึกจากรูป)').length,
       totalDebit: allDetails.fold<double>(0, (s, d) => s + d.debit),
       totalCredit: allDetails.fold<double>(0, (s, d) => s + d.credit),
       byBookCode: mergedByBookCode,
@@ -260,9 +297,13 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
         .toList();
     final totalJournals =
         filteredStats.fold<int>(0, (s, e) => s + e.count);
+    final allDetails = filteredStats.expand((s) => s.details).toList();
+    final totalLinkedJournals =
+        allDetails.where((d) => d.taskName != null && d.taskName != '(ไม่ได้บันทึกจากรูป)').length;
     return KpiJournalEmployee(
       name: emp.name,
       totalJournals: totalJournals,
+      totalLinkedJournals: totalLinkedJournals,
       totalDebit: filteredStats
           .expand((s) => s.details)
           .fold<double>(0, (s, d) => s + d.debit),
@@ -318,10 +359,13 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
         return idx.isEven ? Colors.white : const Color(0xFFF8FAFC);
       }),
       onSelectChanged: (_) => setState(() {
-        if (isExpanded)
+        if (isExpanded) {
           _expandedIds.remove(emp.name);
-        else
+          // Also collapse all child shop rows for this employee
+          _expandedIds.removeWhere((key) => key.startsWith('${emp.name}::'));
+        } else {
           _expandedIds.add(emp.name);
+        }
       }),
       cells: [
         // พนักงาน
@@ -330,7 +374,10 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
             padding: const EdgeInsets.only(left: 16),
             child: Row(
               children: [
-                UserAvatar(name: emp.name, radius: KpiDimensions.avatarRadius),
+                UserAvatar(
+                  name: _nameMappings[emp.name] ?? emp.name,
+                  radius: KpiDimensions.avatarRadius,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(
@@ -338,24 +385,32 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        emp.name,
+                        _nameMappings[emp.name] ?? emp.name,
                         style: KpiTextStyles.employeeName(_fontScale),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      /*if (emp.shopNames.isNotEmpty)
+                      if (_nameMappings.containsKey(emp.name))
                         Text(
-                          emp.shopNames.join(', '),
+                          '(${emp.name})',
                           style: TextStyle(
                             fontSize: 9 * _fontScale,
                             color: const Color(0xFF94A3B8),
                           ),
                           overflow: TextOverflow.ellipsis,
-                        ),*/
+                        ),
                     ],
                   ),
                 ),
               ],
             ),
+          ),
+        ),
+        // ต้องบันทึก
+        DataCell(
+          _numCell(
+            emp.totalDocument,
+            Colors.transparent,
+            const Color(0xFF475569),
           ),
         ),
         // คีย์
@@ -457,6 +512,9 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
               ),
             ],
           ),
+        ),
+        DataCell(
+          _numCell(stat.totalDocument, Colors.transparent, const Color(0xFF475569)),
         ),
         DataCell(
           _numCell(stat.count, Colors.transparent, const Color(0xFF6366F1)),
@@ -589,13 +647,33 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
                       const SizedBox(
                         height: 2,
                       ), // ระยะห่างระหว่างบรรทัด (ปรับได้ตามต้องการ)
-                      // --- บรรทัดที่สอง: dStr ---
-                      Text(
-                        dStr,
-                        style: TextStyle(
-                          fontSize: 10 * _fontScale,
-                          color: const Color(0xFF94A3B8),
-                        ),
+                      // --- บรรทัดที่สอง: dStr และ taskName ---
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            dStr,
+                            style: TextStyle(
+                              fontSize: 10 * _fontScale,
+                              color: const Color(0xFF94A3B8),
+                            ),
+                          ),
+                          if (d.taskName != null) ...[
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                d.taskName!,
+                                style: TextStyle(
+                                  fontSize: 10 * _fontScale,
+                                  color: const Color(0xFF64748B),
+                                  fontStyle: FontStyle.italic,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
@@ -604,6 +682,8 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
             ],
           ),
         ),
+        // ต้องบันทึก (ว่าง)
+        const DataCell(SizedBox()),
         // คีย์
         DataCell(
           d.createdBy == empName
@@ -790,14 +870,14 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
             child: Row(
               children: [
                 const Text(
-                  'ยอดคีย์รายพนักงาน',
+                  'ยอดคีย์จากรูปภาพรายพนักงาน',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(width: 10),
                 _chipBadge(
                   icon: Icons.description_outlined,
                   label:
-                      '${NumberFormat('#,###').format(filteredJournalCount)} รายการ',
+                      '${NumberFormat('#,###').format(filteredJournalCount)} รูปภาพ',
                   bgColor: const Color(0xFFEFF6FF),
                   borderColor: const Color(0xFFBFDBFE),
                   textColor: const Color(0xFF1D4ED8),
@@ -908,6 +988,14 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
                             ),
                             DataColumn2(
                               label: _hCell(
+                                'เอกสารที่\nต้องบันทึก',
+                                Colors.transparent,
+                              ),
+                              size: ColumnSize.S,
+                              numeric: true,
+                            ),
+                            DataColumn2(
+                              label: _hCell(
                                 'คีย์',
                                 KpiColors.section1Background.withValues(
                                   alpha: 0.5,
@@ -982,24 +1070,6 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
     ),
   );
 
-  Widget _groupLabel(String text, Color color) => Container(
-    alignment: Alignment.center,
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.3),
-      border: const Border(
-        left: BorderSide(color: Colors.white),
-        right: BorderSide(color: Colors.white),
-      ),
-    ),
-    child: Text(
-      text,
-      style: TextStyle(
-        fontSize: 11 * _fontScale,
-        fontWeight: FontWeight.bold,
-        color: const Color(0xFF374151),
-      ),
-    ),
-  );
 
   Widget _chipBadge({
     required IconData icon,
@@ -1143,90 +1213,3 @@ class _FontScaleButton extends StatelessWidget {
   }
 }
 
-class _LastActiveWidget extends StatelessWidget {
-  final DateTime? date;
-  final double fontScale;
-
-  const _LastActiveWidget({this.date, required this.fontScale});
-
-  @override
-  Widget build(BuildContext context) {
-    if (date == null) {
-      return Text('—', style: TextStyle(fontSize: 12 * fontScale));
-    }
-    final diff = DateTime.now().difference(date!);
-    String label;
-    if (diff.inMinutes < 60) {
-      label = '${diff.inMinutes} นาทีที่แล้ว';
-    } else if (diff.inHours < 24) {
-      label = '${diff.inHours} ชม. ที่แล้ว';
-    } else {
-      label = DateFormat('dd/MM/yy HH:mm').format(date!);
-    }
-    return Text(
-      label,
-      style: TextStyle(
-        fontSize: 12 * fontScale,
-        color: const Color(0xFF94A3B8),
-      ),
-    );
-  }
-}
-
-class _ColSep extends StatelessWidget {
-  const _ColSep();
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 1,
-    height: 28,
-    margin: const EdgeInsets.symmetric(horizontal: 8),
-    color: const Color(0xFFE2E8F0),
-  );
-}
-
-class _CountBadge extends StatelessWidget {
-  final int count;
-  final Color color;
-  final double fontScale;
-
-  const _CountBadge({
-    required this.count,
-    required this.color,
-    required this.fontScale,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (count == 0) {
-      return Text(
-        '—',
-        textAlign: TextAlign.right,
-        style: TextStyle(
-          fontSize: 12 * fontScale,
-          color: const Color(0xFFCBD5E1),
-        ),
-      );
-    }
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            NumberFormat('#,###').format(count),
-            style: TextStyle(
-              fontSize: 12 * fontScale,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}

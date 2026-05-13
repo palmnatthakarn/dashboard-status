@@ -16,6 +16,7 @@ class KpiEmployeeTable extends StatefulWidget {
   final int rowsPerPage;
   final double fontScale;
   final int totalEmployees;
+  final Map<String, String> nameMappings;
 
   final Function(String) onToggleExpand;
   final Function(int) onPageChanged;
@@ -30,6 +31,7 @@ class KpiEmployeeTable extends StatefulWidget {
     required this.rowsPerPage,
     required this.fontScale,
     required this.totalEmployees,
+    this.nameMappings = const {},
     required this.onToggleExpand,
     required this.onPageChanged,
     required this.onRowsPerPageChanged,
@@ -89,8 +91,6 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
           _buildHeader(),
           const Divider(height: 1, color: Color(0xFFF1F5F9)),
 
-          // Table content
-          // Table content
           _buildTableContent(effectivePage),
 
           // Pagination
@@ -117,26 +117,40 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          const Text(
+          Text(
             'รายชื่อพนักงาน',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              fontSize: 16 * widget.fontScale,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(width: 16),
           // Font size toggle buttons
-          Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                _buildFontScaleButton(Icons.text_decrease_rounded, 1.0),
-                Container(width: 1, height: 20, color: Colors.grey[300]),
-                _buildFontScaleButton(Icons.text_fields_rounded, 1.2),
-                Container(width: 1, height: 20, color: Colors.grey[300]),
-                _buildFontScaleButton(Icons.text_increase_rounded, 1.4),
-              ],
-            ),
+          Row(
+            children: [1.0, 1.2, 1.4].map((scale) {
+              final isSelected = widget.fontScale == scale;
+              return GestureDetector(
+                onTap: () => widget.onFontScaleChanged(scale),
+                child: Container(
+                  margin: const EdgeInsets.only(left: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? const Color(0xFF3B82F6)
+                        : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    scale == 1.0 ? '1x' : '${scale}x',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.white : const Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
           ),
           const Spacer(),
           Container(
@@ -147,9 +161,9 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
             ),
             child: Text(
               'ทั้งหมด ${widget.totalEmployees} คน',
-              style: const TextStyle(
-                color: Color(0xFF3B82F6),
-                fontSize: 12,
+              style: TextStyle(
+                color: const Color(0xFF3B82F6),
+                fontSize: 12 * widget.fontScale,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -408,10 +422,7 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
         size: ColumnSize.S,
         numeric: true,
       ),
-      const DataColumn2(
-        label: Center(child: Text('% สำเร็จ')),
-        size: ColumnSize.S,
-      ),
+
       const DataColumn2(
         label: Center(child: Text('ความล่าช้า')),
         size: ColumnSize.S,
@@ -521,10 +532,13 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
             KpiColors.section3Background.withValues(alpha: 0.6),
           ),
         ),
-        // % สำเร็จ
-        DataCell(Center(child: _buildProgressBar(employee.completionRate))),
+
         // ความล่าช้า
-        const DataCell(Center(child: SizedBox())),
+        DataCell(
+          Center(
+            child: _buildDelayIndicator(employee.delayStep, employee.delayDays),
+          ),
+        ),
         // Expand icon
         DataCell(
           AnimatedRotation(
@@ -611,8 +625,7 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
             KpiColors.section3Background.withValues(alpha: 0.3),
           ),
         ),
-        // % สำเร็จ
-        DataCell(Center(child: _buildProgressBar(detail.progress))),
+
         // ความล่าช้า
         DataCell(
           Center(
@@ -626,12 +639,13 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
   }
 
   Widget _buildEmployeeCell(KpiEmployee employee) {
+    final mappedName = widget.nameMappings[employee.name] ?? employee.name;
     return Padding(
       padding: const EdgeInsets.only(left: 16),
       child: Row(
         children: [
           UserAvatar(
-            name: employee.name,
+            name: mappedName,
             fontScale: widget.fontScale,
             radius: KpiDimensions.avatarRadius,
             colorPalette: KpiColors.avatarColors,
@@ -643,7 +657,7 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  employee.name,
+                  mappedName,
                   style: KpiTextStyles.employeeName(widget.fontScale),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -721,53 +735,19 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
     );
   }
 
-  Widget _buildProgressBar(double percentage) {
-    final clampedPercentage = percentage.clamp(0.0, 100.0);
-    final progressColor = clampedPercentage >= 100
-        ? KpiColors.completed
-        : clampedPercentage >= 50
-        ? KpiColors.waitingVerify
-        : KpiColors.cancelled;
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          '${clampedPercentage.toStringAsFixed(0)}%',
-          style: TextStyle(
-            fontSize: 11 * widget.fontScale,
-            fontWeight: FontWeight.w600,
-            color: progressColor,
-          ),
-        ),
-        const SizedBox(width: 4),
-        SizedBox(
-          width: 40,
-          child: Container(
-            height: 6,
-            decoration: BoxDecoration(
-              color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(3),
-            ),
-            child: FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: clampedPercentage / 100,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: progressColor,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildDelayIndicator(String delayStep, int delayDays) {
     if (delayStep == 'none') {
-      return const SizedBox();
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle_outline_rounded, size: 14, color: Colors.grey[400]),
+          const SizedBox(width: 4),
+          Text(
+            'ปกติ',
+            style: TextStyle(fontSize: 9 * widget.fontScale, color: Colors.grey[400]),
+          ),
+        ],
+      );
     }
 
     Color stepColor;
@@ -827,33 +807,6 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
           ],
         ),
       ],
-    );
-  }
-
-  Widget _buildFontScaleButton(IconData icon, double scale) {
-    final isSelected = widget.fontScale == scale;
-    return InkWell(
-      onTap: () => widget.onFontScaleChanged(scale),
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 4,
-                  ),
-                ]
-              : null,
-        ),
-        child: Icon(
-          icon,
-          size: 16,
-          color: isSelected ? const Color(0xFF3B82F6) : const Color(0xFF64748B),
-        ),
-      ),
     );
   }
 

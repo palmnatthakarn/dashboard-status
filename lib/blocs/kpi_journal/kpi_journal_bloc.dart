@@ -3,8 +3,10 @@ import '../../utils/app_logger.dart';
 import '../../services/auth_repository.dart';
 import '../../services/journal_service.dart';
 import '../../services/multi_shop_service.dart';
+import '../../services/task_service.dart';
 import 'kpi_journal_event.dart';
 import 'kpi_journal_state.dart';
+import '../../services/employee_mapping_service.dart';
 
 class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
   KpiJournalBloc() : super(KpiJournalInitial()) {
@@ -20,17 +22,18 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
   ) async {
     emit(KpiJournalLoading());
     try {
-
       List<KpiJournalShopItem> shops = [];
       if (AuthRepository.isAuthenticated) {
         try {
           final rawShops = await MultiShopService.listShops();
           shops = rawShops.map((s) {
-            final id = s['shopid']?.toString() ??
+            final id =
+                s['shopid']?.toString() ??
                 s['shop_id']?.toString() ??
                 s['id']?.toString() ??
                 '';
-            String name = s['shopname']?.toString() ?? s['shop_name']?.toString() ?? id;
+            String name =
+                s['shopname']?.toString() ?? s['shop_name']?.toString() ?? id;
             if (s['names'] != null && (s['names'] as List).isNotEmpty) {
               name = (s['names'] as List).first['name']?.toString() ?? name;
             }
@@ -48,20 +51,24 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
         endDate: null,
       );
 
-      emit(KpiJournalLoaded(
-        employees: employees.employees,
-        filteredEmployees: employees.employees,
-        shops: shops,
-        selectedShopId: '',
-        selectedShopName: 'ทุกร้าน',
-        startDate: null,
-        endDate: null,
-        grandTotalJournals:
-            employees.employees.fold(0, (s, e) => s + e.totalJournals),
-        grandTotalEmployees: employees.employees.length,
-        allCheckers: employees.allCheckers,
-        allUpdaters: employees.allUpdaters,
-      ));
+      emit(
+        KpiJournalLoaded(
+          employees: employees.employees,
+          filteredEmployees: employees.employees,
+          shops: shops,
+          selectedShopId: '',
+          selectedShopName: 'ทุกร้าน',
+          startDate: null,
+          endDate: null,
+          grandTotalJournals: employees.employees.fold(
+            0,
+            (s, e) => s + e.totalJournals,
+          ),
+          grandTotalEmployees: employees.employees.length,
+          allCheckers: employees.allCheckers,
+          allUpdaters: employees.allUpdaters,
+        ),
+      );
     } catch (e) {
       emit(KpiJournalError('ไม่สามารถโหลดข้อมูลได้: $e'));
     }
@@ -74,11 +81,13 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
     if (state is! KpiJournalLoaded) return;
     final current = state as KpiJournalLoaded;
 
-    emit(current.copyWith(
-      isSearching: true,
-      selectedShopId: event.shopId,
-      selectedShopName: event.shopName,
-    ));
+    emit(
+      current.copyWith(
+        isSearching: true,
+        selectedShopId: event.shopId,
+        selectedShopName: event.shopName,
+      ),
+    );
 
     try {
       final startDate = event.startDate;
@@ -94,21 +103,23 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
       final query = event.query ?? current.searchQuery;
       final filtered = _applySearch(result.employees, query);
 
-      emit(KpiJournalLoaded(
-        employees: result.employees,
-        filteredEmployees: filtered,
-        shops: current.shops,
-        selectedShopId: event.shopId,
-        selectedShopName: event.shopName,
-        startDate: startDate,
-        endDate: endDate,
-        searchQuery: query,
-        isSearching: false,
-        grandTotalJournals: current.grandTotalJournals,
-        grandTotalEmployees: current.grandTotalEmployees,
-        allCheckers: result.allCheckers,
-        allUpdaters: result.allUpdaters,
-      ));
+      emit(
+        KpiJournalLoaded(
+          employees: result.employees,
+          filteredEmployees: filtered,
+          shops: current.shops,
+          selectedShopId: event.shopId,
+          selectedShopName: event.shopName,
+          startDate: startDate,
+          endDate: endDate,
+          searchQuery: query,
+          isSearching: false,
+          grandTotalJournals: current.grandTotalJournals,
+          grandTotalEmployees: current.grandTotalEmployees,
+          allCheckers: result.allCheckers,
+          allUpdaters: result.allUpdaters,
+        ),
+      );
     } catch (e) {
       dLog('❌ Error in SelectShopAndSearchJournal: $e');
       emit((state as KpiJournalLoaded).copyWith(isSearching: false));
@@ -121,13 +132,15 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
   ) async {
     if (state is! KpiJournalLoaded) return;
     final current = state as KpiJournalLoaded;
-    add(SelectShopAndSearchJournal(
-      shopId: current.selectedShopId,
-      shopName: current.selectedShopName,
-      startDate: event.startDate,
-      endDate: event.endDate,
-      query: current.searchQuery,
-    ));
+    add(
+      SelectShopAndSearchJournal(
+        shopId: current.selectedShopId,
+        shopName: current.selectedShopName,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        query: current.searchQuery,
+      ),
+    );
   }
 
   Future<void> _onReset(
@@ -155,17 +168,61 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
         ? '${endDate.year}-${endDate.month.toString().padLeft(2, '0')}-${endDate.day.toString().padLeft(2, '0')}'
         : null;
 
-    final bool isAllShops =
-        shopId == null || shopId.isEmpty || shopId == 'all';
+    final bool isAllShops = shopId == null || shopId.isEmpty || shopId == 'all';
 
     // list of shops to iterate
     final targetShops = isAllShops
         ? shops
         : shops.where((s) => s.shopId == shopId).toList();
 
+    final Map<String, int> taskDocCountMap = {};
+    final Map<String, String> taskNameMap = {};
+    final Map<String, int> shopTotalDocsMap = {};
+
     // fallback: if shop list is empty, try a single call with the current session
     if (targetShops.isEmpty) {
       dLog('⚠️ No shops found, doing single fallback call');
+
+      try {
+        final resp = await TaskService.fetchTasksForShop(
+          shopId: '',
+          limit: 5000,
+          status: [0, 1, 2, 3, 4, 5, 6],
+        );
+        if (resp.success && resp.tasks.isNotEmpty) {
+          int shopPassedDocs = 0;
+          Set<String> processedTasks = {};
+          
+          for (final t in resp.tasks) {
+            int passedDocs = 0;
+            if (t.totalDocumentStatus != null) {
+              for (final s in t.totalDocumentStatus) {
+                if (s.status == 1) passedDocs += s.total;
+              }
+            }
+
+            // Only sum top-level tasks to avoid double counting parent & child
+            // Also, ONLY sum tasks that have main status 3, 4, or 6
+            if (t.parentGuidfixed.isEmpty && (t.status == 3 || t.status == 4 || t.status == 6)) {
+              if (!processedTasks.contains(t.guidfixed)) {
+                processedTasks.add(t.guidfixed);
+                shopPassedDocs += passedDocs;
+              }
+            }
+
+            taskDocCountMap[t.guidfixed] = passedDocs;
+            taskNameMap[t.guidfixed] = t.name;
+            if (t.taskChild != null && t.taskChild!.guidfixed.isNotEmpty) {
+              taskDocCountMap[t.taskChild!.guidfixed] = passedDocs;
+              taskNameMap[t.taskChild!.guidfixed] = t.taskChild!.name;
+            }
+          }
+          shopTotalDocsMap['ไม่ระบุร้าน'] = shopPassedDocs;
+        }
+      } catch (e) {
+        /* ignore */
+      }
+
       await _fetchPagesIntoMap(
         accMap: accMap,
         checkedCount: checkedCount,
@@ -176,9 +233,51 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
         endStr: endStr,
         rangeStart: startDate,
         rangeEnd: endDate,
+        taskDocCountMap: taskDocCountMap,
+        taskNameMap: taskNameMap,
       );
     } else {
       for (final shop in targetShops) {
+        try {
+          final resp = await TaskService.fetchTasksForShop(
+            shopId: shop.shopId,
+            limit: 5000,
+            status: [0, 1, 2, 3, 4, 5, 6],
+          );
+          if (resp.success && resp.tasks.isNotEmpty) {
+            int shopPassedDocs = 0;
+            Set<String> processedTasks = {};
+            
+            for (final t in resp.tasks) {
+              int passedDocs = 0;
+              if (t.totalDocumentStatus != null) {
+                for (final s in t.totalDocumentStatus) {
+                  if (s.status == 1) passedDocs += s.total;
+                }
+              }
+
+              // Only sum top-level tasks to avoid double counting parent & child
+              // Also, ONLY sum tasks that have main status 3, 4, or 6
+              if (t.parentGuidfixed.isEmpty && (t.status == 3 || t.status == 4 || t.status == 6)) {
+                if (!processedTasks.contains(t.guidfixed)) {
+                  processedTasks.add(t.guidfixed);
+                  shopPassedDocs += passedDocs;
+                }
+              }
+
+              taskDocCountMap[t.guidfixed] = passedDocs;
+              taskNameMap[t.guidfixed] = t.name;
+              if (t.taskChild != null && t.taskChild!.guidfixed.isNotEmpty) {
+                taskDocCountMap[t.taskChild!.guidfixed] = passedDocs;
+                taskNameMap[t.taskChild!.guidfixed] = t.taskChild!.name;
+              }
+            }
+            shopTotalDocsMap[shop.shopName] = shopPassedDocs;
+          }
+        } catch (e) {
+          dLog('⚠️ Failed to fetch tasks for shop ${shop.shopName}: $e');
+        }
+
         await _fetchPagesIntoMap(
           accMap: accMap,
           checkedCount: checkedCount,
@@ -189,40 +288,52 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
           endStr: endStr,
           rangeStart: startDate,
           rangeEnd: endDate,
+          taskDocCountMap: taskDocCountMap,
+          taskNameMap: taskNameMap,
         );
       }
     }
 
-    final rawEmployees = accMap.values.map((a) => a.build()).toList();
-    final employees = rawEmployees.map((e) => KpiJournalEmployee(
-      name: e.name,
-      totalJournals: e.totalJournals,
-      totalDebit: e.totalDebit,
-      totalCredit: e.totalCredit,
-      byBookCode: e.byBookCode,
-      lastActive: e.lastActive,
-      details: e.details,
-      shopNames: e.shopNames,
-      shopStats: e.shopStats,
-      totalChecked: checkedCount[e.name] ?? 0,
-      totalUpdated: updatedCount[e.name] ?? 0,
-    )).toList()
-      ..sort((a, b) => b.totalJournals.compareTo(a.totalJournals));
+    final rawEmployees = accMap.values.map((a) => a.build(shopTotalDocsMap)).toList();
+    final employees =
+        rawEmployees
+            .map(
+              (e) => KpiJournalEmployee(
+                name: e.name,
+                totalJournals: e.totalJournals,
+                totalDocument: e.totalDocument,
+                totalDebit: e.totalDebit,
+                totalCredit: e.totalCredit,
+                byBookCode: e.byBookCode,
+                lastActive: e.lastActive,
+                details: e.details,
+                shopNames: e.shopNames,
+                shopStats: e.shopStats,
+                totalChecked: checkedCount[e.name] ?? 0,
+                totalUpdated: updatedCount[e.name] ?? 0,
+              ),
+            )
+            .toList()
+          ..sort((a, b) => b.totalJournals.compareTo(a.totalJournals));
 
     // ── Build reviewMap: reviewer → shop → [details they reviewed but didn't key] ──
     final keyerNames = Set<String>.from(accMap.keys);
-    final Map<String, Map<String, Map<String, KpiJournalDetail>>> reviewMap = {};
+    final Map<String, Map<String, Map<String, KpiJournalDetail>>> reviewMap =
+        {};
     // (reviewer → (shopName → (docNo → detail))) — dedup by docNo per shop
 
     for (final emp in rawEmployees) {
       for (final det in emp.details) {
         final shop = det.shopName ?? 'ไม่ระบุร้าน';
         void collect(String? reviewer) {
-          if (reviewer == null || reviewer == emp.name) return; // skip self-review
+          if (reviewer == null || reviewer.isEmpty || reviewer == emp.name)
+            return; // skip self-review
           reviewMap
-              .putIfAbsent(reviewer, () => {})
-              .putIfAbsent(shop, () => {})[det.docNo] = det;
+                  .putIfAbsent(reviewer, () => {})
+                  .putIfAbsent(shop, () => {})[det.docNo] =
+              det;
         }
+
         collect(det.checkedBy);
         collect(det.updatedBy);
       }
@@ -235,26 +346,26 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
       String shopName,
       List<KpiJournalDetail> reviewDocs,
     ) {
-      final allDetails = [
-        ...?existing?.details,
-        ...reviewDocs,
-      ]..sort((a, b) {
+      final allDetails = [...?existing?.details, ...reviewDocs]
+        ..sort((a, b) {
           if (a.docDate == null) return 1;
           if (b.docDate == null) return -1;
           return b.docDate!.compareTo(a.docDate!);
         });
       int chk = 0, upd = 0;
-      DateTime? la = existing?.lastActive;
+      DateTime? la;
       for (final d in allDetails) {
         if (d.checkedBy == empName) chk++;
         if (d.updatedBy == empName) upd++;
-        if (d.docDate != null && (la == null || d.docDate!.isAfter(la))) la = d.docDate;
+        if (d.docDate != null && (la == null || d.docDate!.isAfter(la)))
+          la = d.docDate;
       }
       return KpiJournalShopStat(
         shopName: shopName,
         count: existing?.count ?? 0,
+        totalDocument: shopTotalDocsMap[shopName] ?? 0,
         byBookCode: existing?.byBookCode ?? const {},
-        lastActive: la,
+        lastActive: la ?? existing?.lastActive,
         details: List.unmodifiable(allDetails),
         totalChecked: chk,
         totalUpdated: upd,
@@ -272,13 +383,25 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
         final shopName = shopEntry.key;
         final reviewDocs = shopEntry.value.values.toList();
         statsMap[shopName] = _mergeShopStat(
-            emp.name, statsMap[shopName], shopName, reviewDocs);
+          emp.name,
+          statsMap[shopName],
+          shopName,
+          reviewDocs,
+        );
       }
       final updatedStats = statsMap.values.toList()
         ..sort((a, b) => b.count.compareTo(a.count));
+        
+      int recalculatedTotalDoc = 0;
+      for (final s in updatedStats) {
+        recalculatedTotalDoc += s.totalDocument;
+      }
+
       return KpiJournalEmployee(
         name: emp.name,
         totalJournals: emp.totalJournals,
+        totalLinkedJournals: emp.totalLinkedJournals,
+        totalDocument: recalculatedTotalDoc,
         totalDebit: emp.totalDebit,
         totalCredit: emp.totalCredit,
         byBookCode: emp.byBookCode,
@@ -292,64 +415,77 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
     }).toList();
 
     // ── 2. Synthetic employees for pure non-keyer reviewers ───────────────
-    final syntheticEmployees = reviewMap.entries
-        .where((e) => !keyerNames.contains(e.key))
-        .map((entry) {
-      final revName = entry.key;
-      final shopStats = entry.value.entries.map((shopEntry) {
-        final details = shopEntry.value.values.toList()
-          ..sort((a, b) {
-            if (a.docDate == null) return 1;
-            if (b.docDate == null) return -1;
-            return b.docDate!.compareTo(a.docDate!);
-          });
-        int chk = 0, upd = 0;
-        DateTime? la;
-        for (final d in details) {
-          if (d.checkedBy == revName) chk++;
-          if (d.updatedBy == revName) upd++;
-          if (d.docDate != null && (la == null || d.docDate!.isAfter(la))) la = d.docDate;
-        }
-        return KpiJournalShopStat(
-          shopName: shopEntry.key,
-          count: 0,
-          byBookCode: const {},
-          lastActive: la,
-          details: List.unmodifiable(details),
-          totalChecked: chk,
-          totalUpdated: upd,
-        );
-      }).toList()
-        ..sort((a, b) =>
-            (b.totalChecked + b.totalUpdated)
-                .compareTo(a.totalChecked + a.totalUpdated));
+    final syntheticEmployees =
+        reviewMap.entries.where((e) => !keyerNames.contains(e.key)).map((
+          entry,
+        ) {
+          final revName = entry.key;
+          final shopStats =
+              entry.value.entries.map((shopEntry) {
+                final details = shopEntry.value.values.toList()
+                  ..sort((a, b) {
+                    if (a.docDate == null) return 1;
+                    if (b.docDate == null) return -1;
+                    return b.docDate!.compareTo(a.docDate!);
+                  });
+                int chk = 0, upd = 0;
+                DateTime? la;
+                for (final d in details) {
+                  if (d.checkedBy == revName) chk++;
+                  if (d.updatedBy == revName) upd++;
+                  if (d.docDate != null &&
+                      (la == null || d.docDate!.isAfter(la)))
+                    la = d.docDate;
+                }
+                return KpiJournalShopStat(
+                  shopName: shopEntry.key,
+                  count: 0,
+                  totalDocument: shopTotalDocsMap[shopEntry.key] ?? 0,
+                  byBookCode: const {},
+                  lastActive: la,
+                  details: List.unmodifiable(details),
+                  totalChecked: chk,
+                  totalUpdated: upd,
+                );
+              }).toList()..sort(
+                (a, b) => (b.totalChecked + b.totalUpdated).compareTo(
+                  a.totalChecked + a.totalUpdated,
+                ),
+              );
 
-      DateTime? lastActive;
-      for (final s in shopStats) {
-        if (s.lastActive != null &&
-            (lastActive == null || s.lastActive!.isAfter(lastActive))) {
-          lastActive = s.lastActive;
-        }
-      }
-      return KpiJournalEmployee(
-        name: revName,
-        totalJournals: 0,
-        totalDebit: 0,
-        totalCredit: 0,
-        byBookCode: const {},
-        lastActive: lastActive,
-        shopNames: shopStats.map((s) => s.shopName).toList(),
-        shopStats: shopStats,
-        totalChecked: checkedCount[revName] ?? 0,
-        totalUpdated: updatedCount[revName] ?? 0,
-      );
-    }).toList()
-      ..sort((a, b) =>
-          (b.totalChecked + b.totalUpdated)
-              .compareTo(a.totalChecked + a.totalUpdated));
+          DateTime? lastActive;
+          for (final s in shopStats) {
+            if (s.lastActive != null &&
+                (lastActive == null || s.lastActive!.isAfter(lastActive))) {
+              lastActive = s.lastActive;
+            }
+          }
+          return KpiJournalEmployee(
+            name: revName,
+            totalJournals: 0,
+            totalLinkedJournals: 0,
+            totalDocument: shopStats.fold(0, (sum, s) => sum + s.totalDocument),
+            totalDebit: 0,
+            totalCredit: 0,
+            byBookCode: const {},
+            lastActive: lastActive,
+            shopNames: shopStats.map((s) => s.shopName).toList(),
+            shopStats: shopStats,
+            totalChecked: checkedCount[revName] ?? 0,
+            totalUpdated: updatedCount[revName] ?? 0,
+          );
+        }).toList()..sort(
+          (a, b) => (b.totalChecked + b.totalUpdated).compareTo(
+            a.totalChecked + a.totalUpdated,
+          ),
+        );
 
     mergedEmployees.addAll(syntheticEmployees);
     // ─────────────────────────────────────────────────────────────────────
+
+    // ✅ บันทึกชื่อพนักงานที่พบในระบบลง Cache เพื่อแนะนำในหน้าตั้งค่า
+    final namesFromApi = mergedEmployees.map((e) => e.name).toList();
+    EmployeeMappingService.saveKnownEmployees(namesFromApi);
 
     final allCheckers = (checkedCount.keys.toList()..sort());
     final allUpdaters = (updatedCount.keys.toList()..sort());
@@ -371,6 +507,8 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
     required String? endStr,
     required DateTime? rangeStart,
     required DateTime? rangeEnd,
+    required Map<String, int> taskDocCountMap,
+    required Map<String, String> taskNameMap,
   }) async {
     // Normalise to date-only boundaries (inclusive) — null means no filter
     final dayStart = rangeStart != null
@@ -382,7 +520,8 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
 
     try {
       await MultiShopService.selectShop(
-          shopId: shopId?.isNotEmpty == true ? shopId : null);
+        shopId: shopId?.isNotEmpty == true ? shopId : null,
+      );
 
       const pageLimit = 500;
       int page = 1;
@@ -407,12 +546,15 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
           final p = resp.pagination;
           if (p != null) {
             // Prefer explicit total_pages; fall back to computing from total/limit
-            totalPages = p.totalPages ??
+            totalPages =
+                p.totalPages ??
                 (p.total != null && p.total! > 0
                     ? ((p.total! + pageLimit - 1) ~/ pageLimit)
                     : 1);
           }
-          dLog('📄 Shop "$shopName" ($shopId): totalPages=$totalPages, total=${resp.pagination?.total}');
+          dLog(
+            '📄 Shop "$shopName" ($shopId): totalPages=$totalPages, total=${resp.pagination?.total}',
+          );
         }
 
         for (final j in journals) {
@@ -423,12 +565,13 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
           if (dayStart != null && dayEnd != null && j.docDatetime != null) {
             try {
               final docDate = DateTime.parse(j.docDatetime!);
-              if (docDate.isBefore(dayStart) || docDate.isAfter(dayEnd)) continue;
+              if (docDate.isBefore(dayStart) || docDate.isAfter(dayEnd))
+                continue;
             } catch (_) {}
           }
 
           accMap.putIfAbsent(creator, () => _Accumulator(creator));
-          accMap[creator]!.add(j, shopName);
+          accMap[creator]!.add(j, shopName, taskDocCountMap, taskNameMap);
 
           // track checkedBy / updatedBy counts
           final checked = (j.checkedBy ?? '').trim();
@@ -469,29 +612,25 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
 class _ShopAccum {
   final String shopName;
   int count = 0;
-  int checkedCount = 0;
-  int updatedCount = 0;
-  DateTime? lastActive;
   final Map<String, int> byBookCode = {};
+  DateTime? lastActive;
   final List<KpiJournalDetail> details = [];
+
+  int totalChecked = 0;
+  int totalUpdated = 0;
 
   _ShopAccum(this.shopName);
 
   KpiJournalShopStat build() {
-    details.sort((a, b) {
-      if (a.docDate == null && b.docDate == null) return 0;
-      if (a.docDate == null) return 1;
-      if (b.docDate == null) return -1;
-      return b.docDate!.compareTo(a.docDate!);
-    });
     return KpiJournalShopStat(
       shopName: shopName,
       count: count,
+      totalDocument: 0, // This is overwritten in Accumulator.build
       byBookCode: Map.unmodifiable(byBookCode),
       lastActive: lastActive,
       details: List.unmodifiable(details),
-      totalChecked: checkedCount,
-      totalUpdated: updatedCount,
+      totalChecked: totalChecked,
+      totalUpdated: totalUpdated,
     );
   }
 }
@@ -499,8 +638,9 @@ class _ShopAccum {
 class _Accumulator {
   final String name;
   int totalJournals = 0;
-  double totalDebit = 0;
-  double totalCredit = 0;
+  int totalLinkedJournals = 0;
+  double totalDebit = 0.0;
+  double totalCredit = 0.0;
   DateTime? lastActive;
   final List<KpiJournalDetail> details = [];
   final Map<String, int> byBookCode = {};
@@ -508,57 +648,85 @@ class _Accumulator {
 
   _Accumulator(this.name);
 
-  void add(dynamic j, String shopName) {
+  void add(
+    dynamic j,
+    String shopName,
+    Map<String, int> taskDocCountMap,
+    Map<String, String> taskNameMap,
+  ) {
+    final String taskId = j.jobGuidfixed?.toString() ?? '';
+    final String docRef = j.documentRef?.toString() ?? '';
+
     totalJournals++;
-    final d = (j.debit ?? 0.0) is double ? (j.debit ?? 0.0) : (j.debit ?? 0.0).toDouble();
-    final c = (j.credit ?? 0.0) is double ? (j.credit ?? 0.0) : (j.credit ?? 0.0).toDouble();
+    final bool isLinkedToTask = taskId.isNotEmpty || docRef.isNotEmpty;
+    if (isLinkedToTask) {
+      totalLinkedJournals++;
+    }
+
+    final d = (j.debit ?? 0.0) is double
+        ? (j.debit ?? 0.0)
+        : (j.debit ?? 0.0).toDouble();
+    final c = (j.credit ?? 0.0) is double
+        ? (j.credit ?? 0.0)
+        : (j.credit ?? 0.0).toDouble();
     totalDebit += d as double;
     totalCredit += c as double;
 
     final bk = (j.bookCode ?? '').toString();
     if (bk.isNotEmpty) byBookCode[bk] = (byBookCode[bk] ?? 0) + 1;
 
-    DateTime? docDate;
+    DateTime? dt;
     try {
-      if (j.docDatetime != null) docDate = DateTime.parse(j.docDatetime!).toLocal();
+      if (j.docDatetime != null) dt = DateTime.parse(j.docDatetime!).toLocal();
     } catch (_) {}
-    DateTime? createdAt;
+    DateTime? creAt;
     try {
-      if (j.createdAt != null) createdAt = DateTime.parse(j.createdAt!).toLocal();
+      if (j.createdAt != null) creAt = DateTime.parse(j.createdAt!).toLocal();
     } catch (_) {}
-    DateTime? updatedAt;
+    DateTime? updAt;
     try {
-      if (j.updatedAt != null) updatedAt = DateTime.parse(j.updatedAt!).toLocal();
+      if (j.updatedAt != null) updAt = DateTime.parse(j.updatedAt!).toLocal();
     } catch (_) {}
-    DateTime? checkedAt;
+    DateTime? chkAt;
     try {
-      if (j.checkedAt != null) checkedAt = DateTime.parse(j.checkedAt!).toLocal();
+      if (j.checkedAt != null) chkAt = DateTime.parse(j.checkedAt!).toLocal();
     } catch (_) {}
-    if (docDate != null &&
-        (lastActive == null || docDate.isAfter(lastActive!))) {
-      lastActive = docDate;
+
+    if (dt != null && (lastActive == null || dt.isAfter(lastActive!))) {
+      lastActive = dt;
     }
 
-    final amount = (j.apiAmount ?? 0.0) is double
+    String? tName;
+    if (taskId.isNotEmpty) {
+      tName = taskNameMap[taskId] ?? 'Task ถูกลบ/ไม่พบ';
+    } else if (j.documentRef?.toString().isNotEmpty == true) {
+      tName = '(Manual)';
+    } else {
+      tName = '(ไม่ได้บันทึกจากรูป)';
+    }
+
+    final amt = (j.apiAmount ?? 0.0) is double
         ? (j.apiAmount ?? 0.0) as double
         : ((j.apiAmount ?? 0.0) as num).toDouble();
 
     final detail = KpiJournalDetail(
-      docNo: (j.docNo ?? '').toString(),
-      docDate: docDate,
+      docNo: j.docNo ?? '',
+      docDate: dt,
       bookCode: bk,
       debit: d,
       credit: c,
-      amount: amount,
+      amount: amt,
       shopName: shopName,
-      accountDescription: j.description?.toString(),
-      checkedBy: (j.checkedBy ?? '').trim().isNotEmpty ? j.checkedBy!.trim() : null,
-      checkedAt: checkedAt,
-      updatedBy: (j.updatedBy ?? '').trim().isNotEmpty ? j.updatedBy!.trim() : null,
-      createdBy: name,
-      createdAt: createdAt,
-      updatedAt: updatedAt,
+      accountDescription: j.description,
+      checkedBy: j.checkedBy?.toString().trim(),
+      checkedAt: chkAt,
+      updatedBy: j.updatedBy?.toString().trim(),
+      createdBy: j.createdBy?.toString().trim(),
+      createdAt: creAt,
+      updatedAt: updAt,
+      taskName: tName,
     );
+
     details.add(detail);
 
     // per-shop tracking
@@ -566,34 +734,54 @@ class _Accumulator {
       _shopAccums.putIfAbsent(shopName, () => _ShopAccum(shopName));
       final sa = _shopAccums[shopName]!;
       sa.count++;
+
       if (bk.isNotEmpty) sa.byBookCode[bk] = (sa.byBookCode[bk] ?? 0) + 1;
-      if (docDate != null &&
-          (sa.lastActive == null || docDate.isAfter(sa.lastActive!))) {
-        sa.lastActive = docDate;
+      if (dt != null && (sa.lastActive == null || dt.isAfter(sa.lastActive!))) {
+        sa.lastActive = dt;
       }
       sa.details.add(detail);
+
       // Only count when THIS employee (the keyer) is also the checker/updater
       final checked = (j.checkedBy ?? '').trim();
-      if (checked == name) sa.checkedCount++;
+      if (checked == name) sa.totalChecked++;
       final updated = (j.updatedBy ?? '').trim();
-      if (updated == name) sa.updatedCount++;
+      if (updated == name) sa.totalUpdated++;
     }
   }
 
-  KpiJournalEmployee build() {
-    final shopStats = _shopAccums.values
-        .map((sa) => sa.build())
-        .toList()
+  KpiJournalEmployee build(Map<String, int> shopTotalDocsMap) {
+    final shopStats = _shopAccums.values.map((sa) {
+      final st = sa.build();
+      return KpiJournalShopStat(
+        shopName: st.shopName,
+        count: st.count,
+        totalDocument: shopTotalDocsMap[st.shopName] ?? 0,
+        byBookCode: st.byBookCode,
+        lastActive: st.lastActive,
+        details: st.details,
+        totalChecked: st.totalChecked,
+        totalUpdated: st.totalUpdated,
+      );
+    }).toList()
       ..sort((a, b) => b.count.compareTo(a.count));
+
     details.sort((a, b) {
       if (a.docDate == null && b.docDate == null) return 0;
       if (a.docDate == null) return 1;
       if (b.docDate == null) return -1;
-      return b.docDate!.compareTo(a.docDate!);
+      return b.docDate!.compareTo(a.docDate!); // จับคู่ใหม่ -> เก่า
     });
+
+    int empTotalDoc = 0;
+    for (final s in shopStats) {
+      empTotalDoc += s.totalDocument;
+    }
+
     return KpiJournalEmployee(
       name: name,
       totalJournals: totalJournals,
+      totalLinkedJournals: totalLinkedJournals,
+      totalDocument: empTotalDoc,
       totalDebit: totalDebit,
       totalCredit: totalCredit,
       byBookCode: Map.unmodifiable(byBookCode),

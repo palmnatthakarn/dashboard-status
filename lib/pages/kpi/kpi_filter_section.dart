@@ -3,86 +3,64 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../blocs/kpi/kpi_state.dart';
+import '../../components/common/searchable_dropdown.dart';
 import '../../models/kpi_employee.dart';
 
 class KpiFilterSection extends StatefulWidget {
   final TextEditingController searchController;
-  final TextEditingController taxIdController;
   final String selectedBranch;
   final DateTime? documentReceiveStartDate;
   final DateTime? documentReceiveEndDate;
-  final DateTimeRange? previousDateRange;
-  final DateTimeRange? statusCheckDateRange;
-  final bool isAdvancedFilterExpanded;
   final List<KpiEmployee> employees;
-  // New shop list from API44
   final List<KpiShopItem> shops;
-  final String? selectedShopId;
-  final String? selectedShopName;
+  final List<String> selectedShopIds;
+  final List<String> selectedShopNames;
   final bool isSearching;
 
-  final VoidCallback onToggleAdvancedFilter;
   final Function(String) onBranchChanged;
-  final Function(String? shopId, String? shopName) onShopSelected;
+  final Function(List<String> shopIds, List<String> shopNames) onShopSelected;
   final Function(DateTime) onStartDateChanged;
   final Function(DateTime) onEndDateChanged;
-  final Function(DateTimeRange?) onPreviousDateRangeChanged;
-  final Function(DateTimeRange?) onStatusCheckDateRangeChanged;
   final VoidCallback onSearch;
   final VoidCallback onClearSearch;
-
   final VoidCallback onRefresh;
 
-  // Multi-select support
   final List<String> selectedEmployeeIds;
   final Function(KpiEmployee) onEmployeeSelected;
   final Function(KpiEmployee) onEmployeeRemoved;
+  final Map<String, String> nameMappings;
 
   const KpiFilterSection({
     super.key,
     required this.searchController,
-    required this.taxIdController,
     required this.selectedBranch,
     required this.documentReceiveStartDate,
     required this.documentReceiveEndDate,
-    required this.previousDateRange,
-    required this.statusCheckDateRange,
-    required this.isAdvancedFilterExpanded,
     required this.employees,
     this.shops = const [],
-    this.selectedShopId,
-    this.selectedShopName,
+    this.selectedShopIds = const [],
+    this.selectedShopNames = const [],
     this.isSearching = false,
-    required this.onToggleAdvancedFilter,
     required this.onBranchChanged,
     required this.onShopSelected,
     required this.onStartDateChanged,
     required this.onEndDateChanged,
-    required this.onPreviousDateRangeChanged,
-    required this.onStatusCheckDateRangeChanged,
     required this.onSearch,
     required this.onClearSearch,
     required this.onRefresh,
     this.selectedEmployeeIds = const [],
     required this.onEmployeeSelected,
     required this.onEmployeeRemoved,
+    this.nameMappings = const {},
   });
 
   @override
   State<KpiFilterSection> createState() => _KpiFilterSectionState();
 }
 
-class _KpiFilterSectionState extends State<KpiFilterSection>
-    with SingleTickerProviderStateMixin {
+class _KpiFilterSectionState extends State<KpiFilterSection> {
   late FocusNode _searchFocusNode;
   Timer? _debounceTimer;
-
-  // Shop search
-  final _shopSearchController = TextEditingController();
-  final _shopSearchFocusNode = FocusNode();
-  bool _isShopDropdownOpen = false;
-  final LayerLink _shopLayerLink = LayerLink();
-  OverlayEntry? _shopOverlay;
 
   @override
   void initState() {
@@ -94,9 +72,6 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
   void dispose() {
     _searchFocusNode.dispose();
     _debounceTimer?.cancel();
-    _shopSearchController.dispose();
-    _shopSearchFocusNode.dispose();
-    _removeShopOverlay();
     super.dispose();
   }
 
@@ -107,68 +82,22 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
     });
   }
 
-  void _removeShopOverlay() {
-    _shopOverlay?.remove();
-    _shopOverlay = null;
-    _isShopDropdownOpen = false;
-  }
+  // ────────────────────── Shop Selector (Multi-select) ──────────────────────
 
-  void _toggleShopDropdown() {
-    if (_isShopDropdownOpen) {
-      _removeShopOverlay();
-    } else {
-      _showShopDropdown();
-    }
-    setState(() {});
-  }
-
-  void _showShopDropdown() {
-    _shopSearchController.clear();
-    _shopOverlay = _buildShopOverlay();
-    Overlay.of(context).insert(_shopOverlay!);
-    _isShopDropdownOpen = true;
-    // Delay to ensure overlay is built before requesting focus
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (_shopSearchFocusNode.canRequestFocus) {
-        _shopSearchFocusNode.requestFocus();
-      }
-    });
-  }
-
-  OverlayEntry _buildShopOverlay() {
-    return OverlayEntry(
-      builder: (context) => GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: () {
-          _removeShopOverlay();
-          setState(() {});
-        },
-        child: Stack(
-          children: [
-            CompositedTransformFollower(
-              link: _shopLayerLink,
-              showWhenUnlinked: false,
-              offset: const Offset(0, 48),
-              child: Material(
-                elevation: 8,
-                shadowColor: Colors.black26,
-                borderRadius: BorderRadius.circular(12),
-                child: _ShopSearchDropdown(
-                  shops: widget.shops,
-                  selectedShopId: widget.selectedShopId,
-                  searchController: _shopSearchController,
-                  focusNode: _shopSearchFocusNode,
-                  onSelect: (shopId, shopName) {
-                    widget.onShopSelected(shopId, shopName);
-                    _removeShopOverlay();
-                    setState(() {});
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+  Widget _buildShopSelector() {
+    final items = widget.shops
+        .map((s) => SearchableDropdownItem(id: s.shopId, label: s.shopName))
+        .toList();
+    return SearchableMultiDropdown(
+      fieldLabel: 'ร้าน',
+      allLabel: 'ทุกร้าน',
+      searchHint: 'ค้นหาร้าน...',
+      icon: Icons.store_rounded,
+      items: items,
+      selectedIds: widget.selectedShopIds,
+      onChanged: (ids, labels) {
+        widget.onShopSelected(ids, labels);
+      },
     );
   }
 
@@ -205,16 +134,6 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
             ),
           ),
 
-          // Advanced Filters (animated expand/collapse)
-          AnimatedCrossFade(
-            firstChild: const SizedBox(width: double.infinity, height: 0),
-            secondChild: _buildAdvancedFilters(),
-            crossFadeState: widget.isAdvancedFilterExpanded
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 300),
-            sizeCurve: Curves.easeInOut,
-          ),
         ],
       ),
     );
@@ -287,7 +206,8 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
         return RawAutocomplete<KpiEmployee>(
           textEditingController: widget.searchController,
           focusNode: _searchFocusNode,
-          displayStringForOption: (KpiEmployee option) => option.name,
+          displayStringForOption: (KpiEmployee option) =>
+              widget.nameMappings[option.name] ?? option.name,
           optionsBuilder: (TextEditingValue textEditingValue) {
             if (textEditingValue.text.isEmpty) {
               return const Iterable<KpiEmployee>.empty();
@@ -295,7 +215,10 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
             final query = textEditingValue.text.toLowerCase();
             return widget.employees.where((KpiEmployee option) {
               if (widget.selectedEmployeeIds.contains(option.id)) return false;
-              return option.name.toLowerCase().contains(query) ||
+              final displayName =
+                  (widget.nameMappings[option.name] ?? option.name).toLowerCase();
+              return displayName.contains(query) ||
+                  option.name.toLowerCase().contains(query) ||
                   option.id.toLowerCase().contains(query);
             });
           },
@@ -433,6 +356,8 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
                           const Divider(height: 1, indent: 16, endIndent: 16),
                       itemBuilder: (BuildContext context, int index) {
                         final option = options.elementAt(index);
+                        final displayName =
+                            widget.nameMappings[option.name] ?? option.name;
                         return ListTile(
                           dense: true,
                           visualDensity: VisualDensity.compact,
@@ -440,7 +365,7 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
                             radius: 14,
                             backgroundColor: const Color(0xFFEFF6FF),
                             child: Text(
-                              option.name.isNotEmpty ? option.name[0] : '?',
+                              displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: Color(0xFF3B82F6),
@@ -449,7 +374,7 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
                             ),
                           ),
                           title: Text(
-                            option.name,
+                            displayName,
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
@@ -457,7 +382,9 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
                             ),
                           ),
                           subtitle: Text(
-                            option.id,
+                            widget.nameMappings.containsKey(option.name)
+                                ? '(${option.name})'
+                                : option.id,
                             style: TextStyle(
                               fontSize: 11,
                               color: Colors.grey[500],
@@ -482,6 +409,7 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
   }
 
   Widget _buildEmployeeChip(KpiEmployee employee) {
+    final displayName = widget.nameMappings[employee.name] ?? employee.name;
     return Container(
       padding: const EdgeInsets.only(left: 8, right: 4, top: 2, bottom: 2),
       decoration: BoxDecoration(
@@ -496,7 +424,7 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
             radius: 8,
             backgroundColor: Colors.white,
             child: Text(
-              employee.name.isNotEmpty ? employee.name[0] : '?',
+              displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
               style: const TextStyle(
                 fontSize: 8,
                 color: Color(0xFF3B82F6),
@@ -506,7 +434,7 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
           ),
           const SizedBox(width: 4),
           Text(
-            employee.name,
+            displayName,
             style: const TextStyle(
               fontSize: 12,
               color: Color(0xFF1E293B),
@@ -531,87 +459,9 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
     );
   }
 
-  // ────────────────────── Shop Selector ──────────────────────
-
-  Widget _buildShopSelector() {
-    final displayName =
-        widget.selectedShopId != null && widget.selectedShopId!.isNotEmpty
-        ? (widget.selectedShopName ?? 'ทุกร้าน')
-        : 'ทุกร้าน';
-
-    return CompositedTransformTarget(
-      link: _shopLayerLink,
-      child: InkWell(
-        onTap: _toggleShopDropdown,
-        borderRadius: BorderRadius.circular(10),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: 200,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: _isShopDropdownOpen
-                ? const Color(0xFFEFF6FF)
-                : const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: _isShopDropdownOpen
-                  ? const Color(0xFF93C5FD)
-                  : const Color(0xFFE2E8F0),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.store_rounded,
-                size: 16,
-                color: _isShopDropdownOpen
-                    ? const Color(0xFF3B82F6)
-                    : const Color(0xFF94A3B8),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'ร้าน',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: _isShopDropdownOpen
-                            ? const Color(0xFF2563EB)
-                            : Colors.grey[500],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Text(
-                      displayName,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF334155),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              AnimatedRotation(
-                turns: _isShopDropdownOpen ? 0.5 : 0,
-                duration: const Duration(milliseconds: 200),
-                child: const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 18,
-                  color: Color(0xFF94A3B8),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   // ────────────────────── Date Range ──────────────────────
+
 
   Widget _buildDateRange() {
     return Row(
@@ -622,6 +472,7 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
           'วันรับเอกสาร',
           widget.documentReceiveStartDate,
           widget.onStartDateChanged,
+          lastDate: widget.documentReceiveEndDate,
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -633,9 +484,10 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
         ),
         _buildCompactDateSelector(
           context,
-          'ตั้งแต่',
+          'ถึง',
           widget.documentReceiveEndDate,
           widget.onEndDateChanged,
+          firstDate: widget.documentReceiveStartDate,
         ),
       ],
     );
@@ -645,8 +497,10 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
     BuildContext context,
     String label,
     DateTime? date,
-    Function(DateTime) onSelect,
-  ) {
+    Function(DateTime) onSelect, {
+    DateTime? firstDate,
+    DateTime? lastDate,
+  }) {
     final fmt = DateFormat('d MMM yy', 'th');
     final hasDate = date != null;
 
@@ -655,8 +509,8 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
         final picked = await showDatePicker(
           context: context,
           initialDate: date ?? DateTime.now(),
-          firstDate: DateTime(2020),
-          lastDate: DateTime(2030),
+          firstDate: firstDate ?? DateTime(2020),
+          lastDate: lastDate ?? DateTime(2030),
           builder: (context, child) {
             return Center(
               child: ConstrainedBox(
@@ -746,16 +600,6 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
           icon: Icons.refresh_rounded,
           tooltip: 'รีเฟรชข้อมูล',
           onTap: widget.onRefresh,
-        ),
-        const SizedBox(width: 4),
-        // Advanced filter toggle
-        _buildToolButton(
-          icon: widget.isAdvancedFilterExpanded
-              ? Icons.tune_rounded
-              : Icons.tune_outlined,
-          tooltip: 'ตัวกรองเพิ่มเติม',
-          isActive: widget.isAdvancedFilterExpanded,
-          onTap: widget.onToggleAdvancedFilter,
         ),
         const SizedBox(width: 8),
         // Search button
@@ -857,387 +701,5 @@ class _KpiFilterSectionState extends State<KpiFilterSection>
     );
   }
 
-  // ────────────────────── Advanced Filters ──────────────────────
-
-  Widget _buildAdvancedFilters() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-      child: Column(
-        children: [
-          const Divider(color: Color(0xFFF1F5F9)),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              // Tax ID
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'เลขผู้เสียภาษี',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 45,
-                      child: TextField(
-                        controller: widget.taxIdController,
-                        textInputAction: TextInputAction.search,
-                        onSubmitted: (_) => widget.onSearch(),
-                        decoration: InputDecoration(
-                          hintText: 'ระบุเลข 13 หลัก',
-                          hintStyle: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 13,
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: Color(0xFF93C5FD),
-                              width: 1.5,
-                            ),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                          ),
-                          prefixIcon: Icon(
-                            Icons.badge_outlined,
-                            size: 18,
-                            color: Colors.grey[400],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              // Previous date range
-              Expanded(
-                child: _buildDateFilterItem(
-                  context,
-                  'วันที่ก่อนหน้า',
-                  widget.previousDateRange,
-                  widget.onPreviousDateRangeChanged,
-                  icon: Icons.history_rounded,
-                ),
-              ),
-              const SizedBox(width: 16),
-              // Status check date range
-              Expanded(
-                child: _buildDateFilterItem(
-                  context,
-                  'วันตรวจสอบสถานะ',
-                  widget.statusCheckDateRange,
-                  widget.onStatusCheckDateRangeChanged,
-                  icon: Icons.fact_check_rounded,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDateFilterItem(
-    BuildContext context,
-    String label,
-    DateTimeRange? range,
-    Function(DateTimeRange?) onSelect, {
-    IconData icon = Icons.calendar_month_rounded,
-    Color color = const Color(0xFF64748B),
-  }) {
-    final dateFormat = DateFormat('d MMM yy', 'th');
-    final hasRange = range != null;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: Colors.grey[600],
-          ),
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: 8),
-        InkWell(
-          onTap: () async {
-            final picked = await showDateRangePicker(
-              context: context,
-              firstDate: DateTime(2020),
-              lastDate: DateTime(2030),
-              builder: (context, child) {
-                return Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      maxWidth: 400.0,
-                      maxHeight: 520.0,
-                    ),
-                    child: Theme(
-                      data: Theme.of(context).copyWith(
-                        colorScheme: const ColorScheme.light(
-                          primary: Color(0xFF3B82F6),
-                          onPrimary: Colors.white,
-                          surface: Colors.white,
-                          onSurface: Color(0xFF1E293B),
-                        ),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: child!,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            );
-            if (picked != null) onSelect(picked);
-          },
-          borderRadius: BorderRadius.circular(10),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            height: 45,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: hasRange
-                  ? const Color(0xFFF0F9FF)
-                  : const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: hasRange
-                    ? const Color(0xFFBAE6FD)
-                    : const Color(0xFFE2E8F0),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  icon,
-                  size: 16,
-                  color: hasRange ? const Color(0xFF0284C7) : color,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    hasRange
-                        ? '${dateFormat.format(range.start)} - ${dateFormat.format(range.end)}'
-                        : '- เลือกช่วงเวลา -',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: hasRange
-                          ? const Color(0xFF334155)
-                          : const Color(0xFF94A3B8),
-                      fontWeight: FontWeight.w500,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (hasRange)
-                  InkWell(
-                    onTap: () => onSelect(null),
-                    borderRadius: BorderRadius.circular(8),
-                    child: const Padding(
-                      padding: EdgeInsets.all(2.0),
-                      child: Icon(
-                        Icons.close_rounded,
-                        color: Color(0xFF94A3B8),
-                        size: 16,
-                      ),
-                    ),
-                  )
-                else
-                  Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: Colors.grey[400],
-                    size: 18,
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 }
 
-// ════════════════════════════════════════════════════════════
-// Searchable Shop Dropdown (Overlay)
-// ════════════════════════════════════════════════════════════
-
-class _ShopSearchDropdown extends StatefulWidget {
-  final List<KpiShopItem> shops;
-  final String? selectedShopId;
-  final TextEditingController searchController;
-  final FocusNode focusNode;
-  final Function(String? shopId, String? shopName) onSelect;
-
-  const _ShopSearchDropdown({
-    required this.shops,
-    required this.selectedShopId,
-    required this.searchController,
-    required this.focusNode,
-    required this.onSelect,
-  });
-
-  @override
-  State<_ShopSearchDropdown> createState() => _ShopSearchDropdownState();
-}
-
-class _ShopSearchDropdownState extends State<_ShopSearchDropdown> {
-  String _query = '';
-
-  @override
-  void initState() {
-    super.initState();
-    widget.searchController.addListener(() {
-      setState(() => _query = widget.searchController.text.toLowerCase());
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final filteredShops = _query.isEmpty
-        ? widget.shops
-        : widget.shops
-              .where(
-                (s) =>
-                    s.shopName.toLowerCase().contains(_query) ||
-                    s.shopId.toLowerCase().contains(_query),
-              )
-              .toList();
-
-    return Container(
-      width: 280,
-      constraints: const BoxConstraints(maxHeight: 320),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Search input
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: TextField(
-              controller: widget.searchController,
-              focusNode: widget.focusNode,
-              style: const TextStyle(fontSize: 13),
-              decoration: InputDecoration(
-                hintText: 'ค้นหาร้าน...',
-                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
-                prefixIcon: const Icon(Icons.search, size: 18),
-                filled: true,
-                fillColor: const Color(0xFFF8FAFC),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-                isDense: true,
-              ),
-            ),
-          ),
-          const Divider(height: 1),
-          // "ทุกร้าน" option
-          _buildShopOption(
-            null,
-            'ทุกร้าน',
-            isSelected:
-                widget.selectedShopId == null || widget.selectedShopId!.isEmpty,
-          ),
-          // Shop list
-          Flexible(
-            child: ListView.builder(
-              padding: EdgeInsets.zero,
-              shrinkWrap: true,
-              itemCount: filteredShops.length,
-              itemBuilder: (context, index) {
-                final shop = filteredShops[index];
-                return _buildShopOption(
-                  shop.shopId,
-                  shop.shopName,
-                  isSelected: shop.shopId == widget.selectedShopId,
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildShopOption(
-    String? shopId,
-    String shopName, {
-    bool isSelected = false,
-  }) {
-    return InkWell(
-      onTap: () {
-        widget.onSelect(shopId ?? '', shopName);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        color: isSelected ? const Color(0xFFEFF6FF) : null,
-        child: Row(
-          children: [
-            Icon(
-              isSelected
-                  ? Icons.radio_button_checked_rounded
-                  : Icons.radio_button_off_rounded,
-              size: 16,
-              color: isSelected
-                  ? const Color(0xFF3B82F6)
-                  : const Color(0xFFCBD5E1),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                shopName,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  color: const Color(0xFF334155),
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (isSelected)
-              const Icon(
-                Icons.check_rounded,
-                size: 16,
-                color: Color(0xFF3B82F6),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}

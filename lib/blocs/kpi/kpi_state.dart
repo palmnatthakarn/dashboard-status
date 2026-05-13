@@ -28,17 +28,13 @@ class KpiLoaded extends KpiState {
   final String? selectedBranch;
   final String? selectedStatus;
   final String searchQuery;
-  // Advanced filters
-  final String? taxId;
-  final DateTime? previousDateStart;
-  final DateTime? previousDateEnd;
-  final DateTime? statusCheckDateStart;
-  final DateTime? statusCheckDateEnd;
   // Shop list from /list-shop API
   final List<KpiShopItem> shops;
-  final String? selectedShopId;
-  final String? selectedShopName;
+  // Multi-select shop support
+  final List<String> selectedShopIds;
+  final List<String> selectedShopNames;
   final bool isSearching;
+  final List<String> selectedEmployeeIds;
 
   const KpiLoaded({
     required this.employees,
@@ -48,19 +44,18 @@ class KpiLoaded extends KpiState {
     this.selectedBranch,
     this.selectedStatus,
     this.searchQuery = '',
-    this.taxId,
-    this.previousDateStart,
-    this.previousDateEnd,
-    this.statusCheckDateStart,
-    this.statusCheckDateEnd,
     this.shops = const [],
-    this.selectedShopId,
-    this.selectedShopName,
+    this.selectedShopIds = const [],
+    this.selectedShopNames = const [],
     this.isSearching = false,
     this.selectedEmployeeIds = const [],
   });
 
-  final List<String> selectedEmployeeIds;
+  /// Backward-compat getters used by existing bloc code
+  String? get selectedShopId =>
+      selectedShopIds.isEmpty ? null : selectedShopIds.first;
+  String? get selectedShopName =>
+      selectedShopNames.isEmpty ? null : selectedShopNames.join(', ');
 
   int get totalDocuments =>
       employees.fold(0, (sum, e) => sum + e.totalDocuments);
@@ -75,25 +70,23 @@ class KpiLoaded extends KpiState {
   int get cancelledDocuments =>
       employees.fold(0, (sum, e) => sum + e.cancelledDocuments);
   int get waitingKey => employees.fold(0, (sum, e) => sum + e.waitingKey);
-  int get waitingVerify => employees.fold(0, (sum, e) => sum + e.waitingVerify);
+  int get waitingVerify =>
+      employees.fold(0, (sum, e) => sum + e.waitingVerify);
   int get waitingFix => employees.fold(0, (sum, e) => sum + e.waitingFix);
+
+  static const _absent = Object();
 
   KpiLoaded copyWith({
     List<KpiEmployee>? employees,
     List<KpiEmployee>? filteredEmployees,
     DateTime? startDate,
     DateTime? endDate,
-    String? selectedBranch,
-    String? selectedStatus,
+    Object? selectedBranch = _absent,
+    Object? selectedStatus = _absent,
     String? searchQuery,
-    String? taxId,
-    DateTime? previousDateStart,
-    DateTime? previousDateEnd,
-    DateTime? statusCheckDateStart,
-    DateTime? statusCheckDateEnd,
     List<KpiShopItem>? shops,
-    String? selectedShopId,
-    String? selectedShopName,
+    List<String>? selectedShopIds,
+    List<String>? selectedShopNames,
     bool? isSearching,
     List<String>? selectedEmployeeIds,
   }) {
@@ -102,17 +95,12 @@ class KpiLoaded extends KpiState {
       filteredEmployees: filteredEmployees ?? this.filteredEmployees,
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
-      selectedBranch: selectedBranch,
-      selectedStatus: selectedStatus ?? this.selectedStatus,
+      selectedBranch: selectedBranch == _absent ? this.selectedBranch : selectedBranch as String?,
+      selectedStatus: selectedStatus == _absent ? this.selectedStatus : selectedStatus as String?,
       searchQuery: searchQuery ?? this.searchQuery,
-      taxId: taxId ?? this.taxId,
-      previousDateStart: previousDateStart ?? this.previousDateStart,
-      previousDateEnd: previousDateEnd ?? this.previousDateEnd,
-      statusCheckDateStart: statusCheckDateStart ?? this.statusCheckDateStart,
-      statusCheckDateEnd: statusCheckDateEnd ?? this.statusCheckDateEnd,
       shops: shops ?? this.shops,
-      selectedShopId: selectedShopId ?? this.selectedShopId,
-      selectedShopName: selectedShopName ?? this.selectedShopName,
+      selectedShopIds: selectedShopIds ?? this.selectedShopIds,
+      selectedShopNames: selectedShopNames ?? this.selectedShopNames,
       isSearching: isSearching ?? this.isSearching,
       selectedEmployeeIds: selectedEmployeeIds ?? this.selectedEmployeeIds,
     );
@@ -127,14 +115,9 @@ class KpiLoaded extends KpiState {
     selectedBranch,
     selectedStatus,
     searchQuery,
-    taxId,
-    previousDateStart,
-    previousDateEnd,
-    statusCheckDateStart,
-    statusCheckDateEnd,
     shops,
-    selectedShopId,
-    selectedShopName,
+    selectedShopIds,
+    selectedShopNames,
     isSearching,
     selectedEmployeeIds,
   ];

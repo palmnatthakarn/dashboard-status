@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 class KpiJournalShopStat {
   final String shopName;
   final int count;
+  final int totalDocument;
   final Map<String, int> byBookCode;
   final DateTime? lastActive;
   final List<KpiJournalDetail> details;
@@ -12,6 +13,7 @@ class KpiJournalShopStat {
   const KpiJournalShopStat({
     required this.shopName,
     required this.count,
+    this.totalDocument = 0,
     required this.byBookCode,
     this.lastActive,
     this.details = const [],
@@ -23,6 +25,8 @@ class KpiJournalShopStat {
 class KpiJournalEmployee {
   final String name; // createdBy email/username
   final int totalJournals;
+  final int totalLinkedJournals;
+  final int totalDocument;
   final double totalDebit;
   final double totalCredit;
   final Map<String, int> byBookCode;
@@ -39,6 +43,8 @@ class KpiJournalEmployee {
   const KpiJournalEmployee({
     required this.name,
     required this.totalJournals,
+    this.totalLinkedJournals = 0,
+    this.totalDocument = 0,
     required this.totalDebit,
     required this.totalCredit,
     required this.byBookCode,
@@ -68,6 +74,7 @@ class KpiJournalDetail {
   final String? createdBy;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final String? taskName;
 
   const KpiJournalDetail({
     required this.docNo,
@@ -84,6 +91,7 @@ class KpiJournalDetail {
     this.createdBy,
     this.createdAt,
     this.updatedAt,
+    this.taskName,
   });
 }
 
@@ -139,6 +147,11 @@ class KpiJournalLoaded extends KpiJournalState {
   });
 
   int get totalJournals => employees.fold(0, (s, e) => s + e.totalJournals);
+  int get totalLinkedJournals => employees.fold(0, (s, e) => s + e.totalLinkedJournals);
+  int get filteredTotalJournals => filteredEmployees.fold(0, (s, e) => s + e.totalJournals);
+  int get filteredTotalLinkedJournals => filteredEmployees.fold(0, (s, e) => s + e.totalLinkedJournals);
+  int get filteredTotalEmployees => filteredEmployees.length;
+
   double get totalDebit => employees.fold(0.0, (s, e) => s + e.totalDebit);
   double get totalCredit => employees.fold(0.0, (s, e) => s + e.totalCredit);
   double get totalNet => totalCredit - totalDebit;

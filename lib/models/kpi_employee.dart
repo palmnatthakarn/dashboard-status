@@ -33,11 +33,7 @@ class KpiEmployee {
 
   final String status; // 'assigned', 'pending', 'completed'
 
-  // New Filter Fields
-  final String? taxId;
-  final DateTime? previousDate;
-  final DateTime? statusCheckDate;
-  final DateTime? lastActive; // Added
+  final DateTime? lastActive;
 
   // Detailed Company Data
   final List<KpiCompanyDetail> companyDetails;
@@ -69,9 +65,6 @@ class KpiEmployee {
     this.incentivePassed = false,
     this.billsNeeded = 0,
     required this.status,
-    this.taxId,
-    this.previousDate,
-    this.statusCheckDate,
     this.lastActive,
     this.companyDetails = const [],
   });

@@ -5,6 +5,7 @@ import '../../blocs/kpi/kpi_bloc.dart';
 import '../../blocs/kpi/kpi_event.dart';
 import '../../blocs/kpi/kpi_state.dart';
 import '../../components/dashboard_loading_widgets.dart';
+import '../../services/employee_mapping_service.dart';
 import 'kpi_bottleneck_section.dart';
 import 'kpi_employee_table.dart';
 import 'kpi_filter_section.dart';
@@ -30,16 +31,13 @@ class KpiPageContent extends StatefulWidget {
 
 class _KpiPageContentState extends State<KpiPageContent> {
   final _searchController = TextEditingController();
-  final _taxIdController = TextEditingController();
   String _selectedBranch = 'ทุกร้าน';
   DateTime? _documentReceiveStartDate;
   DateTime? _documentReceiveEndDate;
-  DateTimeRange? _previousDateRange;
-  DateTimeRange? _statusCheckDateRange;
 
   // Shop selection state
-  String? _selectedShopId;
-  String? _selectedShopName;
+  List<String> _selectedShopIds = [];
+  List<String> _selectedShopNames = [];
 
   // Selected Employee Tags
   final List<String> _selectedEmployeeIds = [];
@@ -54,9 +52,22 @@ class _KpiPageContentState extends State<KpiPageContent> {
   // Font size scale (1.0 = normal, 1.2 = large, 1.4 = extra large)
   double _fontScale = 1.0;
 
-  // Filter section expansion state
-  final bool _isFilterExpanded = true;
-  bool _isAdvancedFilterExpanded = false;
+  Map<String, String> _nameMappings = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMappings();
+  }
+
+  Future<void> _loadMappings() async {
+    final mappings = await EmployeeMappingService.getAllMappings();
+    if (mounted) {
+      setState(() {
+        _nameMappings = mappings;
+      });
+    }
+  }
 
   void _toggleExpansion(String id) {
     setState(() {
@@ -71,7 +82,6 @@ class _KpiPageContentState extends State<KpiPageContent> {
   @override
   void dispose() {
     _searchController.dispose();
-    _taxIdController.dispose();
     super.dispose();
   }
 
@@ -100,6 +110,10 @@ class _KpiPageContentState extends State<KpiPageContent> {
                   if (state is KpiLoaded) {
                     return RefreshIndicator(
                       onRefresh: () async {
+                        setState(() {
+                          _selectedShopIds = [];
+                          _selectedShopNames = [];
+                        });
                         context.read<KpiBloc>().add(LoadKpiData());
                       },
                       child: SingleChildScrollView(
@@ -116,96 +130,80 @@ class _KpiPageContentState extends State<KpiPageContent> {
                               },
                             ),
                             const SizedBox(height: 15),
-                            if (_isFilterExpanded) ...[
-                              KpiFilterSection(
-                                searchController: _searchController,
-                                taxIdController: _taxIdController,
-                                selectedBranch: _selectedBranch,
-                                documentReceiveStartDate:
-                                    _documentReceiveStartDate,
-                                documentReceiveEndDate: _documentReceiveEndDate,
-                                previousDateRange: _previousDateRange,
-                                statusCheckDateRange: _statusCheckDateRange,
-                                isAdvancedFilterExpanded:
-                                    _isAdvancedFilterExpanded,
-                                employees: state.employees,
-                                shops: state.shops,
-                                selectedShopId: state.selectedShopId,
-                                selectedShopName: state.selectedShopName,
-                                isSearching: state.isSearching,
-                                selectedEmployeeIds: _selectedEmployeeIds,
-                                onToggleAdvancedFilter: () {
-                                  setState(() {
-                                    _isAdvancedFilterExpanded =
-                                        !_isAdvancedFilterExpanded;
-                                  });
-                                },
-                                onBranchChanged: (val) {
-                                  setState(() => _selectedBranch = val);
-                                },
-                                onShopSelected: (shopId, shopName) {
-                                  setState(() {
-                                    _selectedShopId = shopId;
-                                    _selectedShopName = shopName;
-                                  });
-                                },
-                                onEmployeeSelected: (employee) {
-                                  setState(() {
-                                    if (!_selectedEmployeeIds.contains(
-                                      employee.id,
-                                    )) {
-                                      _selectedEmployeeIds.add(employee.id);
-                                    }
-                                  });
-                                },
-                                onEmployeeRemoved: (employee) {
-                                  setState(() {
-                                    _selectedEmployeeIds.remove(employee.id);
-                                  });
-                                },
-                                onStartDateChanged: (date) {
-                                  setState(
-                                    () => _documentReceiveStartDate = date,
-                                  );
-                                },
-                                onEndDateChanged: (date) {
-                                  setState(
-                                    () => _documentReceiveEndDate = date,
-                                  );
-                                },
-                                onPreviousDateRangeChanged: (range) {
-                                  setState(() => _previousDateRange = range);
-                                },
-                                onStatusCheckDateRangeChanged: (range) {
-                                  setState(() => _statusCheckDateRange = range);
-                                },
-                                onSearch: () {
-                                  context.read<KpiBloc>().add(
-                                    SelectShopAndSearch(
-                                      shopId: _selectedShopId,
-                                      shopName: _selectedShopName,
-                                      startDate: _documentReceiveStartDate,
-                                      endDate: _documentReceiveEndDate,
-                                      query: _searchController.text,
-                                      selectedEmployeeIds: _selectedEmployeeIds,
-                                    ),
-                                  );
-                                },
-                                onClearSearch: () {
-                                  setState(() {
-                                    _searchController.clear();
-                                    _selectedEmployeeIds.clear();
-                                  });
-                                  // Trigger search to reset results ??
-                                  // Usually clear button just clears inputs. User clicks search to refresh.
-                                  // Or user expects reset? "Search" button is explicit.
-                                },
-                                onRefresh: () {
-                                  context.read<KpiBloc>().add(LoadKpiData());
-                                },
-                              ),
-                              const SizedBox(height: 15),
-                            ],
+                            KpiFilterSection(
+                              searchController: _searchController,
+                              selectedBranch: _selectedBranch,
+                              documentReceiveStartDate: _documentReceiveStartDate,
+                              documentReceiveEndDate: _documentReceiveEndDate,
+                              employees: state.employees,
+                              shops: state.shops,
+                              selectedShopIds: _selectedShopIds,
+                              selectedShopNames: _selectedShopNames,
+                              isSearching: state.isSearching,
+                              selectedEmployeeIds: _selectedEmployeeIds,
+                              nameMappings: _nameMappings,
+                              onBranchChanged: (val) {
+                                setState(() => _selectedBranch = val);
+                              },
+                              onShopSelected: (shopIds, shopNames) {
+                                setState(() {
+                                  _selectedShopIds = shopIds;
+                                  _selectedShopNames = shopNames;
+                                });
+                              },
+                              onEmployeeSelected: (employee) {
+                                setState(() {
+                                  if (!_selectedEmployeeIds.contains(employee.id)) {
+                                    _selectedEmployeeIds.add(employee.id);
+                                  }
+                                });
+                              },
+                              onEmployeeRemoved: (employee) {
+                                setState(() {
+                                  _selectedEmployeeIds.remove(employee.id);
+                                });
+                              },
+                              onStartDateChanged: (date) {
+                                setState(() => _documentReceiveStartDate = date);
+                              },
+                              onEndDateChanged: (date) {
+                                setState(() => _documentReceiveEndDate = date);
+                              },
+                              onSearch: () {
+                                context.read<KpiBloc>().add(
+                                  SelectShopAndSearch(
+                                    shopIds: _selectedShopIds,
+                                    shopNames: _selectedShopNames,
+                                    startDate: _documentReceiveStartDate,
+                                    endDate: _documentReceiveEndDate,
+                                    query: _searchController.text,
+                                    selectedEmployeeIds: _selectedEmployeeIds,
+                                  ),
+                                );
+                              },
+                              onClearSearch: () {
+                                setState(() {
+                                  _searchController.clear();
+                                  _selectedEmployeeIds.clear();
+                                  _documentReceiveStartDate = null;
+                                  _documentReceiveEndDate = null;
+                                });
+                                context.read<KpiBloc>().add(
+                                  SelectShopAndSearch(
+                                    shopIds: _selectedShopIds,
+                                    shopNames: _selectedShopNames,
+                                  ),
+                                );
+                              },
+                              onRefresh: () {
+                                setState(() {
+                                  _selectedShopIds = [];
+                                  _selectedShopNames = [];
+                                });
+                                context.read<KpiBloc>().add(LoadKpiData());
+                              },
+                            ),
+                            const SizedBox(height: 15),
                             KpiEmployeeTable(
                               employees: state.filteredEmployees,
                               expandedEmployeeIds: _expandedEmployeeIds,
@@ -213,6 +211,7 @@ class _KpiPageContentState extends State<KpiPageContent> {
                               rowsPerPage: _rowsPerPage,
                               fontScale: _fontScale,
                               totalEmployees: state.filteredEmployees.length,
+                              nameMappings: _nameMappings,
                               onToggleExpand: _toggleExpansion,
                               onPageChanged: (page) {
                                 setState(() => _currentPage = page);
@@ -255,9 +254,11 @@ class _KpiPageContentState extends State<KpiPageContent> {
       elevation: 0,
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
-      title: Row(
+      title: const Row(
         children: [
-          const Text(
+          Icon(Icons.analytics_rounded, color: Color(0xFF3B82F6), size: 22),
+          SizedBox(width: 8),
+          Text(
             'KPI Dashboard',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
           ),

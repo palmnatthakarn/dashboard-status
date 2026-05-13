@@ -14,27 +14,30 @@ class LoadShops extends KpiEvent {}
 
 /// Select shop and fetch tasks
 class SelectShopAndSearch extends KpiEvent {
-  final String? shopId;
-  final String? shopName;
+  final List<String> shopIds;
+  final List<String> shopNames;
   final DateTime? startDate;
   final DateTime? endDate;
   final String? query;
+  final List<String>? selectedEmployeeIds;
 
   const SelectShopAndSearch({
-    this.shopId,
-    this.shopName,
+    this.shopIds = const [],
+    this.shopNames = const [],
     this.startDate,
     this.endDate,
     this.query,
     this.selectedEmployeeIds,
   });
 
-  final List<String>? selectedEmployeeIds;
+  /// Convenience getter: single shopId for backward compat (first selected, or '')
+  String? get shopId => shopIds.isEmpty ? null : shopIds.first;
+  String? get shopName => shopNames.isEmpty ? null : shopNames.join(', ');
 
   @override
   List<Object?> get props => [
-    shopId,
-    shopName,
+    shopIds,
+    shopNames,
     startDate,
     endDate,
     query,
@@ -83,70 +86,3 @@ class UpdateEmployeeFilter extends KpiEvent {
   List<Object?> get props => [selectedEmployeeIds, query];
 }
 
-class FilterByAdvancedOptions extends KpiEvent {
-  final String? taxId;
-  final DateTime? previousDateStart;
-  final DateTime? previousDateEnd;
-  final DateTime? statusCheckDateStart;
-  final DateTime? statusCheckDateEnd;
-
-  const FilterByAdvancedOptions({
-    this.taxId,
-    this.previousDateStart,
-    this.previousDateEnd,
-    this.statusCheckDateStart,
-    this.statusCheckDateEnd,
-  });
-
-  @override
-  List<Object?> get props => [
-    taxId,
-    previousDateStart,
-    previousDateEnd,
-    statusCheckDateStart,
-    statusCheckDateEnd,
-  ];
-}
-
-class ApplyAllFilters extends KpiEvent {
-  final String query;
-  final String? branch;
-  final DateTime? startDate;
-  final DateTime? endDate;
-  final String? taxId;
-  final DateTime? previousDateStart;
-  final DateTime? previousDateEnd;
-  final DateTime? statusCheckDateStart;
-  final DateTime? statusCheckDateEnd;
-
-  const ApplyAllFilters({
-    this.query = '',
-    this.branch,
-    this.startDate,
-    this.endDate,
-    this.taxId,
-    this.previousDateStart,
-    this.previousDateEnd,
-    this.statusCheckDateStart,
-    this.statusCheckDateEnd,
-    this.selectedEmployeeIds,
-  });
-
-  final List<String>? selectedEmployeeIds;
-
-  @override
-  List<Object?> get props => [
-    query,
-    branch,
-    startDate,
-    endDate,
-    taxId,
-    previousDateStart,
-    previousDateEnd,
-    statusCheckDateStart,
-    statusCheckDateEnd,
-    selectedEmployeeIds,
-  ];
-}
-
-class ResetFilters extends KpiEvent {}

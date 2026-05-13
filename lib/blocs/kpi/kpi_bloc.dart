@@ -37,9 +37,6 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
     on<FilterByBranch>(_onFilterByBranch);
     on<FilterByStatus>(_onFilterByStatus);
     on<UpdateEmployeeFilter>(_onUpdateEmployeeFilter);
-    on<FilterByAdvancedOptions>(_onFilterByAdvancedOptions);
-    on<ApplyAllFilters>(_onApplyAllFilters);
-    on<ResetFilters>(_onResetFilters);
   }
 
   /// Load shop list on initial page load and auto-select first shop
@@ -49,8 +46,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
     try {
       List<KpiShopItem> shops = [];
       List<KpiEmployee> employees = [];
-      String? selectedShopId;
-      String? selectedShopName;
+
 
       // Load shop list from /list-shop API
       if (AuthRepository.isAuthenticated) {
@@ -59,218 +55,29 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
           final shopList = await MultiShopService.listShops();
 
           if (shopList.isNotEmpty) {
-            shops = shopList.map((shop) {
-              final shopId =
-                  shop['shopid']?.toString() ??
-                  shop['shop_id']?.toString() ??
-                  shop['id']?.toString() ??
-                  '';
+            shops = shopList.map(_parseShopItem).toList();
 
-              // Get shop name from names array if available
-              String shopName =
-                  shop['shopname']?.toString() ??
-                  shop['shop_name']?.toString() ??
-                  shopId;
+            dLog('🏪 Loading tasks for all shops (default)...');
+            try {
+              final fetched = await _fetchShopTasksAndJournals(shops);
+              final allTasks = fetched.tasks;
+              final allJournalCountMap = fetched.journalMap;
 
-              if (shop['names'] != null && (shop['names'] as List).isNotEmpty) {
-                final firstName = (shop['names'] as List).first;
-                shopName = firstName['name']?.toString() ?? shopName;
+              dLog('📊 Tasks: ${allTasks.length}, JournalMap keys: ${allJournalCountMap.length}');
+
+              if (allTasks.isNotEmpty) {
+                _applyJournalExtras(allTasks, allJournalCountMap);
+                employees = _groupTasksByOwner(allTasks);
+                dLog('✅ Loaded ${employees.length} employees (grouped) for all shops');
               }
-
-              return KpiShopItem(shopId: shopId, shopName: shopName);
-            }).toList();
-
-            dLog('✅ Loaded ${shops.length} shops');
-
-            // Auto-select "All Shops" by default
-            if (shops.isNotEmpty) {
-              selectedShopId = '';
-              selectedShopName = 'ทุกร้าน';
-
-              dLog('🏪 Auto-selecting All Shops');
-
-              try {
-                final List<TaskWithShop> allTasks = [];
-                // Combined map: taskGuid → { createdBy → keyedCount } across all shops
-                final Map<String, Map<String, int>> allJournalCountMap = {};
-
-                // Fetch tasks AND GL Journals for each shop in the same shop context
-                for (final shop in shops) {
-                  try {
-                    // fetchTasksForShop calls selectShop(shopId) first, then /task
-                    final response = await TaskService.fetchTasksForShop(
-                      shopId: shop.shopId,
-                      limit: 20,
-                      status: [0, 1, 2, 3, 4, 5, 6],
-                    );
-
-                    if (response.success && response.tasks.isNotEmpty) {
-                      allTasks.addAll(
-                        response.tasks.map(
-                          (t) => TaskWithShop(t, shop.shopName),
-                        ),
-                      );
-                    }
-
-                    // Fetch GL Journals for this shop IMMEDIATELY after selectShop
-                    // so the server returns journals in the correct shop context
-                    try {
-                      final glResp = await JournalService.getAllGLJournals(
-                        task: 'GL Journal',
-                      );
-                      print('[KPI-DEBUG] 📋 GL Journals for shop ${shop.shopName}: ${glResp.journals?.length ?? 0}');
-                      if (glResp.success == true && glResp.journals != null) {
-                        // Debug: print first entry jobGuidfixed to confirm the link
-                        if (glResp.journals!.isNotEmpty) {
-                          final first = glResp.journals!.first;
-                          print('[KPI-DEBUG] 🔑 First GL Journal: jobGuidfixed="${first.jobGuidfixed}", createdBy="${first.createdBy}"');
-                        }
-                        // Use jobGuidfixed (links directly to task.guidfixed) for matching
-                        for (final journal in glResp.journals!) {
-                          if (journal.jobGuidfixed != null &&
-                              journal.jobGuidfixed!.isNotEmpty &&
-                              journal.createdBy != null) {
-                            allJournalCountMap
-                                .putIfAbsent(journal.jobGuidfixed!, () => {})
-                                .update(
-                                  journal.createdBy!,
-                                  (c) => c + 1,
-                                  ifAbsent: () => 1,
-                                );
-                          }
-                        }
-                      }
-                    } catch (e) {
-                      dLog('⚠️ Failed to fetch GL Journals for shop ${shop.shopName}: $e');
-                    }
-                  } catch (e) {
-                    dLog(
-                      '⚠️ Failed to load tasks for shop ${shop.shopName}: $e',
-                    );
-                  }
-                } // end for (shop in shops)
-
-                print('[KPI-DEBUG] 📊 Tasks: ${allTasks.length}, JournalMap keys: ${allJournalCountMap.length}');
-                print('[KPI-DEBUG] 🔍 Sample documentRef keys: ${allJournalCountMap.keys.take(5).toList()}');
-                print('[KPI-DEBUG] 🔍 Task guidfixed (first 5): ${allTasks.map((t) => t.task.guidfixed).take(5).toList()}');
-
-                if (allTasks.isNotEmpty) {
-                  // Build maps for child→parent resolution
-                  // GL Journal documentRef = child task guidfixed
-                  // We need to walk up: documentRef → child task → parent task (for KPI row)
-                  final Map<String, TaskWithShop> guidToTask = {};
-                  final Map<String, List<String>> parentToChildren = {};
-
-                  for (final item in allTasks) {
-                    guidToTask[item.task.guidfixed] = item;
-                    if (item.task.parentGuidfixed.isNotEmpty) {
-                      parentToChildren
-                          .putIfAbsent(item.task.parentGuidfixed, () => [])
-                          .add(item.task.guidfixed);
-                    }
-                  }
-
-                  // Debug: check how many documentRefs can be resolved through children
-                  int directMatchCount = 0;
-                  int childMatchCount = 0;
-                  for (final docRef in allJournalCountMap.keys) {
-                    final matchedTask = guidToTask[docRef];
-                    if (matchedTask != null) {
-                      if (matchedTask.task.parentGuidfixed.isEmpty) {
-                        directMatchCount++;
-                      } else {
-                        childMatchCount++;
-                      }
-                    }
-                  }
-                  print('[KPI-DEBUG] 🔗 documentRef matches: direct=$directMatchCount, via-child=$childMatchCount out of ${allJournalCountMap.length}');
-
-                  // Add extra TaskWithShop rows for each GL Journal keyer B:
-                  // For each parent (top-level) task, accumulate keyers from:
-                  //   1. Direct match (documentRef == parent task.guidfixed)
-                  //   2. Child match (documentRef == child.guidfixed, child.parentGuidfixed == parent.guidfixed)
-                  if (allJournalCountMap.isNotEmpty) {
-                    final List<TaskWithShop> extras = [];
-
-                    for (final item in allTasks) {
-                      // Only process top-level tasks (parent tasks) for KPI rows
-                      if (item.task.parentGuidfixed.isNotEmpty) continue;
-
-                      // Collect combined keyer counts for this parent task
-                      final Map<String, int> combinedKeyerMap = {};
-
-                      // 1. Direct match: parent task.guidfixed in GL Journal
-                      final directMatch = allJournalCountMap[item.task.guidfixed];
-                      if (directMatch != null) {
-                        for (final e in directMatch.entries) {
-                          combinedKeyerMap.update(e.key, (c) => c + e.value, ifAbsent: () => e.value);
-                        }
-                      }
-
-                      // 2. Child-task match: each child's guidfixed in GL Journal
-                      final children = parentToChildren[item.task.guidfixed] ?? [];
-                      for (final childGuid in children) {
-                        final childMatch = allJournalCountMap[childGuid];
-                        if (childMatch != null) {
-                          for (final e in childMatch.entries) {
-                            combinedKeyerMap.update(e.key, (c) => c + e.value, ifAbsent: () => e.value);
-                          }
-                        }
-                      }
-
-                      // 3. taskChild.guidfixed match (if API exposes a single child GUID)
-                      if (item.task.taskChild != null && item.task.taskChild!.guidfixed.isNotEmpty) {
-                        final taskChildMatch = allJournalCountMap[item.task.taskChild!.guidfixed];
-                        if (taskChildMatch != null) {
-                          for (final e in taskChildMatch.entries) {
-                            combinedKeyerMap.update(e.key, (c) => c + e.value, ifAbsent: () => e.value);
-                          }
-                        }
-                      }
-
-                      if (combinedKeyerMap.isNotEmpty) {
-                        print('[KPI-DEBUG] ✅ MATCH: task "${item.task.name}" ownerBy="${item.task.ownerBy}" keyers=${combinedKeyerMap.keys.toList()}');
-                        int keyedByOthersSum = 0;
-                        for (final entry in combinedKeyerMap.entries) {
-                          final keyer = entry.key;
-                          final count = entry.value;
-                          if (keyer != item.task.ownerBy) {
-                            keyedByOthersSum += count;
-                            print('[KPI-DEBUG] ➕ Adding B row: keyer=$keyer count=$count');
-                            extras.add(
-                              TaskWithShop(
-                                item.task,
-                                item.shopName,
-                                journalCreatedBy: keyer,
-                                keyedDocumentCount: count,
-                              ),
-                            );
-                          }
-                        }
-                        item.totalKeyedByOthers = keyedByOthersSum;
-                      }
-                    }
-
-                    print('[KPI-DEBUG] 📊 B extras added: ${extras.length}');
-                    allTasks.addAll(extras);
-                  } else {
-                    dLog('⚠️ allJournalCountMap EMPTY — no documentRef/createdBy found');
-                  }
-
-                  employees = _groupTasksByOwner(allTasks);
-                  dLog(
-                    '✅ Loaded ${employees.length} employees (grouped) for all shops',
-                  );
-                }
-              } catch (e) {
-                dLog('⚠️ Failed to load tasks for all shops: $e');
-              }
+            } catch (e) {
+              dLog('⚠️ Failed to load tasks for all shops: $e');
             }
-          }
+          } // end if (shopList.isNotEmpty)
         } catch (e) {
           dLog('⚠️ Failed to load shop list: $e');
         }
-      }
+      } // end if (AuthRepository.isAuthenticated)
 
       final now = DateTime.now();
       final startDate = DateTime(now.year, now.month, 1);
@@ -283,8 +90,8 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
           startDate: startDate,
           endDate: endDate,
           shops: shops,
-          selectedShopId: selectedShopId,
-          selectedShopName: selectedShopName,
+          selectedShopIds: const [],
+          selectedShopNames: const [],
         ),
       );
     } catch (e) {
@@ -301,25 +108,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
       dLog('🏪 Refreshing shop list...');
       final shopList = await MultiShopService.listShops();
 
-      final shops = shopList.map((shop) {
-        final shopId =
-            shop['shopid']?.toString() ??
-            shop['shop_id']?.toString() ??
-            shop['id']?.toString() ??
-            '';
-
-        String shopName =
-            shop['shopname']?.toString() ??
-            shop['shop_name']?.toString() ??
-            shopId;
-
-        if (shop['names'] != null && (shop['names'] as List).isNotEmpty) {
-          final firstName = (shop['names'] as List).first;
-          shopName = firstName['name']?.toString() ?? shopName;
-        }
-
-        return KpiShopItem(shopId: shopId, shopName: shopName);
-      }).toList();
+      final shops = shopList.map(_parseShopItem).toList();
 
       emit(currentState.copyWith(shops: shops));
       dLog('✅ Shop list refreshed: ${shops.length} shops');
@@ -340,169 +129,45 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
     emit(
       currentState.copyWith(
         isSearching: true,
-        selectedShopId: event.shopId,
-        selectedShopName: event.shopName,
+        selectedShopIds: event.shopIds,
+        selectedShopNames: event.shopNames,
       ),
     );
 
     try {
       List<KpiEmployee> employees = [];
-      List<TaskWithShop> allTasks = [];
-      final Map<String, Map<String, int>> allJournalCountMap = {};
 
-      if (event.shopId == null ||
-          event.shopId!.isEmpty ||
-          event.shopId == 'all') {
-        dLog('🏪 Fetching tasks for ALL shops...');
+      dLog('🏪 Fetching tasks for ${event.shopIds.isEmpty ? "ALL" : event.shopIds.length} shops...');
 
-        // Iterate all shops — fetch tasks AND GL Journals per shop context
-        for (final shop in currentState.shops) {
-          try {
-            // fetchTasksForShop calls selectShop(shopId) first, then /task
-            final response = await TaskService.fetchTasksForShop(
-              shopId: shop.shopId,
-              limit: 20,
-              status: [0, 1, 2, 3, 4, 5, 6],
-            );
+      final targetShops = event.shopIds.isEmpty
+          ? currentState.shops
+          : currentState.shops.where((s) => event.shopIds.contains(s.shopId)).toList();
 
-            if (response.success && response.tasks.isNotEmpty) {
-              allTasks.addAll(
-                response.tasks.map((t) => TaskWithShop(t, shop.shopName)),
-              );
-            }
-
-            // Fetch GL Journals immediately after shop is selected
-            try {
-              final glResp = await JournalService.getAllGLJournals(
-                task: 'GL Journal',
-              );
-              if (glResp.success == true && glResp.journals != null) {
-                for (final journal in glResp.journals!) {
-                  if (journal.jobGuidfixed != null &&
-                      journal.jobGuidfixed!.isNotEmpty &&
-                      journal.createdBy != null) {
-                    allJournalCountMap
-                        .putIfAbsent(journal.jobGuidfixed!, () => {})
-                        .update(
-                          journal.createdBy!,
-                          (c) => c + 1,
-                          ifAbsent: () => 1,
-                        );
-                  }
-                }
-              }
-            } catch (e) {
-              dLog('⚠️ Failed to fetch GL Journals for shop ${shop.shopName}: $e');
-            }
-          } catch (e) {
-            dLog('⚠️ Failed to load tasks for shop ${shop.shopName}: $e');
-          }
-        }
-      } else {
-        // Fetch for single shop
-        dLog('🏪 Fetching tasks for shop ${event.shopId}...');
-        final response = await TaskService.fetchTasksForShop(
-          shopId: event.shopId!,
-          limit: 20,
-          status: [0, 1, 2, 3, 4, 5, 6],
-        );
-
-        if (response.success && response.tasks.isNotEmpty) {
-          allTasks.addAll(
-            response.tasks.map((t) => TaskWithShop(t, event.shopName!)),
-          );
-        }
-
-        // Fetch GL Journals for this single shop (already selected above)
-        try {
-          final glResp = await JournalService.getAllGLJournals(
-            task: 'GL Journal',
-          );
-          if (glResp.success == true && glResp.journals != null) {
-            for (final journal in glResp.journals!) {
-              if (journal.jobGuidfixed != null &&
-                  journal.jobGuidfixed!.isNotEmpty &&
-                  journal.createdBy != null) {
-                allJournalCountMap
-                    .putIfAbsent(journal.jobGuidfixed!, () => {})
-                    .update(
-                      journal.createdBy!,
-                      (c) => c + 1,
-                      ifAbsent: () => 1,
-                    );
-              }
-            }
-          }
-        } catch (e) {
-          dLog('⚠️ Failed to fetch GL Journals for shop ${event.shopId}: $e');
-        }
-      }
+      final fetched = await _fetchShopTasksAndJournals(targetShops);
+      final allTasks = fetched.tasks;
+      final allJournalCountMap = fetched.journalMap;
 
       if (allTasks.isNotEmpty) {
-        // Filter tasks by ownerAt date range
         List<TaskWithShop> filteredTasks = allTasks;
 
         if (event.startDate != null && event.endDate != null) {
-          final start = DateTime(
-            event.startDate!.year,
-            event.startDate!.month,
-            event.startDate!.day,
-          );
-          final end = DateTime(
-            event.endDate!.year,
-            event.endDate!.month,
-            event.endDate!.day,
-            23,
-            59,
-            59,
-          );
-
+          final start = DateTime(event.startDate!.year, event.startDate!.month, event.startDate!.day);
+          final end = DateTime(event.endDate!.year, event.endDate!.month, event.endDate!.day, 23, 59, 59);
           filteredTasks = allTasks.where((item) {
-            return item.task.ownerAt.isAfter(
-                  start.subtract(const Duration(seconds: 1)),
-                ) &&
+            return item.task.ownerAt.isAfter(start.subtract(const Duration(seconds: 1))) &&
                 item.task.ownerAt.isBefore(end);
           }).toList();
         }
 
-        // Add extra TaskWithShop rows for GL Journal keyers (B)
-        // while keeping original ownerBy (A) entries
-        if (allJournalCountMap.isNotEmpty) {
-          final List<TaskWithShop> extras = [];
-          for (final item in filteredTasks) {
-            final keyerMap = allJournalCountMap[item.task.guidfixed];
-            if (keyerMap != null) {
-              int keyedByOthersSum = 0;
-              for (final entry in keyerMap.entries) {
-                final keyer = entry.key;
-                final count = entry.value;
-                if (keyer != item.task.ownerBy) {
-                  keyedByOthersSum += count;
-                  extras.add(
-                    TaskWithShop(
-                      item.task,
-                      item.shopName,
-                      journalCreatedBy: keyer,
-                      keyedDocumentCount: count,
-                    ),
-                  );
-                }
-              }
-              item.totalKeyedByOthers = keyedByOthersSum;
-            }
-          }
-          filteredTasks.addAll(extras);
-        }
-
-        // Group tasks by ownerBy (or effectively journalCreatedBy)
+        _applyJournalExtras(filteredTasks, allJournalCountMap);
         employees = _groupTasksByOwner(filteredTasks);
         dLog('✅ Loaded ${employees.length} employees (grouped)');
       } else {
-        dLog('📋 No shop selected, showing empty list');
+        dLog('📋 No tasks found for selected shops');
       }
 
-      // Apply filters (including search query)
       final query = event.query ?? currentState.searchQuery;
+
       final filteredEmployees = _applyFilters(
         employees,
         startDate: event.startDate,
@@ -510,11 +175,6 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         branch: currentState.selectedBranch,
         status: currentState.selectedStatus,
         query: query,
-        taxId: currentState.taxId,
-        previousDateStart: currentState.previousDateStart,
-        previousDateEnd: currentState.previousDateEnd,
-        statusCheckDateStart: currentState.statusCheckDateStart,
-        statusCheckDateEnd: currentState.statusCheckDateEnd,
         selectedEmployeeIds: event.selectedEmployeeIds,
       );
 
@@ -522,8 +182,8 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         currentState.copyWith(
           employees: employees,
           filteredEmployees: filteredEmployees,
-          selectedShopId: event.shopId,
-          selectedShopName: event.shopName,
+          selectedShopIds: event.shopIds,
+          selectedShopNames: event.shopNames,
           startDate: event.startDate,
           endDate: event.endDate,
           searchQuery: query,
@@ -541,6 +201,139 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         ),
       );
     }
+  }
+
+  KpiShopItem _parseShopItem(dynamic shop) {
+    final shopId = shop['shopid']?.toString() ??
+        shop['shop_id']?.toString() ??
+        shop['id']?.toString() ??
+        '';
+    String shopName = shop['shopname']?.toString() ??
+        shop['shop_name']?.toString() ??
+        shopId;
+    if (shop['names'] != null && (shop['names'] as List).isNotEmpty) {
+      shopName = (shop['names'] as List).first['name']?.toString() ?? shopName;
+    }
+    return KpiShopItem(shopId: shopId, shopName: shopName);
+  }
+
+  Future<({List<TaskWithShop> tasks, Map<String, Map<String, int>> journalMap})>
+      _fetchShopTasksAndJournals(List<KpiShopItem> shops) async {
+    final List<TaskWithShop> allTasks = [];
+    final Map<String, Map<String, int>> allJournalCountMap = {};
+
+    for (final shop in shops) {
+      final result = await _fetchOneShop(shop);
+      allTasks.addAll(result.tasks);
+      result.journalMap.forEach((guid, keyers) {
+        keyers.forEach((keyer, count) {
+          allJournalCountMap
+              .putIfAbsent(guid, () => {})
+              .update(keyer, (c) => c + count, ifAbsent: () => count);
+        });
+      });
+    }
+    return (tasks: allTasks, journalMap: allJournalCountMap);
+  }
+
+  Future<({List<TaskWithShop> tasks, Map<String, Map<String, int>> journalMap})>
+      _fetchOneShop(KpiShopItem shop) async {
+    final List<TaskWithShop> tasks = [];
+    final Map<String, Map<String, int>> journalMap = {};
+
+    try {
+      final response = await TaskService.fetchTasksForShop(
+        shopId: shop.shopId,
+        limit: 5000,
+        status: [0, 1, 2, 3, 4, 5, 6],
+      );
+      if (response.success && response.tasks.isNotEmpty) {
+        tasks.addAll(response.tasks.map((t) => TaskWithShop(t, shop.shopName)));
+      }
+    } catch (e) {
+      dLog('⚠️ Failed to load tasks for shop ${shop.shopName}: $e');
+    }
+
+    try {
+      final glResp = await JournalService.getAllGLJournals(
+        task: 'GL Journal',
+        shopId: shop.shopId.isNotEmpty ? shop.shopId : null,
+      );
+      dLog('📋 GL Journals for shop ${shop.shopName}: ${glResp.journals?.length ?? 0}');
+      if (glResp.success == true && glResp.journals != null) {
+        for (final journal in glResp.journals!) {
+          if (journal.jobGuidfixed != null &&
+              journal.jobGuidfixed!.isNotEmpty &&
+              journal.createdBy != null) {
+            journalMap
+                .putIfAbsent(journal.jobGuidfixed!, () => {})
+                .update(journal.createdBy!, (c) => c + 1, ifAbsent: () => 1);
+          }
+        }
+      }
+    } catch (e) {
+      dLog('⚠️ Failed to fetch GL Journals for shop ${shop.shopName}: $e');
+    }
+
+    return (tasks: tasks, journalMap: journalMap);
+  }
+
+  void _applyJournalExtras(
+    List<TaskWithShop> tasks,
+    Map<String, Map<String, int>> journalMap,
+  ) {
+    if (journalMap.isEmpty) {
+      dLog('⚠️ journalMap EMPTY — no documentRef/createdBy found');
+      return;
+    }
+
+    final Map<String, List<String>> parentToChildren = {};
+    for (final item in tasks) {
+      if (item.task.parentGuidfixed.isNotEmpty) {
+        parentToChildren
+            .putIfAbsent(item.task.parentGuidfixed, () => [])
+            .add(item.task.guidfixed);
+      }
+    }
+
+    final List<TaskWithShop> extras = [];
+    for (final item in tasks) {
+      if (item.task.parentGuidfixed.isNotEmpty) continue;
+
+      final Map<String, int> combinedKeyerMap = {};
+
+      void mergeMap(Map<String, int>? source) {
+        source?.forEach((k, v) =>
+            combinedKeyerMap.update(k, (c) => c + v, ifAbsent: () => v));
+      }
+
+      mergeMap(journalMap[item.task.guidfixed]);
+      for (final childGuid in parentToChildren[item.task.guidfixed] ?? []) {
+        mergeMap(journalMap[childGuid]);
+      }
+      if (item.task.taskChild != null && item.task.taskChild!.guidfixed.isNotEmpty) {
+        mergeMap(journalMap[item.task.taskChild!.guidfixed]);
+      }
+
+      if (combinedKeyerMap.isNotEmpty) {
+        int keyedByOthersSum = 0;
+        for (final entry in combinedKeyerMap.entries) {
+          if (entry.key != item.task.ownerBy) {
+            keyedByOthersSum += entry.value;
+            extras.add(TaskWithShop(
+              item.task,
+              item.shopName,
+              journalCreatedBy: entry.key,
+              keyedDocumentCount: entry.value,
+            ));
+          }
+        }
+        item.totalKeyedByOthers = keyedByOthersSum;
+      }
+    }
+
+    dLog('📊 B extras added: ${extras.length}');
+    tasks.addAll(extras);
   }
 
   /// Group tasks by the person who actually keyed the documents (createdBy from GL Journal).
@@ -739,9 +532,6 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         incentivePassed: incentivePassed,
         billsNeeded: billsNeeded > 0 ? billsNeeded : 0,
         status: overallStatus,
-        taxId: ownerBy,
-        previousDate: latestActive,
-        statusCheckDate: latestActive,
         lastActive: latestActive,
         companyDetails: companyDetails,
       );
@@ -758,11 +548,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         branch: currentState.selectedBranch,
         status: currentState.selectedStatus,
         query: currentState.searchQuery,
-        taxId: currentState.taxId,
-        previousDateStart: currentState.previousDateStart,
-        previousDateEnd: currentState.previousDateEnd,
-        statusCheckDateStart: currentState.statusCheckDateStart,
-        statusCheckDateEnd: currentState.statusCheckDateEnd,
+        selectedEmployeeIds: currentState.selectedEmployeeIds,
       );
 
       emit(
@@ -786,11 +572,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         branch: branch,
         status: currentState.selectedStatus,
         query: currentState.searchQuery,
-        taxId: currentState.taxId,
-        previousDateStart: currentState.previousDateStart,
-        previousDateEnd: currentState.previousDateEnd,
-        statusCheckDateStart: currentState.statusCheckDateStart,
-        statusCheckDateEnd: currentState.statusCheckDateEnd,
+        selectedEmployeeIds: currentState.selectedEmployeeIds,
       );
 
       emit(
@@ -813,11 +595,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         branch: currentState.selectedBranch,
         status: status,
         query: currentState.searchQuery,
-        taxId: currentState.taxId,
-        previousDateStart: currentState.previousDateStart,
-        previousDateEnd: currentState.previousDateEnd,
-        statusCheckDateStart: currentState.statusCheckDateStart,
-        statusCheckDateEnd: currentState.statusCheckDateEnd,
+        selectedEmployeeIds: currentState.selectedEmployeeIds,
       );
 
       emit(
@@ -842,11 +620,6 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         branch: currentState.selectedBranch,
         status: currentState.selectedStatus,
         query: event.query,
-        taxId: currentState.taxId,
-        previousDateStart: currentState.previousDateStart,
-        previousDateEnd: currentState.previousDateEnd,
-        statusCheckDateStart: currentState.statusCheckDateStart,
-        statusCheckDateEnd: currentState.statusCheckDateEnd,
         selectedEmployeeIds: event.selectedEmployeeIds,
       );
 
@@ -855,99 +628,6 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
           searchQuery: event.query,
           filteredEmployees: filtered,
           selectedEmployeeIds: event.selectedEmployeeIds,
-        ),
-      );
-    }
-  }
-
-  void _onFilterByAdvancedOptions(
-    FilterByAdvancedOptions event,
-    Emitter<KpiState> emit,
-  ) {
-    if (state is KpiLoaded) {
-      final currentState = state as KpiLoaded;
-      final filtered = _applyFilters(
-        currentState.employees,
-        startDate: currentState.startDate,
-        endDate: currentState.endDate,
-        branch: currentState.selectedBranch,
-        status: currentState.selectedStatus,
-        query: currentState.searchQuery,
-        taxId: event.taxId,
-        previousDateStart: event.previousDateStart,
-        previousDateEnd: event.previousDateEnd,
-        statusCheckDateStart: event.statusCheckDateStart,
-        statusCheckDateEnd: event.statusCheckDateEnd,
-        selectedEmployeeIds: currentState.selectedEmployeeIds,
-      );
-
-      emit(
-        currentState.copyWith(
-          taxId: event.taxId,
-          previousDateStart: event.previousDateStart,
-          previousDateEnd: event.previousDateEnd,
-          statusCheckDateStart: event.statusCheckDateStart,
-          statusCheckDateEnd: event.statusCheckDateEnd,
-          filteredEmployees: filtered,
-        ),
-      );
-    }
-  }
-
-  void _onApplyAllFilters(ApplyAllFilters event, Emitter<KpiState> emit) {
-    if (state is KpiLoaded) {
-      final currentState = state as KpiLoaded;
-
-      String? branch = event.branch;
-      if (branch == 'all' || branch == 'ทุกร้าน') branch = null;
-
-      final filtered = _applyFilters(
-        currentState.employees,
-        startDate: event.startDate,
-        endDate: event.endDate,
-        branch: branch,
-        status: currentState.selectedStatus,
-        query: event.query,
-        taxId: event.taxId,
-        previousDateStart: event.previousDateStart,
-        previousDateEnd: event.previousDateEnd,
-        statusCheckDateStart: event.statusCheckDateStart,
-        statusCheckDateEnd: event.statusCheckDateEnd,
-        selectedEmployeeIds: event.selectedEmployeeIds,
-      );
-
-      emit(
-        currentState.copyWith(
-          searchQuery: event.query,
-          selectedBranch: branch,
-          startDate: event.startDate,
-          endDate: event.endDate,
-          taxId: event.taxId,
-          previousDateStart: event.previousDateStart,
-          previousDateEnd: event.previousDateEnd,
-          statusCheckDateStart: event.statusCheckDateStart,
-          statusCheckDateEnd: event.statusCheckDateEnd,
-          filteredEmployees: filtered,
-          selectedEmployeeIds: event.selectedEmployeeIds,
-        ),
-      );
-    }
-  }
-
-  void _onResetFilters(ResetFilters event, Emitter<KpiState> emit) {
-    if (state is KpiLoaded) {
-      final currentState = state as KpiLoaded;
-      emit(
-        currentState.copyWith(
-          filteredEmployees: currentState.employees,
-          selectedBranch: null,
-          selectedStatus: null,
-          searchQuery: '',
-          taxId: null,
-          previousDateStart: null,
-          previousDateEnd: null,
-          statusCheckDateStart: null,
-          statusCheckDateEnd: null,
         ),
       );
     }
@@ -960,69 +640,32 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
     String? branch,
     String? status,
     String? query,
-    String? taxId,
-    DateTime? previousDateStart,
-    DateTime? previousDateEnd,
-    DateTime? statusCheckDateStart,
-    DateTime? statusCheckDateEnd,
     List<String>? selectedEmployeeIds,
   }) {
     var filtered = employees;
 
-    // 1. Filter by Selected Employees (Tags)
     if (selectedEmployeeIds != null && selectedEmployeeIds.isNotEmpty) {
-      // If tags are selected, SHOW ONLY those employees
-      filtered = filtered
-          .where((e) => selectedEmployeeIds.contains(e.id))
-          .toList();
-    }
-    // 2. OR Filter by Search Query (if provided)
-    // Note: If tags are present, query might be used to filter WITHIN tags or just for autocomplete.
-    // Based on requirement "can still type to search", usually typing filters the list.
-    // If selectedEmployeeIds is NOT empty, we already narrowed down to those.
-    // If we type "Som" while "Emp A" is selected, usually we don't filter Key "Emp A" out unless "Emp A" doesn't match "Som".
-    // But typically in multi-select, the text input is for ADDING new tags, not filtering the RESULT TABLE further (unless it's a separate filter).
-    // However, the prompt says "select multiple... but still can type to search".
-    // This implies the text field acts as a finder.
-    // Let's assume:
-    // - If selectedEmployeeIds is NOT EMPTY: The table shows those IDs.
-    // - If selectedEmployeeIds IS EMPTY: The table shows results matching 'query'.
-    else if (query != null && query.isNotEmpty) {
+      filtered = filtered.where((e) => selectedEmployeeIds.contains(e.id)).toList();
+    } else if (query != null && query.isNotEmpty) {
       final q = query.toLowerCase();
       filtered = filtered
           .where(
             (e) =>
                 e.name.toLowerCase().contains(q) ||
                 e.id.toLowerCase().contains(q) ||
-                (e.taxId != null && e.taxId!.toLowerCase().contains(q)) ||
                 e.branch.toLowerCase().contains(q),
           )
           .toList();
     }
 
     if (startDate != null && endDate != null) {
+      final start = DateTime(startDate.year, startDate.month, startDate.day);
+      final end = DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
       filtered = filtered.where((e) {
-        // Normalize dates to ignore time if needed, or just compare
-        // Assuming checks are inclusive
-        final start = DateTime(startDate.year, startDate.month, startDate.day);
-        final end = DateTime(
-          endDate.year,
-          endDate.month,
-          endDate.day,
-          23,
-          59,
-          59,
-        );
-
-        // Filter based on sub-table company details recording date
         if (e.companyDetails.isEmpty) return false;
-
-        return e.companyDetails.any((detail) {
-          return detail.recordingDate.isAfter(
-                start.subtract(const Duration(seconds: 1)),
-              ) &&
-              detail.recordingDate.isBefore(end);
-        });
+        return e.companyDetails.any((detail) =>
+            detail.recordingDate.isAfter(start.subtract(const Duration(seconds: 1))) &&
+            detail.recordingDate.isBefore(end));
       }).toList();
     }
 
@@ -1049,62 +692,6 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         default:
           filtered = filtered.where((e) => e.status == status).toList();
       }
-    }
-
-    // Query filter moved to top to handle priority with selectedEmployeeIds
-
-    if (taxId != null && taxId.isNotEmpty) {
-      filtered = filtered
-          .where((e) => e.taxId != null && e.taxId!.contains(taxId))
-          .toList();
-    }
-
-    if (previousDateStart != null && previousDateEnd != null) {
-      final start = DateTime(
-        previousDateStart.year,
-        previousDateStart.month,
-        previousDateStart.day,
-      );
-      final end = DateTime(
-        previousDateEnd.year,
-        previousDateEnd.month,
-        previousDateEnd.day,
-        23,
-        59,
-        59,
-      );
-
-      filtered = filtered.where((e) {
-        if (e.previousDate == null) return false;
-        return e.previousDate!.isAfter(
-              start.subtract(const Duration(seconds: 1)),
-            ) &&
-            e.previousDate!.isBefore(end);
-      }).toList();
-    }
-
-    if (statusCheckDateStart != null && statusCheckDateEnd != null) {
-      final start = DateTime(
-        statusCheckDateStart.year,
-        statusCheckDateStart.month,
-        statusCheckDateStart.day,
-      );
-      final end = DateTime(
-        statusCheckDateEnd.year,
-        statusCheckDateEnd.month,
-        statusCheckDateEnd.day,
-        23,
-        59,
-        59,
-      );
-
-      filtered = filtered.where((e) {
-        if (e.statusCheckDate == null) return false;
-        return e.statusCheckDate!.isAfter(
-              start.subtract(const Duration(seconds: 1)),
-            ) &&
-            e.statusCheckDate!.isBefore(end);
-      }).toList();
     }
 
     return filtered;

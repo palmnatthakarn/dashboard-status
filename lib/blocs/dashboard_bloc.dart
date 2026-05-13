@@ -301,6 +301,8 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     DocDetails shop,
     DateTimeRange? selectedDateRange,
   ) {
+    if (shop.yearlyAverage != null) return shop.yearlyAverage!;
+
     // คำนวณยอดรายปีจาก monthly_summary
     if (shop.monthlySummary == null) return 0.0;
 

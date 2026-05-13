@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 
+import '../core/constants/app_constants.dart';
 import 'app_logger.dart';
 
 class DashboardHelper {
@@ -7,6 +8,9 @@ class DashboardHelper {
     dynamic shop,
     DateTimeRange? selectedDateRange,
   ) {
+    final yearlyAverage = _readYearlyAverage(shop);
+    if (yearlyAverage != null) return yearlyAverage;
+
     // คำนวณยอดรายปีจาก monthly_summary
     if (shop.monthlySummary == null) return 0.0;
 
@@ -32,11 +36,12 @@ class DashboardHelper {
           final profitLoss = calculateProfitLoss(shop, selectedDateRange);
           switch (status) {
             case 'safe':
-              return profitLoss < 1000000;
+              return profitLoss < AppConstants.safeIncomeMax;
             case 'warning':
-              return profitLoss >= 1000000 && profitLoss <= 1800000;
+              return profitLoss >= AppConstants.warningIncomeMin &&
+                  profitLoss <= AppConstants.warningIncomeMax;
             case 'exceeded':
-              return profitLoss > 1800000;
+              return profitLoss > AppConstants.exceededIncomeMin;
             case 'all':
               return true;
             default:
@@ -59,6 +64,9 @@ class DashboardHelper {
     DateTimeRange? selectedDateRange,
   ) {
     try {
+      final yearlyAverage = _readYearlyAverage(shop);
+      if (yearlyAverage != null) return yearlyAverage;
+
       if (shop.dailyTransactions == null || shop.dailyTransactions.isEmpty) {
         // ใช้ข้อมูลจาก monthlySummary แทนถ้าไม่มี dailyTransactions
         return getIncomeForPeriod(shop, selectedDateRange);
@@ -157,5 +165,15 @@ class DashboardHelper {
         'rejected': 0,
       };
     }
+  }
+
+  static double? _readYearlyAverage(dynamic shop) {
+    try {
+      final value = shop.yearlyAverage;
+      if (value is num) return value.toDouble();
+    } catch (_) {
+      return null;
+    }
+    return null;
   }
 }
