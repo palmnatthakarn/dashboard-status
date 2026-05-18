@@ -17,10 +17,20 @@ class _EmployeeMappingPageState extends State<EmployeeMappingPage> {
   int _titleTapCount = 0;
   bool _showDebugInfo = false;
 
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+  int _activeTab = 0; // 0=all, 1=configured, 2=unconfigured
+
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -28,8 +38,7 @@ class _EmployeeMappingPageState extends State<EmployeeMappingPage> {
     dLog('🔄 Loading data for mapping page...');
     final mappings = await EmployeeMappingService.getAllMappings();
     final known = await EmployeeMappingService.getKnownEmployees();
-    
-    // Sort known names and filter out those already in mappings
+
     known.sort();
     final filteredKnown = known.where((name) => !mappings.containsKey(name)).toList();
 
@@ -40,6 +49,22 @@ class _EmployeeMappingPageState extends State<EmployeeMappingPage> {
         _isLoading = false;
       });
     }
+  }
+
+  Map<String, String> get _filteredMappings {
+    if (_searchQuery.isEmpty) return _mappings;
+    final q = _searchQuery.toLowerCase();
+    return Map.fromEntries(
+      _mappings.entries.where(
+        (e) => e.key.toLowerCase().contains(q) || e.value.toLowerCase().contains(q),
+      ),
+    );
+  }
+
+  List<String> get _filteredKnownNames {
+    if (_searchQuery.isEmpty) return _knownNames;
+    final q = _searchQuery.toLowerCase();
+    return _knownNames.where((n) => n.toLowerCase().contains(q)).toList();
   }
 
   void _showMappingDialog([String? username, String? displayName]) {
@@ -175,6 +200,15 @@ class _EmployeeMappingPageState extends State<EmployeeMappingPage> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredMappings = _filteredMappings;
+    final filteredKnownNames = _filteredKnownNames;
+    final showConfigured = _activeTab == 0 || _activeTab == 1;
+    final showUnconfigured = _activeTab == 0 || _activeTab == 2;
+
+    final hasResults =
+        (showConfigured && filteredMappings.isNotEmpty) ||
+        (showUnconfigured && filteredKnownNames.isNotEmpty);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -213,84 +247,216 @@ class _EmployeeMappingPageState extends State<EmployeeMappingPage> {
           const SizedBox(width: 8),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)))
-          : CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                if (_showDebugInfo)
-                  SliverToBoxAdapter(child: _buildDebugPanel()),
-                SliverToBoxAdapter(
-                  child: Container(
-                    margin: const EdgeInsets.all(16),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF6366F1), Color(0xFF4F46E5)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.auto_awesome, color: Colors.white, size: 24),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'รายชื่อพนักงานจะขึ้นแสดงเองเมื่อพนักงานทำการบันทึกบัญชี\nเลือกรายชื่อด้านล่างเพื่อแก้ชื่อให้เป็นระเบียบตามต้องการ',
-                            style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w500, height: 1.5),
+      body: Column(
+        children: [
+          _buildSearchAndTabs(),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)))
+                : CustomScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    slivers: [
+                      if (_showDebugInfo)
+                        SliverToBoxAdapter(child: _buildDebugPanel()),
+                      if (_activeTab == 0 && _searchQuery.isEmpty)
+                        SliverToBoxAdapter(child: _buildInfoBanner()),
+                      if (showConfigured && filteredMappings.isNotEmpty) ...[
+                        _buildSectionHeader(
+                          'ตั้งค่าชื่อแล้ว',
+                          filteredMappings.length,
+                          const Color(0xFF10B981),
+                          Icons.check_circle_rounded,
+                        ),
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                final username = filteredMappings.keys.elementAt(index);
+                                final displayName = filteredMappings[username]!;
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _buildMappingCard(username, displayName),
+                                );
+                              },
+                              childCount: filteredMappings.length,
+                            ),
                           ),
                         ),
                       ],
-                    ),
+                      if (showUnconfigured && filteredKnownNames.isNotEmpty) ...[
+                        _buildSectionHeader(
+                          'ยังไม่ได้ตั้งชื่อ',
+                          filteredKnownNames.length,
+                          const Color(0xFFF59E0B),
+                          Icons.pending_rounded,
+                        ),
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                final username = filteredKnownNames[index];
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: _buildApiNameCard(username),
+                                );
+                              },
+                              childCount: filteredKnownNames.length,
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (!hasResults)
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: _searchQuery.isNotEmpty
+                              ? _buildNoSearchResults()
+                              : _buildEmptyState(),
+                        ),
+                      const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                    ],
                   ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchAndTabs() {
+    return Container(
+      color: Colors.white,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (v) => setState(() => _searchQuery = v),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              decoration: InputDecoration(
+                hintText: 'ค้นหาชื่อหรือ ID ระบบ...',
+                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 20),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF94A3B8)),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                 ),
-                if (_mappings.isNotEmpty) ...[
-                  _buildSectionHeader('รายชื่อพนังงานที่ตั้งค่าแล้ว', _mappings.length, const Color(0xFF10B981)),
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final username = _mappings.keys.elementAt(index);
-                          final displayName = _mappings[username]!;
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _buildMappingCard(username, displayName),
-                          );
-                        },
-                        childCount: _mappings.length,
-                      ),
-                    ),
-                  ),
-                ],
-                if (_knownNames.isNotEmpty) ...[
-                  _buildSectionHeader('รายชื่อพนักงาน (ไม่ได้ตั้งค่า)', _knownNames.length, const Color(0xFFF59E0B)),
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final username = _knownNames[index];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: _buildApiNameCard(username),
-                          );
-                        },
-                        childCount: _knownNames.length,
-                      ),
-                    ),
-                  ),
-                ],
-                if (_mappings.isEmpty && _knownNames.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _buildEmptyState(),
-                  ),
-                const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                _buildTab(0, 'ทั้งหมด', _mappings.length + _knownNames.length, const Color(0xFF6366F1)),
+                const SizedBox(width: 8),
+                _buildTab(1, 'ตั้งค่าแล้ว', _mappings.length, const Color(0xFF10B981)),
+                const SizedBox(width: 8),
+                _buildTab(2, 'ยังไม่ตั้งค่า', _knownNames.length, const Color(0xFFF59E0B)),
               ],
             ),
+          ),
+          const SizedBox(height: 1),
+          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTab(int index, String label, int count, Color color) {
+    final isActive = _activeTab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _activeTab = index),
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.only(bottom: 10),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: isActive ? color : Colors.transparent,
+                width: 2.5,
+              ),
+            ),
+          ),
+          child: Column(
+            children: [
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                  color: isActive ? color : const Color(0xFF94A3B8),
+                ),
+                child: Text(label),
+              ),
+              const SizedBox(height: 4),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isActive ? color.withValues(alpha: 0.12) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  count.toString(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: isActive ? color : const Color(0xFFCBD5E1),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoBanner() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF6366F1), Color(0xFF4F46E5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'รายชื่อพนักงานจะขึ้นแสดงเองเมื่อมีการบันทึกบัญชี\nแตะรายชื่อเพื่อตั้งชื่อที่ต้องการแสดงผล',
+              style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w500, height: 1.5),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -301,7 +467,7 @@ class _EmployeeMappingPageState extends State<EmployeeMappingPage> {
         origin = Uri.base.toString();
       } catch (_) {}
     }
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(12),
@@ -332,22 +498,38 @@ class _EmployeeMappingPageState extends State<EmployeeMappingPage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-          Expanded(child: Text(value, textAlign: TextAlign.right, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title, int count, Color accentColor) {
+  Widget _buildSectionHeader(String title, int count, Color accentColor, IconData icon) {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
         child: Row(
           children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 14, color: accentColor),
+            ),
+            const SizedBox(width: 8),
             Text(
               title.toUpperCase(),
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w800,
                 color: Color(0xFF64748B),
                 letterSpacing: 0.8,
@@ -355,7 +537,7 @@ class _EmployeeMappingPageState extends State<EmployeeMappingPage> {
             ),
             const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: accentColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
@@ -364,7 +546,7 @@ class _EmployeeMappingPageState extends State<EmployeeMappingPage> {
               child: Text(
                 '$count คน',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: FontWeight.w800,
                   color: accentColor,
                 ),
@@ -383,10 +565,7 @@ class _EmployeeMappingPageState extends State<EmployeeMappingPage> {
         children: [
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              shape: BoxShape.circle,
-            ),
+            decoration: const BoxDecoration(color: Color(0xFFF1F5F9), shape: BoxShape.circle),
             child: Icon(Icons.badge_outlined, size: 48, color: Colors.grey[400]),
           ),
           const SizedBox(height: 24),
@@ -405,32 +584,58 @@ class _EmployeeMappingPageState extends State<EmployeeMappingPage> {
     );
   }
 
+  Widget _buildNoSearchResults() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(color: Color(0xFFF1F5F9), shape: BoxShape.circle),
+            child: Icon(Icons.search_off_rounded, size: 40, color: Colors.grey[400]),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'ไม่พบผลลัพธ์',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF475569)),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'ไม่พบชื่อหรือ ID ที่ตรงกับ "$_searchQuery"',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMappingCard(String username, String displayName) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: InkWell(
         onTap: () => _showMappingDialog(username, displayName),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
+                width: 42,
+                height: 42,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
                     colors: [Color(0xFF10B981), Color(0xFF059669)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -440,33 +645,37 @@ class _EmployeeMappingPageState extends State<EmployeeMappingPage> {
                 child: Center(
                   child: Text(
                     displayName.isNotEmpty ? displayName[0] : '?',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 17),
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       displayName,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
                     ),
                     const SizedBox(height: 2),
                     Row(
                       children: [
-                        const Icon(Icons.link_rounded, size: 14, color: Color(0xFF94A3B8)),
-                        const SizedBox(width: 4),
-                        Text(
-                          'ID ระบบ: $username',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                        const Icon(Icons.link_rounded, size: 13, color: Color(0xFF94A3B8)),
+                        const SizedBox(width: 3),
+                        Flexible(
+                          child: Text(
+                            username,
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -475,7 +684,7 @@ class _EmployeeMappingPageState extends State<EmployeeMappingPage> {
                     color: const Color(0xFF6366F1),
                     onTap: () => _showMappingDialog(username, displayName),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   _IconButton(
                     icon: Icons.delete_rounded,
                     color: const Color(0xFFEF4444),
@@ -495,43 +704,49 @@ class _EmployeeMappingPageState extends State<EmployeeMappingPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: ListTile(
         onTap: () => _showMappingDialog(username),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         leading: Container(
-          width: 32,
-          height: 32,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(8),
+            color: const Color(0xFFFEF3C7),
+            borderRadius: BorderRadius.circular(10),
           ),
-          child: const Icon(Icons.person_outline_rounded, size: 16, color: Color(0xFF64748B)),
+          child: const Icon(Icons.person_outline_rounded, size: 18, color: Color(0xFFF59E0B)),
         ),
         title: Text(
           username,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+        ),
+        subtitle: const Text(
+          'ยังไม่ได้ตั้งชื่อแสดงผล',
+          style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
         ),
         trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+            color: const Color(0xFF6366F1).withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.2)),
           ),
           child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'ตั้งค่าชื่อ',
+                'ตั้งชื่อ',
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF6366F1)),
               ),
-              SizedBox(width: 4),
-              Icon(Icons.chevron_right_rounded, size: 14, color: Color(0xFF6366F1)),
+              SizedBox(width: 3),
+              Icon(Icons.add_rounded, size: 13, color: Color(0xFF6366F1)),
             ],
           ),
         ),
         dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       ),
     );
   }
@@ -552,12 +767,12 @@ class _IconButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(7),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, size: 18, color: color),
+          child: Icon(icon, size: 16, color: color),
         ),
       ),
     );

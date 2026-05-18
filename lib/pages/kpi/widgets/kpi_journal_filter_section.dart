@@ -7,6 +7,8 @@ import '../../../components/common/searchable_dropdown.dart';
 class KpiJournalFilterSection extends StatefulWidget {
   final List<KpiJournalEmployee> employees;
   final List<KpiJournalShopItem> shops;
+  final DateTime? initialStartDate;
+  final DateTime? initialEndDate;
   final VoidCallback onRefresh;
   final void Function(
     List<String> shopIds,
@@ -24,6 +26,8 @@ class KpiJournalFilterSection extends StatefulWidget {
     super.key,
     required this.employees,
     required this.shops,
+    this.initialStartDate,
+    this.initialEndDate,
     required this.onRefresh,
     required this.onSearch,
     required this.onLocalFilterChanged,
@@ -44,6 +48,34 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
   DateTime? _startDate;
   DateTime? _endDate;
   List<String> _selectedBookCodes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _startDate = widget.initialStartDate;
+    _endDate = widget.initialEndDate;
+  }
+
+  @override
+  void didUpdateWidget(KpiJournalFilterSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // เมื่อข้อมูล employees เปลี่ยน ตรวจสอบว่า selectedBookCodes ยังถูกต้อง
+    if (oldWidget.employees != widget.employees) {
+      final allCodes = <String>{};
+      for (final emp in widget.employees) {
+        allCodes.addAll(emp.byBookCode.keys);
+      }
+      final validCodes = _selectedBookCodes.where(allCodes.contains).toList();
+      if (validCodes.length != _selectedBookCodes.length) {
+        _selectedBookCodes = validCodes;
+      }
+    }
+    if (oldWidget.initialStartDate != widget.initialStartDate ||
+        oldWidget.initialEndDate != widget.initialEndDate) {
+      _startDate = widget.initialStartDate;
+      _endDate = widget.initialEndDate;
+    }
+  }
 
   @override
   void dispose() {
@@ -125,15 +157,8 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
         .map((c) => SearchableDropdownItem(id: c, label: c))
         .toList();
 
-    // ถ้าค่าที่เลือกไว้ไม่อยู่ใน items ใหม่ → ล้างออก
-    final validCodes =
-        _selectedBookCodes.where(codes.contains).toList();
-    if (validCodes.length != _selectedBookCodes.length) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        setState(() => _selectedBookCodes = validCodes);
-      });
-    }
+    // ถ้าค่าที่เลือกไว้ไม่อยู่ใน items ใหม่ → ล้างออก (ไม่ใช้ addPostFrameCallback ระหว่าง build)
+    final validCodes = _selectedBookCodes.where(codes.contains).toList();
 
     return SearchableMultiDropdown(
       fieldLabel: 'สมุดบัญชี',

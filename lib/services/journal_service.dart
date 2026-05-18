@@ -325,23 +325,13 @@ class JournalService {
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
       final response = await http.get(uri, headers: headers);
-      dLog('📡 Response status: ${response.statusCode}');
-      dLog(
-        '📄 Response body preview: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}',
-      );
+      // ignore: avoid_print
+      print('[KPI_DEBUG] 📡 GL Journal status=${response.statusCode} url=$uri');
+      // ignore: avoid_print
+      print('[KPI_DEBUG] 📄 body=${response.body.substring(0, response.body.length > 300 ? 300 : response.body.length)}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
-        dLog('✅ Successfully parsed JSON. Data keys: ${data.keys.toList()}');
-
-        if (data['data'] != null) {
-          final list = data['data'] as List;
-          dLog('📊 Found ${list.length} items in data');
-          if (list.isNotEmpty) {
-            dLog('Example item: ${list.first}');
-          }
-        }
-
         return JournalResponse.fromJson(data);
       } else {
         throw Exception(
@@ -349,7 +339,8 @@ class JournalService {
         );
       }
     } catch (e) {
-      dLog('💥 Error fetching GL journals: $e');
+      // ignore: avoid_print
+      print('[KPI_DEBUG] 💥 GL Journal error: $e');
       rethrow;
     }
   }

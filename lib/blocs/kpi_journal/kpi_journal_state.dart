@@ -147,10 +147,29 @@ class KpiJournalLoaded extends KpiJournalState {
   });
 
   int get totalJournals => employees.fold(0, (s, e) => s + e.totalJournals);
-  int get totalLinkedJournals => employees.fold(0, (s, e) => s + e.totalLinkedJournals);
-  int get filteredTotalJournals => filteredEmployees.fold(0, (s, e) => s + e.totalJournals);
-  int get filteredTotalLinkedJournals => filteredEmployees.fold(0, (s, e) => s + e.totalLinkedJournals);
+  int get totalLinkedJournals =>
+      employees.fold(0, (s, e) => s + e.totalLinkedJournals);
+  int get totalDocuments => _sumUniqueShopDocuments(employees);
+  int get filteredTotalJournals =>
+      filteredEmployees.fold(0, (s, e) => s + e.totalJournals);
+  int get filteredTotalLinkedJournals =>
+      filteredEmployees.fold(0, (s, e) => s + e.totalLinkedJournals);
+  int get filteredTotalDocuments => _sumUniqueShopDocuments(filteredEmployees);
   int get filteredTotalEmployees => filteredEmployees.length;
+
+  static int _sumUniqueShopDocuments(List<KpiJournalEmployee> employees) {
+    final documentsByShop = <String, int>{};
+    for (final employee in employees) {
+      for (final stat in employee.shopStats) {
+        if (stat.shopName.isEmpty || stat.totalDocument <= 0) continue;
+        final current = documentsByShop[stat.shopName] ?? 0;
+        if (stat.totalDocument > current) {
+          documentsByShop[stat.shopName] = stat.totalDocument;
+        }
+      }
+    }
+    return documentsByShop.values.fold(0, (sum, count) => sum + count);
+  }
 
   double get totalDebit => employees.fold(0.0, (s, e) => s + e.totalDebit);
   double get totalCredit => employees.fold(0.0, (s, e) => s + e.totalCredit);

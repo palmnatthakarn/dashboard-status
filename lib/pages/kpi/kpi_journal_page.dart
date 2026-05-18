@@ -81,6 +81,8 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
                             KpiJournalFilterSection(
                               employees: state.employees,
                               shops: state.shops,
+                              initialStartDate: state.startDate,
+                              initialEndDate: state.endDate,
                               onRefresh: () => ctx
                                   .read<KpiJournalBloc>()
                                   .add(LoadKpiJournalData()),
@@ -163,7 +165,7 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
           child: _SummaryCard(
             data: _CardData(
               title: 'รายการบันทึกบัญชีจากรูปภาพทั้งหมด',
-              value: NumberFormat('#,###').format(state.filteredTotalLinkedJournals),
+              value: NumberFormat('#,###').format(state.filteredTotalDocuments),
               icon: Icons.image_rounded,
               color: const Color(0xFF6366F1),
             ),
@@ -249,7 +251,13 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
     return KpiJournalEmployee(
       name: emp.name,
       totalJournals: filteredStats.fold(0, (s, e) => s + e.count),
-      totalLinkedJournals: allDetails.where((d) => d.taskName != null && d.taskName != '(ไม่ได้บันทึกจากรูป)').length,
+      totalLinkedJournals: allDetails
+          .where(
+            (d) =>
+                d.taskName != null && d.taskName != '(ไม่ได้บันทึกจากรูป)',
+          )
+          .length,
+      totalDocument: filteredStats.fold(0, (s, e) => s + e.totalDocument),
       totalDebit: allDetails.fold<double>(0, (s, d) => s + d.debit),
       totalCredit: allDetails.fold<double>(0, (s, d) => s + d.credit),
       byBookCode: mergedByBookCode,
@@ -304,6 +312,7 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
       name: emp.name,
       totalJournals: totalJournals,
       totalLinkedJournals: totalLinkedJournals,
+      totalDocument: filteredStats.fold(0, (s, e) => s + e.totalDocument),
       totalDebit: filteredStats
           .expand((s) => s.details)
           .fold<double>(0, (s, d) => s + d.debit),

@@ -100,7 +100,7 @@ class _SearchableDropdownState extends State<SearchableDropdown> {
   void _toggle() {
     if (_isOpen) {
       _removeOverlay();
-      setState(() {});
+      if (mounted) setState(() {});
     } else {
       _searchController.clear();
       _overlay = _buildOverlay();
@@ -108,7 +108,7 @@ class _SearchableDropdownState extends State<SearchableDropdown> {
       _isOpen = true;
       setState(() {});
       Future.delayed(const Duration(milliseconds: 100), () {
-        if (_searchFocusNode.canRequestFocus) _searchFocusNode.requestFocus();
+        if (mounted && _searchFocusNode.canRequestFocus) _searchFocusNode.requestFocus();
       });
     }
   }
@@ -119,7 +119,7 @@ class _SearchableDropdownState extends State<SearchableDropdown> {
         behavior: HitTestBehavior.translucent,
         onTap: () {
           _removeOverlay();
-          setState(() {});
+          if (mounted) setState(() {});
         },
         child: Stack(
           children: [
@@ -274,15 +274,23 @@ class _SearchableDropdownPanel extends StatefulWidget {
 
 class _SearchableDropdownPanelState extends State<_SearchableDropdownPanel> {
   String _query = '';
+  late VoidCallback _listener;
 
   @override
   void initState() {
     super.initState();
-    widget.searchController.addListener(() {
+    _listener = () {
       if (mounted) {
         setState(() => _query = widget.searchController.text.toLowerCase());
       }
-    });
+    };
+    widget.searchController.addListener(_listener);
+  }
+
+  @override
+  void dispose() {
+    widget.searchController.removeListener(_listener);
+    super.dispose();
   }
 
   @override
@@ -462,7 +470,7 @@ class _SearchableMultiDropdownState extends State<SearchableMultiDropdown> {
   void _toggle() {
     if (_isOpen) {
       _removeOverlay();
-      setState(() {});
+      if (mounted) setState(() {});
     } else {
       _localSelected = List.from(widget.selectedIds);
       _searchController.clear();
@@ -471,7 +479,7 @@ class _SearchableMultiDropdownState extends State<SearchableMultiDropdown> {
       _isOpen = true;
       setState(() {});
       Future.delayed(const Duration(milliseconds: 100), () {
-        if (_searchFocusNode.canRequestFocus) _searchFocusNode.requestFocus();
+        if (mounted && _searchFocusNode.canRequestFocus) _searchFocusNode.requestFocus();
       });
     }
   }
@@ -483,7 +491,7 @@ class _SearchableMultiDropdownState extends State<SearchableMultiDropdown> {
       _localSelected.add(id);
     }
     _overlay?.markNeedsBuild();
-    setState(() {});
+    if (mounted) setState(() {});
     final labels = _localSelected
         .map((i) => widget.items.firstWhere((x) => x.id == i).label)
         .toList();
@@ -493,7 +501,7 @@ class _SearchableMultiDropdownState extends State<SearchableMultiDropdown> {
   void _clearAll() {
     _localSelected.clear();
     _overlay?.markNeedsBuild();
-    setState(() {});
+    if (mounted) setState(() {});
     widget.onChanged([], []);
   }
 
@@ -503,7 +511,7 @@ class _SearchableMultiDropdownState extends State<SearchableMultiDropdown> {
         behavior: HitTestBehavior.translucent,
         onTap: () {
           _removeOverlay();
-          setState(() {});
+          if (mounted) setState(() {});
         },
         child: Stack(
           children: [
@@ -671,15 +679,23 @@ class _MultiSelectPanel extends StatefulWidget {
 
 class _MultiSelectPanelState extends State<_MultiSelectPanel> {
   String _query = '';
+  late VoidCallback _listener;
 
   @override
   void initState() {
     super.initState();
-    widget.searchController.addListener(() {
+    _listener = () {
       if (mounted) {
         setState(() => _query = widget.searchController.text.toLowerCase());
       }
-    });
+    };
+    widget.searchController.addListener(_listener);
+  }
+
+  @override
+  void dispose() {
+    widget.searchController.removeListener(_listener);
+    super.dispose();
   }
 
   @override

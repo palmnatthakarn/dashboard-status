@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../utils/app_logger.dart';
 import '../../services/auth_repository.dart';
+import '../../services/document_image_service.dart';
 import '../../services/journal_service.dart';
 import '../../services/multi_shop_service.dart';
 import '../../services/task_service.dart';
@@ -22,6 +23,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
   ) async {
     emit(KpiJournalLoading());
     try {
+      final defaultRange = _currentMonthRange();
       List<KpiJournalShopItem> shops = [];
       if (AuthRepository.isAuthenticated) {
         try {
@@ -47,8 +49,8 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
       final employees = await _fetchAndGroup(
         shops: shops,
         shopId: null,
-        startDate: null,
-        endDate: null,
+        startDate: defaultRange.start,
+        endDate: defaultRange.end,
       );
 
       emit(
@@ -58,8 +60,8 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
           shops: shops,
           selectedShopId: '',
           selectedShopName: 'ทุกร้าน',
-          startDate: null,
-          endDate: null,
+          startDate: defaultRange.start,
+          endDate: defaultRange.end,
           grandTotalJournals: employees.employees.fold(
             0,
             (s, e) => s + e.totalJournals,
@@ -93,12 +95,40 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
       final startDate = event.startDate;
       final endDate = event.endDate;
 
-      final result = await _fetchAndGroup(
+      var result = await _fetchAndGroup(
         shops: current.shops,
         shopId: event.shopId,
         startDate: startDate,
         endDate: endDate,
       );
+      final totalJournalsFound = result.employees.fold(0, (sum, emp) => sum + emp.totalJournals);
+      // ignore: avoid_print
+      print('[KPI_DEBUG] 🔎 Shop "${event.shopName}" (${event.shopId}): employees=${result.employees.length}, totalJournals=$totalJournalsFound');
+
+      final selectedShopHasNoJournals =
+          event.shopId?.isNotEmpty == true &&
+          event.shopName?.isNotEmpty == true &&
+          totalJournalsFound == 0;
+      if (selectedShopHasNoJournals) {
+        // ignore: avoid_print
+        print('[KPI_DEBUG] ⚠️ No GL journals found by shopId=${event.shopId}; retrying by branch name "${event.shopName}"');
+        result = await _fetchAndGroup(
+          shops: [
+            KpiJournalShopItem(
+              shopId: event.shopId ?? '',
+              shopName: event.shopName ?? '',
+            ),
+          ],
+          shopId: null,
+          startDate: startDate,
+          endDate: endDate,
+          journalShopNameFilter: event.shopName,
+          skipShopSelection: true,
+        );
+        final retryTotal = result.employees.fold(0, (sum, emp) => sum + emp.totalJournals);
+        // ignore: avoid_print
+        print('[KPI_DEBUG] 🔁 Retry result: employees=${result.employees.length}, totalJournals=$retryTotal');
+      }
 
       final query = event.query ?? current.searchQuery;
       final filtered = _applySearch(result.employees, query);
@@ -156,6 +186,8 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
     required String? shopId,
     required DateTime? startDate,
     required DateTime? endDate,
+    String? journalShopNameFilter,
+    bool skipShopSelection = false,
   }) async {
     final Map<String, _Accumulator> accMap = {};
     final Map<String, int> checkedCount = {};
@@ -171,13 +203,43 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
     final bool isAllShops = shopId == null || shopId.isEmpty || shopId == 'all';
 
     // list of shops to iterate
-    final targetShops = isAllShops
+    final targetShops = journalShopNameFilter?.isNotEmpty == true
+        ? [
+            KpiJournalShopItem(
+              shopId: shopId ?? (shops.isNotEmpty ? shops.first.shopId : ''),
+              shopName: journalShopNameFilter!,
+            ),
+          ]
+        : isAllShops
         ? shops
         : shops.where((s) => s.shopId == shopId).toList();
 
     final Map<String, int> taskDocCountMap = {};
     final Map<String, String> taskNameMap = {};
     final Map<String, int> shopTotalDocsMap = {};
+
+    try {
+      final imageGroupDocCountByShopId =
+          await DocumentImageService.fetchDocumentImageGroups(
+            page: 1,
+            perPage: 9999,
+            fromDate: startStr,
+            toDate: endStr,
+            ref: 1,
+            shopId: isAllShops ? null : shopId,
+          );
+      for (final shop in targetShops) {
+        final count =
+            imageGroupDocCountByShopId[shop.shopId] ??
+            imageGroupDocCountByShopId[shop.shopName] ??
+            imageGroupDocCountByShopId[shop.shopName.trim().toLowerCase()];
+        if (count != null) {
+          shopTotalDocsMap[shop.shopName] = count;
+        }
+      }
+    } catch (e) {
+      dLog('⚠️ Failed to fetch document image groups: $e');
+    }
 
     // fallback: if shop list is empty, try a single call with the current session
     if (targetShops.isEmpty) {
@@ -217,7 +279,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
               taskNameMap[t.taskChild!.guidfixed] = t.taskChild!.name;
             }
           }
-          shopTotalDocsMap['ไม่ระบุร้าน'] = shopPassedDocs;
+          shopTotalDocsMap.putIfAbsent('ไม่ระบุร้าน', () => shopPassedDocs);
         }
       } catch (e) {
         /* ignore */
@@ -235,6 +297,8 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
         rangeEnd: endDate,
         taskDocCountMap: taskDocCountMap,
         taskNameMap: taskNameMap,
+        journalShopNameFilter: journalShopNameFilter,
+        skipShopSelection: skipShopSelection,
       );
     } else {
       for (final shop in targetShops) {
@@ -272,7 +336,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
                 taskNameMap[t.taskChild!.guidfixed] = t.taskChild!.name;
               }
             }
-            shopTotalDocsMap[shop.shopName] = shopPassedDocs;
+            shopTotalDocsMap.putIfAbsent(shop.shopName, () => shopPassedDocs);
           }
         } catch (e) {
           dLog('⚠️ Failed to fetch tasks for shop ${shop.shopName}: $e');
@@ -290,6 +354,8 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
           rangeEnd: endDate,
           taskDocCountMap: taskDocCountMap,
           taskNameMap: taskNameMap,
+          journalShopNameFilter: journalShopNameFilter,
+          skipShopSelection: skipShopSelection,
         );
       }
     }
@@ -301,6 +367,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
               (e) => KpiJournalEmployee(
                 name: e.name,
                 totalJournals: e.totalJournals,
+                totalLinkedJournals: e.totalLinkedJournals,
                 totalDocument: e.totalDocument,
                 totalDebit: e.totalDebit,
                 totalCredit: e.totalCredit,
@@ -509,6 +576,8 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
     required DateTime? rangeEnd,
     required Map<String, int> taskDocCountMap,
     required Map<String, String> taskNameMap,
+    String? journalShopNameFilter,
+    bool skipShopSelection = false,
   }) async {
     // Normalise to date-only boundaries (inclusive) — null means no filter
     final dayStart = rangeStart != null
@@ -519,9 +588,11 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
         : null;
 
     try {
-      await MultiShopService.selectShop(
-        shopId: shopId?.isNotEmpty == true ? shopId : null,
-      );
+      if (!skipShopSelection) {
+        await MultiShopService.selectShop(
+          shopId: shopId?.isNotEmpty == true ? shopId : null,
+        );
+      }
 
       const pageLimit = 500;
       int page = 1;
@@ -538,7 +609,11 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
           endDate: endStr,
         );
 
-        if (resp.success != true || resp.journals == null) break;
+        if (resp.success != true || resp.journals == null) {
+          // ignore: avoid_print
+          print('[KPI_DEBUG] ❌ Break! Shop "$shopName" ($shopId) page=$page success=${resp.success} journals=${resp.journals == null ? "NULL" : "empty?"}');
+          break;
+        }
 
         final journals = resp.journals!;
 
@@ -552,14 +627,34 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
                     ? ((p.total! + pageLimit - 1) ~/ pageLimit)
                     : 1);
           }
-          dLog(
-            '📄 Shop "$shopName" ($shopId): totalPages=$totalPages, total=${resp.pagination?.total}',
-          );
+          // ignore: avoid_print
+          print('[KPI_DEBUG] 📄 Shop "$shopName" ($shopId): totalPages=$totalPages, total=${resp.pagination?.total}');
         }
+
+        int skippedNoCreator = 0;
+        int skippedNameMismatch = 0;
+        int accepted = 0;
 
         for (final j in journals) {
           final creator = (j.createdBy ?? '').trim();
-          if (creator.isEmpty) continue;
+          if (creator.isEmpty) {
+            skippedNoCreator++;
+            continue;
+          }
+
+          if (journalShopNameFilter?.isNotEmpty == true) {
+            final expected = _normalizeShopName(journalShopNameFilter!);
+            final actual = _normalizeShopName(j.branchName ?? j.shopName ?? '');
+            if (actual != expected) {
+              skippedNameMismatch++;
+              if (skippedNameMismatch <= 3) {
+                // ignore: avoid_print
+                print('[KPI_DEBUG]   🔍 name mismatch: expected="$expected" actual="$actual" (branchName="${j.branchName}")');
+              }
+              continue;
+            }
+          }
+          accepted++;
 
           // Filter by doc_date — only when the user has picked a date range
           if (dayStart != null && dayEnd != null && j.docDatetime != null) {
@@ -584,13 +679,16 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
           }
         }
 
+        // ignore: avoid_print
+        print('[KPI_DEBUG]   📊 Page $page | total=${journals.length} | accepted=$accepted | skipped(noCreator)=$skippedNoCreator | skipped(nameMismatch)=$skippedNameMismatch');
+
         // If the server returned fewer records than requested, this is the last page
         if (journals.length < pageLimit) break;
 
         page++;
       } while (page <= totalPages);
 
-      dLog('✅ Shop "$shopName": fetched ${page - 1} page(s)');
+      dLog('✅ Shop "$shopName": fetched ${page - 1} page(s), accMap size=${accMap.length}');
     } catch (e) {
       dLog('⚠️ Failed to fetch GL for shop "$shopName": $e');
     }
@@ -604,6 +702,24 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
     final q = query.trim().toLowerCase();
     return employees.where((e) => e.name.toLowerCase().contains(q)).toList();
   }
+
+  String _normalizeShopName(String value) =>
+      value.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+
+  _DateRange _currentMonthRange() {
+    final now = DateTime.now();
+    return _DateRange(
+      DateTime(now.year, now.month, 1),
+      DateTime(now.year, now.month, now.day),
+    );
+  }
+}
+
+class _DateRange {
+  final DateTime start;
+  final DateTime end;
+
+  const _DateRange(this.start, this.end);
 }
 
 // ─── Private accumulator ────────────────────────────────────────────────────

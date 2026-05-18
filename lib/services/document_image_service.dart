@@ -53,12 +53,14 @@ class DocumentImage {
 /// Model for document image group data
 class DocumentImageGroup {
   final String shopId; // guidfixedid from API
+  final String shopName;
   final int billCount; // billcount from API
   final int imageCount; // count of imagereferences array
   final List<Map<String, dynamic>>? imageReferences;
 
   DocumentImageGroup({
     required this.shopId,
+    this.shopName = '',
     required this.billCount,
     required this.imageCount,
     this.imageReferences,
@@ -77,8 +79,19 @@ class DocumentImageGroup {
     }
 
     return DocumentImageGroup(
-      shopId: json['guidfixedid']?.toString() ?? '',
-      billCount: _parseInt(json['billcount']),
+      shopId:
+          json['guidfixedid']?.toString() ??
+          json['shopid']?.toString() ??
+          json['shop_id']?.toString() ??
+          '',
+      shopName:
+          json['shopname']?.toString() ??
+          json['shop_name']?.toString() ??
+          json['name']?.toString() ??
+          '',
+      billCount: _parseInt(
+        json['billcount'] ?? json['bill_count'] ?? json['total'],
+      ),
       imageCount: imgCount,
       imageReferences: imgRefs,
     );
@@ -171,9 +184,14 @@ class DocumentImageService {
   }
 
   /// Fetch document image groups for all shops
-  /// Returns map of shopId -> billCount
+  /// Returns map of shop identifier/name -> billCount
   static Future<Map<String, int>> fetchDocumentImageGroups({
-    int limit = 9999,
+    int page = 1,
+    int perPage = 9999,
+    String? fromDate,
+    String? toDate,
+    int ref = 1,
+    String? shopId,
   }) async {
     final token = AuthRepository.token;
 
@@ -182,12 +200,29 @@ class DocumentImageService {
       return {};
     }
 
-    final url = '$baseUrl/documentimagegroup?limit=$limit';
-    dLog('📸 Fetching document images from: $url');
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'perPage': perPage.toString(),
+      'ref': ref.toString(),
+    };
+    if (fromDate != null && fromDate.isNotEmpty) {
+      queryParams['fromdate'] = fromDate;
+    }
+    if (toDate != null && toDate.isNotEmpty) {
+      queryParams['todate'] = toDate;
+    }
+    if (shopId != null && shopId.isNotEmpty) {
+      queryParams['shopid'] = shopId;
+    }
+
+    final uri = Uri.parse(
+      '$baseUrl/documentimagegroup',
+    ).replace(queryParameters: queryParams);
+    dLog('📸 Fetching document image groups from: $uri');
 
     try {
       final response = await http.get(
-        Uri.parse(url),
+        uri,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -202,8 +237,16 @@ class DocumentImageService {
         if (data['success'] == true && data['data'] != null) {
           final Map<String, int> billCountMap = {};
 
-          if (data['data'] is List) {
-            final groups = (data['data'] as List)
+          final rawGroups = data['data'] is List
+              ? data['data'] as List
+              : data['data'] is Map && data['data']['items'] is List
+              ? data['data']['items'] as List
+              : data['data'] is Map && data['data']['data'] is List
+              ? data['data']['data'] as List
+              : const [];
+
+          if (rawGroups.isNotEmpty) {
+            final groups = rawGroups
                 .map((item) => DocumentImageGroup.fromJson(item))
                 .toList();
 
@@ -211,8 +254,15 @@ class DocumentImageService {
             for (var group in groups) {
               if (group.shopId.isNotEmpty) {
                 billCountMap[group.shopId] = group.billCount;
+              }
+              if (group.shopName.isNotEmpty) {
+                billCountMap[group.shopName] = group.billCount;
+                billCountMap[group.shopName.trim().toLowerCase()] =
+                    group.billCount;
+              }
+              if (group.shopId.isNotEmpty || group.shopName.isNotEmpty) {
                 dLog(
-                  '  📋 Shop ${group.shopId}: billCount=${group.billCount}, imageCount=${group.imageCount}',
+                  '  📋 Shop ${group.shopId}/${group.shopName}: billCount=${group.billCount}, imageCount=${group.imageCount}',
                 );
               }
             }
