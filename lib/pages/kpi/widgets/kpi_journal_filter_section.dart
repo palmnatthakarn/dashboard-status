@@ -85,6 +85,7 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
   }
 
   void _triggerSearch() {
+    _searchFocusNode.unfocus();
     widget.onSearch(
         _selectedShopIds, _selectedShopNames, _startDate, _endDate);
   }
@@ -214,6 +215,7 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
       },
       onSelected: (KpiJournalEmployee selection) {
         _searchController.clear();
+        _searchFocusNode.unfocus();
         setState(() => _selectedEmployees.add(selection));
       },
       fieldViewBuilder:
@@ -278,6 +280,7 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
                                   focusNode: fieldFocusNode,
                                   style: const TextStyle(fontSize: 14),
                                   onSubmitted: (_) {
+                                    fieldFocusNode.unfocus();
                                     _triggerSearch();
                                     _notifyLocal();
                                     onFieldSubmitted();
@@ -306,6 +309,7 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
                           _searchController.text.isNotEmpty)
                         InkWell(
                           onTap: () {
+                            _searchFocusNode.unfocus();
                             _searchController.clear();
                             setState(() => _selectedEmployees.clear());
                           },
@@ -568,7 +572,10 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: widget.onRefresh,
+              onTap: () {
+                _searchFocusNode.unfocus();
+                widget.onRefresh();
+              },
               borderRadius: BorderRadius.circular(10),
               child: const SizedBox(
                 width: 36,

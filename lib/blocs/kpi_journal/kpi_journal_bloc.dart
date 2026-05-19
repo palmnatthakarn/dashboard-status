@@ -217,6 +217,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
     final Map<String, int> taskDocCountMap = {};
     final Map<String, String> taskNameMap = {};
     final Map<String, int> shopTotalDocsMap = {};
+    final Set<String> activeTaskGuids = {};
 
     try {
       final imageGroupDocCountByShopId =
@@ -245,6 +246,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
     if (targetShops.isEmpty) {
       dLog('⚠️ No shops found, doing single fallback call');
 
+      List<TaskItem> fallbackTasks = [];
       try {
         final resp = await TaskService.fetchTasksForShop(
           shopId: '',
@@ -252,6 +254,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
           status: [0, 1, 2, 3, 4, 5, 6],
         );
         if (resp.success && resp.tasks.isNotEmpty) {
+          fallbackTasks = resp.tasks;
           int shopPassedDocs = 0;
           Set<String> processedTasks = {};
           
@@ -263,9 +266,11 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
               }
             }
 
-            // Only sum top-level tasks to avoid double counting parent & child
-            // Also, ONLY sum tasks that have main status 3, 4, or 6
-            if (t.parentGuidfixed.isEmpty && (t.status == 3 || t.status == 4 || t.status == 6)) {
+            // Only sum top-level tasks in the selected ownerAt range to avoid
+            // comparing this period's keying work against old carried-over jobs.
+            if (t.parentGuidfixed.isEmpty &&
+                (t.status == 3 || t.status == 4 || t.status == 6) &&
+                _isTaskOwnerAtInRange(t, startDate, endDate)) {
               if (!processedTasks.contains(t.guidfixed)) {
                 processedTasks.add(t.guidfixed);
                 shopPassedDocs += passedDocs;
@@ -279,7 +284,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
               taskNameMap[t.taskChild!.guidfixed] = t.taskChild!.name;
             }
           }
-          shopTotalDocsMap.putIfAbsent('ไม่ระบุร้าน', () => shopPassedDocs);
+          shopTotalDocsMap['ไม่ระบุร้าน'] = shopPassedDocs;
         }
       } catch (e) {
         /* ignore */
@@ -297,11 +302,21 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
         rangeEnd: endDate,
         taskDocCountMap: taskDocCountMap,
         taskNameMap: taskNameMap,
+        activeTaskGuids: activeTaskGuids,
         journalShopNameFilter: journalShopNameFilter,
         skipShopSelection: skipShopSelection,
       );
+      if (fallbackTasks.isNotEmpty) {
+        shopTotalDocsMap['ไม่ระบุร้าน'] = _sumTaskDocsForPeriod(
+          fallbackTasks,
+          startDate,
+          endDate,
+          activeTaskGuids,
+        );
+      }
     } else {
       for (final shop in targetShops) {
+        List<TaskItem> shopTasks = [];
         try {
           final resp = await TaskService.fetchTasksForShop(
             shopId: shop.shopId,
@@ -309,6 +324,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
             status: [0, 1, 2, 3, 4, 5, 6],
           );
           if (resp.success && resp.tasks.isNotEmpty) {
+            shopTasks = resp.tasks;
             int shopPassedDocs = 0;
             Set<String> processedTasks = {};
             
@@ -320,9 +336,11 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
                 }
               }
 
-              // Only sum top-level tasks to avoid double counting parent & child
-              // Also, ONLY sum tasks that have main status 3, 4, or 6
-              if (t.parentGuidfixed.isEmpty && (t.status == 3 || t.status == 4 || t.status == 6)) {
+              // Only sum top-level tasks in the selected ownerAt range to avoid
+              // comparing this period's keying work against old carried-over jobs.
+              if (t.parentGuidfixed.isEmpty &&
+                  (t.status == 3 || t.status == 4 || t.status == 6) &&
+                  _isTaskOwnerAtInRange(t, startDate, endDate)) {
                 if (!processedTasks.contains(t.guidfixed)) {
                   processedTasks.add(t.guidfixed);
                   shopPassedDocs += passedDocs;
@@ -336,7 +354,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
                 taskNameMap[t.taskChild!.guidfixed] = t.taskChild!.name;
               }
             }
-            shopTotalDocsMap.putIfAbsent(shop.shopName, () => shopPassedDocs);
+            shopTotalDocsMap[shop.shopName] = shopPassedDocs;
           }
         } catch (e) {
           dLog('⚠️ Failed to fetch tasks for shop ${shop.shopName}: $e');
@@ -354,9 +372,18 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
           rangeEnd: endDate,
           taskDocCountMap: taskDocCountMap,
           taskNameMap: taskNameMap,
+          activeTaskGuids: activeTaskGuids,
           journalShopNameFilter: journalShopNameFilter,
           skipShopSelection: skipShopSelection,
         );
+        if (shopTasks.isNotEmpty) {
+          shopTotalDocsMap[shop.shopName] = _sumTaskDocsForPeriod(
+            shopTasks,
+            startDate,
+            endDate,
+            activeTaskGuids,
+          );
+        }
       }
     }
 
@@ -576,6 +603,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
     required DateTime? rangeEnd,
     required Map<String, int> taskDocCountMap,
     required Map<String, String> taskNameMap,
+    required Set<String> activeTaskGuids,
     String? journalShopNameFilter,
     bool skipShopSelection = false,
   }) async {
@@ -665,6 +693,11 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
             } catch (_) {}
           }
 
+          final taskGuid = (j.jobGuidfixed ?? '').toString().trim();
+          if (taskGuid.isNotEmpty) {
+            activeTaskGuids.add(taskGuid);
+          }
+
           accMap.putIfAbsent(creator, () => _Accumulator(creator));
           accMap[creator]!.add(j, shopName, taskDocCountMap, taskNameMap);
 
@@ -701,6 +734,77 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
     if (query == null || query.trim().isEmpty) return employees;
     final q = query.trim().toLowerCase();
     return employees.where((e) => e.name.toLowerCase().contains(q)).toList();
+  }
+
+  int _sumTaskDocsForPeriod(
+    List<TaskItem> tasks,
+    DateTime? startDate,
+    DateTime? endDate,
+    Set<String> activeTaskGuids,
+  ) {
+    int total = 0;
+    final processedTasks = <String>{};
+
+    for (final task in tasks) {
+      if (task.parentGuidfixed.isNotEmpty) continue;
+      if (task.status != 3 && task.status != 4 && task.status != 6) continue;
+      if (!_isTaskRelevantToPeriod(
+        task,
+        startDate,
+        endDate,
+        activeTaskGuids,
+      )) {
+        continue;
+      }
+      if (!processedTasks.add(task.guidfixed)) continue;
+
+      int passedDocs = 0;
+      for (final status in task.totalDocumentStatus) {
+        if (status.status == 1) passedDocs += status.total;
+      }
+      total += passedDocs;
+    }
+
+    return total;
+  }
+
+  bool _isTaskRelevantToPeriod(
+    TaskItem task,
+    DateTime? startDate,
+    DateTime? endDate,
+    Set<String> activeTaskGuids,
+  ) {
+    if (_isTaskOwnerAtInRange(task, startDate, endDate)) return true;
+    if (activeTaskGuids.contains(task.guidfixed)) return true;
+
+    final childGuid = task.taskChild?.guidfixed;
+    return childGuid != null &&
+        childGuid.isNotEmpty &&
+        activeTaskGuids.contains(childGuid);
+  }
+
+  bool _isTaskOwnerAtInRange(
+    TaskItem task,
+    DateTime? startDate,
+    DateTime? endDate,
+  ) {
+    final ownerAt = task.ownerAt;
+    if (startDate != null) {
+      final start = DateTime(startDate.year, startDate.month, startDate.day);
+      if (ownerAt.isBefore(start)) return false;
+    }
+    if (endDate != null) {
+      final end = DateTime(
+        endDate.year,
+        endDate.month,
+        endDate.day,
+        23,
+        59,
+        59,
+      );
+      if (ownerAt.isAfter(end)) return false;
+    }
+    return true;
   }
 
   String _normalizeShopName(String value) =>

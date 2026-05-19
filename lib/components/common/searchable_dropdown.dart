@@ -92,7 +92,11 @@ class _SearchableDropdownState extends State<SearchableDropdown> {
   }
 
   void _removeOverlay() {
-    _overlay?.remove();
+    _searchFocusNode.unfocus();
+    final overlay = _overlay;
+    if (overlay != null && overlay.mounted) {
+      overlay.remove();
+    }
     _overlay = null;
     _isOpen = false;
   }
@@ -104,7 +108,9 @@ class _SearchableDropdownState extends State<SearchableDropdown> {
     } else {
       _searchController.clear();
       _overlay = _buildOverlay();
-      Overlay.of(context).insert(_overlay!);
+      final overlayState = Overlay.maybeOf(context);
+      if (overlayState == null) return;
+      overlayState.insert(_overlay!);
       _isOpen = true;
       setState(() {});
       Future.delayed(const Duration(milliseconds: 100), () {
@@ -143,7 +149,7 @@ class _SearchableDropdownState extends State<SearchableDropdown> {
                   onSelect: (id, label) {
                     widget.onChanged(id, label);
                     _removeOverlay();
-                    setState(() {});
+                    if (mounted) setState(() {});
                   },
                 ),
               ),
@@ -462,7 +468,11 @@ class _SearchableMultiDropdownState extends State<SearchableMultiDropdown> {
   }
 
   void _removeOverlay() {
-    _overlay?.remove();
+    _searchFocusNode.unfocus();
+    final overlay = _overlay;
+    if (overlay != null && overlay.mounted) {
+      overlay.remove();
+    }
     _overlay = null;
     _isOpen = false;
   }
@@ -475,7 +485,9 @@ class _SearchableMultiDropdownState extends State<SearchableMultiDropdown> {
       _localSelected = List.from(widget.selectedIds);
       _searchController.clear();
       _overlay = _buildOverlay();
-      Overlay.of(context).insert(_overlay!);
+      final overlayState = Overlay.maybeOf(context);
+      if (overlayState == null) return;
+      overlayState.insert(_overlay!);
       _isOpen = true;
       setState(() {});
       Future.delayed(const Duration(milliseconds: 100), () {

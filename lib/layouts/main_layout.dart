@@ -141,9 +141,11 @@ class _MainLayoutState extends State<MainLayout> {
   }
 
   Widget _buildBody(ScreenType screenType) {
+    final selectedPage = _buildSelectedPage();
+
     switch (screenType) {
       case ScreenType.mobile:
-        return _pages[_selectedIndex];
+        return selectedPage;
       case ScreenType.tablet:
       case ScreenType.desktop:
       case ScreenType.largeDesktop:
@@ -165,9 +167,32 @@ class _MainLayoutState extends State<MainLayout> {
                 ),
               ),
             ),
-            Expanded(child: _pages[_selectedIndex]),
+            Expanded(child: selectedPage),
           ],
         );
+    }
+  }
+
+  Widget _buildSelectedPage() {
+    switch (_selectedIndex) {
+      case 0:
+        return const DashboardContent();
+      case 1:
+        return const KpiPage();
+      case 2:
+        return const KpiJournalPage();
+      case 3:
+        return const ReportPage(title: 'รายงานภาพรวม');
+      case 4:
+        return const FinancialStatementsPage();
+      case 5:
+        return const TaxPage();
+      case 6:
+        return const DailyJournalPage();
+      case 7:
+        return const SettingsPage();
+      default:
+        return const DashboardContent();
     }
   }
 

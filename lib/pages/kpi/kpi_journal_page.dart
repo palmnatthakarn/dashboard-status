@@ -148,7 +148,7 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
           Icon(Icons.edit_note_rounded, color: Color(0xFF6366F1), size: 22),
           SizedBox(width: 8),
           Text(
-            'KPI — บันทึกบัญชีจากรูป',
+            'KPI — บันทึกบัญชี',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
           ),
         ],
@@ -164,7 +164,7 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
         Expanded(
           child: _SummaryCard(
             data: _CardData(
-              title: 'รายการบันทึกบัญชีจากรูปภาพทั้งหมด',
+              title: 'รายการบันทึกบัญชีทั้งหมด',
               value: NumberFormat('#,###').format(state.filteredTotalDocuments),
               icon: Icons.image_rounded,
               color: const Color(0xFF6366F1),

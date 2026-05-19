@@ -78,6 +78,7 @@ class _KpiFilterSectionState extends State<KpiFilterSection> {
   void _onSearchChanged(String text) {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _searchFocusNode.unfocus();
       widget.onSearch();
     });
   }
@@ -297,6 +298,7 @@ class _KpiFilterSectionState extends State<KpiFilterSection> {
                                     textInputAction: TextInputAction.search,
                                     onChanged: _onSearchChanged,
                                     onSubmitted: (_) {
+                                      fieldFocusNode.unfocus();
                                       widget.onSearch();
                                       onFieldSubmitted();
                                     },
@@ -326,7 +328,10 @@ class _KpiFilterSectionState extends State<KpiFilterSection> {
                             widget.searchController.text.isNotEmpty)
                           _buildMiniIconButton(
                             Icons.clear_rounded,
-                            onTap: widget.onClearSearch,
+                            onTap: () {
+                              _searchFocusNode.unfocus();
+                              widget.onClearSearch();
+                            },
                             tooltip: 'ล้างการค้นหา',
                           ),
                       ],
@@ -599,14 +604,20 @@ class _KpiFilterSectionState extends State<KpiFilterSection> {
         _buildToolButton(
           icon: Icons.refresh_rounded,
           tooltip: 'รีเฟรชข้อมูล',
-          onTap: widget.onRefresh,
+          onTap: () {
+            _searchFocusNode.unfocus();
+            widget.onRefresh();
+          },
         ),
         const SizedBox(width: 8),
         // Search button
         Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: widget.onSearch,
+            onTap: () {
+              _searchFocusNode.unfocus();
+              widget.onSearch();
+            },
             borderRadius: BorderRadius.circular(10),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),

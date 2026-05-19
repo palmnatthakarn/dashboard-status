@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../utils/app_logger.dart';
 
@@ -8,6 +10,7 @@ import '../../services/task_service.dart';
 import '../../services/auth_repository.dart';
 import '../../services/multi_shop_service.dart';
 import '../../services/journal_service.dart';
+import '../../services/employee_mapping_service.dart';
 
 class TaskWithShop {
   final TaskItem task;
@@ -67,6 +70,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
 
               if (allTasks.isNotEmpty) {
                 _applyJournalExtras(allTasks, allJournalCountMap);
+                _cacheKnownEmployees(allTasks);
                 employees = _groupTasksByOwner(allTasks);
                 dLog('✅ Loaded ${employees.length} employees (grouped) for all shops');
               }
@@ -160,6 +164,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         }
 
         _applyJournalExtras(filteredTasks, allJournalCountMap);
+        _cacheKnownEmployees(filteredTasks);
         employees = _groupTasksByOwner(filteredTasks);
         dLog('✅ Loaded ${employees.length} employees (grouped)');
       } else {
@@ -276,6 +281,27 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
     }
 
     return (tasks: tasks, journalMap: journalMap);
+  }
+
+  void _cacheKnownEmployees(List<TaskWithShop> tasks) {
+    final names = <String>{};
+    for (final item in tasks) {
+      final ownerBy = item.task.ownerBy.trim();
+      final journalCreatedBy = item.journalCreatedBy?.trim();
+
+      if (ownerBy.isNotEmpty) names.add(ownerBy);
+      if (journalCreatedBy != null && journalCreatedBy.isNotEmpty) {
+        names.add(journalCreatedBy);
+      }
+    }
+
+    if (names.isEmpty) return;
+    unawaited(
+      EmployeeMappingService.saveKnownEmployees(
+        names.toList(),
+      ).catchError((e) => dLog('Failed to cache KPI employee names: $e')),
+    );
+    dLog('Cached ${names.length} known KPI employee names');
   }
 
   void _applyJournalExtras(
