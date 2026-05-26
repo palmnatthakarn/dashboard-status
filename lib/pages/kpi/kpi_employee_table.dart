@@ -284,9 +284,9 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
   Widget _buildScrollableHeaderGroups() {
     // 11 Flex columns (Size S) + 1 Fixed width column (50)
     // Group 1: Count (1 col)
-    // Group 2: Verify (4 cols)
+    // Group 2: Verify (5 cols)
     // Group 3: Account (4 cols)
-    // Group 4: Spacer (2 cols for %/Delay) + Fixed 50
+    // Group 4: Spacer (1 col for Delay) + Fixed 50
     return Row(
       children: [
         // Section 1: Count (1 flex unit) - Spacer to merge visually
@@ -295,9 +295,9 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
           child: Container(), // Empty container to leave header space blank
         ),
 
-        // Section 2: Verification Status (4 flex units)
+        // Section 2: Verification Status (5 flex units)
         Expanded(
-          flex: 4,
+          flex: 5,
           child: _buildGroupedHeaderLabel(
             'สถานะการตรวจสอบ',
             KpiColors.section2Background,
@@ -313,8 +313,8 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
           ),
         ),
 
-        // Empty space for Stats columns (2 flex units)
-        Expanded(flex: 2, child: Container(color: Colors.white)),
+        // Empty space for Delay column (1 flex unit)
+        Expanded(flex: 1, child: Container(color: Colors.white)),
 
         // Blank space for Expand column (Fixed 50)
         SizedBox(width: 50, child: Container(color: Colors.white)),
@@ -385,6 +385,14 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
       DataColumn2(
         label: _buildHeaderCellColored(
           'ไม่บันทึก',
+          KpiColors.section2Background.withValues(alpha: 0.5),
+        ),
+        size: ColumnSize.S,
+        numeric: true,
+      ),
+      DataColumn2(
+        label: _buildHeaderCellColored(
+          'ไม่ต้องผ่านขั้นตอน',
           KpiColors.section2Background.withValues(alpha: 0.5),
         ),
         size: ColumnSize.S,
@@ -504,10 +512,17 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
             KpiColors.section2Background.withValues(alpha: 0.6),
           ),
         ),
+        // ไม่ต้องผ่านขั้นตอน
+        DataCell(
+          _buildCountCell(
+            employee.notRequiredApprovalDocuments,
+            KpiColors.section2Background.withValues(alpha: 0.6),
+          ),
+        ),
         // เอกสารที่ต้องบันทึก
         DataCell(
           _buildCountCell(
-            employee.passedDocuments,
+            employee.requiredToRecordDocuments,
             KpiColors.section3Background.withValues(alpha: 0.6),
           ),
         ),
@@ -521,7 +536,10 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
         // คงเหลือ
         DataCell(
           _buildCountCell(
-            employee.passedDocuments - employee.referenceCount,
+            _remainingToRecord(
+              employee.requiredToRecordDocuments,
+              employee.referenceCount,
+            ),
             KpiColors.section3Background.withValues(alpha: 0.6),
           ),
         ),
@@ -597,10 +615,17 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
             KpiColors.section2Background.withValues(alpha: 0.3),
           ),
         ),
+        // ไม่ต้องผ่านขั้นตอน
+        DataCell(
+          _buildCountCell(
+            detail.notRequiredApproval,
+            KpiColors.section2Background.withValues(alpha: 0.3),
+          ),
+        ),
         // เอกสารที่ต้องบันทึก
         DataCell(
           _buildCountCell(
-            detail.passed,
+            detail.requiredToRecord,
             KpiColors.section3Background.withValues(alpha: 0.3),
           ),
         ),
@@ -614,7 +639,10 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
         // คงเหลือ
         DataCell(
           _buildCountCell(
-            detail.passed - detail.referenceCount,
+            _remainingToRecord(
+              detail.requiredToRecord,
+              detail.referenceCount,
+            ),
             KpiColors.section3Background.withValues(alpha: 0.3),
           ),
         ),
@@ -685,6 +713,11 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
         ],
       ),
     );
+  }
+
+  int _remainingToRecord(int requiredToRecord, int recorded) {
+    final value = requiredToRecord - recorded;
+    return value > 0 ? value : 0;
   }
 
   Widget _buildSubRowLabel(KpiCompanyDetail detail, int index) {
@@ -773,6 +806,10 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
         stepColor = KpiColors.cancelled;
         stepIcon = Icons.cancel_outlined;
         break;
+      case 'ปิดการอนุมัติ':
+        stepColor = const Color(0xFF6366F1);
+        stepIcon = Icons.lock_outline_rounded;
+        break;
       default:
         stepColor = Colors.grey;
         stepIcon = Icons.access_time;
@@ -796,14 +833,15 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
                 fontWeight: FontWeight.w500,
               ),
             ),
-            Text(
-              '$delayDays วัน',
-              style: TextStyle(
-                fontSize: 9 * widget.fontScale,
-                color: stepColor,
-                fontWeight: FontWeight.w500,
+            if (delayStep != 'ปิดการอนุมัติ')
+              Text(
+                '$delayDays วัน',
+                style: TextStyle(
+                  fontSize: 9 * widget.fontScale,
+                  color: stepColor,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
           ],
         ),
       ],

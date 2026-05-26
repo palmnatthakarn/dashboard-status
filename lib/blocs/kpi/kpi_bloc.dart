@@ -389,6 +389,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
       int totalPending = 0;
       int totalWaitingVerify = 0;
       int totalCompleted = 0;
+      int totalRequiredToRecord = 0;
       int totalPassed = 0;
       int totalRemaining = 0;
       int totalNotRecorded = 0;
@@ -408,8 +409,9 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         
         // Both rows see the full document count
         final int docCount = task.totalDocument;
-        // Only B gets a recorded count, A gets 0
-        final int taskRefCount = isContributorRow ? item.keyedDocumentCount : 0;
+        // B rows use GL Journal keyed count. Owner rows keep the task's
+        // referenceCount minus documents already assigned to other keyers.
+        final int glRecordedCount = isContributorRow ? item.keyedDocumentCount : 0;
         
         // In the overall Employee summary (Main Row A), we accumulate the full counts.
         // We only add to the Employee total if it's NOT a contributor row, to avoid double-counting
@@ -417,10 +419,6 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         if (!isContributorRow) {
           totalDocCount += docCount;
           totalRefBalance += task.referenceBalance;
-          totalRefCount += taskRefCount; // A's taskRefCount is 0, so employee recorded count comes from B separately
-        } else {
-          // Add B's recorded count to the master employee total
-          totalRefCount += taskRefCount;
         }
 
         // Both A and B sub-rows show the full context of the task
@@ -428,11 +426,18 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         int taskPending = 0;
         int taskCompleted = 0;
         
-        int taskPassed = task.getStatusCount(1);
+        final int passedStatusCount = task.getStatusCount(1);
+        int taskPassed = passedStatusCount;
+        int taskRequiredToRecord = passedStatusCount;
+        int taskRecordedCount = isContributorRow
+            ? glRecordedCount
+            : _ownerRecordedCount(item);
         int taskRemaining = task.referenceBalance;
         int taskNotRecorded = task.getStatusCount(3);
         int taskCancelled = task.cancelledCount;
-        int taskNotRequiredApproval = task.notRequiredApprovalCount;
+        int taskNotRequiredApproval = task.status == 6
+            ? task.totalDocument
+            : task.notRequiredApprovalCount;
 
         switch (task.status) {
           case 4: // Completed
@@ -444,13 +449,19 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
           case 1: // Waiting Verify
             taskWaitingVerify = task.totalDocument;
             break;
+          case 6: // Not required approval / skip workflow
+            taskWaitingVerify = task.getStatusCount(0);
+            taskNotRequiredApproval = task.totalDocument;
+            break;
           default:
             break;
         }
 
         // Only add to the Employee master totals if it's the A row to prevent double counting
+        totalRefCount += taskRecordedCount;
         if (!isContributorRow) {
           totalPassed += taskPassed;
+          totalRequiredToRecord += taskRequiredToRecord;
           totalRemaining += taskRemaining;
           totalNotRecorded += taskNotRecorded;
           totalCancelled += taskCancelled;
@@ -465,7 +476,9 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         if (latestActive == null || task.ownerAt.isAfter(latestActive!)) {
           latestActive = task.ownerAt;
         }
-        if (taskWaitingVerify > 0) {
+        if (task.status == 6) {
+          taskDelayStep = 'ปิดการอนุมัติ';
+        } else if (taskWaitingVerify > 0) {
           taskDelayStep = 'รอตรวจสอบ';
         } else if (taskPending > 0) {
           taskDelayStep = 'รอบันทึก';
@@ -487,6 +500,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
           totalBillCount: task.totalDocument, // Full job count for both A and B
           assigned: task.billCount,
           completed: taskCompleted,
+          requiredToRecord: taskRequiredToRecord,
           cancelled: taskCancelled,
           notRequiredApproval: taskNotRequiredApproval,
           pending: taskPending,
@@ -496,7 +510,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
           passed: taskPassed,
           remaining: taskRemaining,
           notRecorded: taskNotRecorded,
-          referenceCount: taskRefCount, // 0 for A, keyed amount for B
+          referenceCount: taskRecordedCount,
           status: task.status.toString(),
           lastActive: task.ownerAt,
           delayStep: taskDelayStep,
@@ -517,7 +531,9 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
       String delayStep = 'none';
       int delayDays = 0;
       final now = DateTime.now();
-      if (totalWaitingVerify > 0) {
+      if (totalNotRequiredApproval > 0) {
+        delayStep = 'ปิดการอนุมัติ';
+      } else if (totalWaitingVerify > 0) {
         delayStep = 'รอตรวจสอบ';
       } else if (totalPending > 0) {
         delayStep = 'รอบันทึก';
@@ -543,6 +559,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         assignedDocuments: 0,
         pendingDocuments: totalPending,
         completedDocuments: totalCompleted,
+        requiredToRecordDocuments: totalRequiredToRecord,
         passedDocuments: totalPassed,
         remainingDocuments: totalRemaining,
         notRecordedDocuments: totalNotRecorded,
@@ -562,6 +579,13 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         companyDetails: companyDetails,
       );
     }).toList();
+  }
+
+  int _ownerRecordedCount(TaskWithShop item) {
+    if (item.task.status == 6) return item.task.referenceCount;
+
+    final value = item.task.referenceCount - item.totalKeyedByOthers;
+    return value > 0 ? value : 0;
   }
 
   void _onFilterByDateRange(FilterByDateRange event, Emitter<KpiState> emit) {

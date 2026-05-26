@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../models/journal.dart';
 import '../../utils/app_logger.dart';
 import '../../services/auth_repository.dart';
 import '../../services/document_image_service.dart';
@@ -9,8 +10,62 @@ import 'kpi_journal_event.dart';
 import 'kpi_journal_state.dart';
 import '../../services/employee_mapping_service.dart';
 
+typedef KpiJournalAuthCheck = bool Function();
+typedef KpiJournalListShops = Future<List<Map<String, dynamic>>> Function();
+typedef KpiJournalSelectShop = Future<bool> Function({String? shopId});
+typedef KpiJournalFetchImageGroups =
+    Future<Map<String, int>> Function({
+      int page,
+      int perPage,
+      String? fromDate,
+      String? toDate,
+      int ref,
+      String? shopId,
+    });
+typedef KpiJournalFetchTasksForShop =
+    Future<TaskResponse> Function({
+      required String shopId,
+      int limit,
+      List<int> status,
+      int page,
+    });
+typedef KpiJournalFetchGLJournals =
+    Future<JournalResponse> Function({
+      int page,
+      int limit,
+      String? shopId,
+      String? task,
+      String sort,
+      String timezone,
+      String? startDate,
+      String? endDate,
+    });
+
 class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
-  KpiJournalBloc() : super(KpiJournalInitial()) {
+  final KpiJournalAuthCheck _isAuthenticated;
+  final KpiJournalListShops _listShops;
+  final KpiJournalSelectShop _selectShop;
+  final KpiJournalFetchImageGroups _fetchDocumentImageGroups;
+  final KpiJournalFetchTasksForShop _fetchTasksForShop;
+  final KpiJournalFetchGLJournals _fetchGLJournals;
+
+  KpiJournalBloc({
+    KpiJournalAuthCheck? isAuthenticated,
+    KpiJournalListShops? listShops,
+    KpiJournalSelectShop? selectShop,
+    KpiJournalFetchImageGroups? fetchDocumentImageGroups,
+    KpiJournalFetchTasksForShop? fetchTasksForShop,
+    KpiJournalFetchGLJournals? fetchGLJournals,
+  })  : _isAuthenticated =
+            isAuthenticated ?? (() => AuthRepository.isAuthenticated),
+        _listShops = listShops ?? MultiShopService.listShops,
+        _selectShop = selectShop ?? MultiShopService.selectShop,
+        _fetchDocumentImageGroups =
+            fetchDocumentImageGroups ??
+            DocumentImageService.fetchDocumentImageGroups,
+        _fetchTasksForShop = fetchTasksForShop ?? TaskService.fetchTasksForShop,
+        _fetchGLJournals = fetchGLJournals ?? JournalService.getAllGLJournals,
+        super(KpiJournalInitial()) {
     on<LoadKpiJournalData>(_onLoadData);
     on<SelectShopAndSearchJournal>(_onSelectShopAndSearch);
     on<FilterKpiJournalByDateRange>(_onFilterByDateRange);
@@ -25,9 +80,9 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
     try {
       final defaultRange = _currentMonthRange();
       List<KpiJournalShopItem> shops = [];
-      if (AuthRepository.isAuthenticated) {
+      if (_isAuthenticated()) {
         try {
-          final rawShops = await MultiShopService.listShops();
+          final rawShops = await _listShops();
           shops = rawShops.map((s) {
             final id =
                 s['shopid']?.toString() ??
@@ -221,7 +276,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
 
     try {
       final imageGroupDocCountByShopId =
-          await DocumentImageService.fetchDocumentImageGroups(
+          await _fetchDocumentImageGroups(
             page: 1,
             perPage: 9999,
             fromDate: startStr,
@@ -248,7 +303,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
 
       List<TaskItem> fallbackTasks = [];
       try {
-        final resp = await TaskService.fetchTasksForShop(
+        final resp = await _fetchTasksForShop(
           shopId: '',
           limit: 5000,
           status: [0, 1, 2, 3, 4, 5, 6],
@@ -259,12 +314,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
           Set<String> processedTasks = {};
           
           for (final t in resp.tasks) {
-            int passedDocs = 0;
-            if (t.totalDocumentStatus != null) {
-              for (final s in t.totalDocumentStatus) {
-                if (s.status == 1) passedDocs += s.total;
-              }
-            }
+            final requiredDocs = _requiredDocsToRecord(t);
 
             // Only sum top-level tasks in the selected ownerAt range to avoid
             // comparing this period's keying work against old carried-over jobs.
@@ -273,14 +323,14 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
                 _isTaskOwnerAtInRange(t, startDate, endDate)) {
               if (!processedTasks.contains(t.guidfixed)) {
                 processedTasks.add(t.guidfixed);
-                shopPassedDocs += passedDocs;
+                shopPassedDocs += requiredDocs;
               }
             }
 
-            taskDocCountMap[t.guidfixed] = passedDocs;
+            taskDocCountMap[t.guidfixed] = requiredDocs;
             taskNameMap[t.guidfixed] = t.name;
             if (t.taskChild != null && t.taskChild!.guidfixed.isNotEmpty) {
-              taskDocCountMap[t.taskChild!.guidfixed] = passedDocs;
+              taskDocCountMap[t.taskChild!.guidfixed] = requiredDocs;
               taskNameMap[t.taskChild!.guidfixed] = t.taskChild!.name;
             }
           }
@@ -318,7 +368,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
       for (final shop in targetShops) {
         List<TaskItem> shopTasks = [];
         try {
-          final resp = await TaskService.fetchTasksForShop(
+          final resp = await _fetchTasksForShop(
             shopId: shop.shopId,
             limit: 5000,
             status: [0, 1, 2, 3, 4, 5, 6],
@@ -329,12 +379,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
             Set<String> processedTasks = {};
             
             for (final t in resp.tasks) {
-              int passedDocs = 0;
-              if (t.totalDocumentStatus != null) {
-                for (final s in t.totalDocumentStatus) {
-                  if (s.status == 1) passedDocs += s.total;
-                }
-              }
+              final requiredDocs = _requiredDocsToRecord(t);
 
               // Only sum top-level tasks in the selected ownerAt range to avoid
               // comparing this period's keying work against old carried-over jobs.
@@ -343,14 +388,14 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
                   _isTaskOwnerAtInRange(t, startDate, endDate)) {
                 if (!processedTasks.contains(t.guidfixed)) {
                   processedTasks.add(t.guidfixed);
-                  shopPassedDocs += passedDocs;
+                  shopPassedDocs += requiredDocs;
                 }
               }
 
-              taskDocCountMap[t.guidfixed] = passedDocs;
+              taskDocCountMap[t.guidfixed] = requiredDocs;
               taskNameMap[t.guidfixed] = t.name;
               if (t.taskChild != null && t.taskChild!.guidfixed.isNotEmpty) {
-                taskDocCountMap[t.taskChild!.guidfixed] = passedDocs;
+                taskDocCountMap[t.taskChild!.guidfixed] = requiredDocs;
                 taskNameMap[t.taskChild!.guidfixed] = t.taskChild!.name;
               }
             }
@@ -420,8 +465,9 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
       for (final det in emp.details) {
         final shop = det.shopName ?? 'ไม่ระบุร้าน';
         void collect(String? reviewer) {
-          if (reviewer == null || reviewer.isEmpty || reviewer == emp.name)
+          if (reviewer == null || reviewer.isEmpty || reviewer == emp.name) {
             return; // skip self-review
+          }
           reviewMap
                   .putIfAbsent(reviewer, () => {})
                   .putIfAbsent(shop, () => {})[det.docNo] =
@@ -434,7 +480,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
     }
 
     // ── 1. Merge review docs into existing keyer employees' shopStats ─────
-    KpiJournalShopStat _mergeShopStat(
+    KpiJournalShopStat mergeShopStat(
       String empName,
       KpiJournalShopStat? existing,
       String shopName,
@@ -451,8 +497,9 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
       for (final d in allDetails) {
         if (d.checkedBy == empName) chk++;
         if (d.updatedBy == empName) upd++;
-        if (d.docDate != null && (la == null || d.docDate!.isAfter(la)))
+        if (d.docDate != null && (la == null || d.docDate!.isAfter(la))) {
           la = d.docDate;
+        }
       }
       return KpiJournalShopStat(
         shopName: shopName,
@@ -476,7 +523,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
       for (final shopEntry in reviewByShop.entries) {
         final shopName = shopEntry.key;
         final reviewDocs = shopEntry.value.values.toList();
-        statsMap[shopName] = _mergeShopStat(
+        statsMap[shopName] = mergeShopStat(
           emp.name,
           statsMap[shopName],
           shopName,
@@ -528,8 +575,9 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
                   if (d.checkedBy == revName) chk++;
                   if (d.updatedBy == revName) upd++;
                   if (d.docDate != null &&
-                      (la == null || d.docDate!.isAfter(la)))
+                      (la == null || d.docDate!.isAfter(la))) {
                     la = d.docDate;
+                  }
                 }
                 return KpiJournalShopStat(
                   shopName: shopEntry.key,
@@ -616,8 +664,11 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
         : null;
 
     try {
+      final queryShopId =
+          journalShopNameFilter?.isNotEmpty == true ? null : shopId;
+
       if (!skipShopSelection) {
-        await MultiShopService.selectShop(
+        await _selectShop(
           shopId: shopId?.isNotEmpty == true ? shopId : null,
         );
       }
@@ -627,12 +678,12 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
       int totalPages = 1;
 
       do {
-        final resp = await JournalService.getAllGLJournals(
+        final resp = await _fetchGLJournals(
           page: page,
           limit: pageLimit,
           sort: 'docdate:-1',
           timezone: '+07',
-          shopId: shopId?.isNotEmpty == true ? shopId : null,
+          shopId: queryShopId?.isNotEmpty == true ? queryShopId : null,
           startDate: startStr,
           endDate: endStr,
         );
@@ -688,8 +739,9 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
           if (dayStart != null && dayEnd != null && j.docDatetime != null) {
             try {
               final docDate = DateTime.parse(j.docDatetime!);
-              if (docDate.isBefore(dayStart) || docDate.isAfter(dayEnd))
+              if (docDate.isBefore(dayStart) || docDate.isAfter(dayEnd)) {
                 continue;
+              }
             } catch (_) {}
           }
 
@@ -758,14 +810,27 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
       }
       if (!processedTasks.add(task.guidfixed)) continue;
 
-      int passedDocs = 0;
-      for (final status in task.totalDocumentStatus) {
-        if (status.status == 1) passedDocs += status.total;
-      }
-      total += passedDocs;
+      total += _requiredDocsToRecord(task);
     }
 
     return total;
+  }
+
+  int _requiredDocsToRecord(TaskItem task) {
+    int passedDocs = 0;
+    int notRequiredApprovalDocs = 0;
+
+    for (final status in task.totalDocumentStatus) {
+      if (status.status == 1) passedDocs += status.total;
+      if (status.status == 6) notRequiredApprovalDocs += status.total;
+    }
+
+    if (task.status == 6 && notRequiredApprovalDocs == 0) {
+      notRequiredApprovalDocs = task.totalDocument;
+    }
+
+    final requiredDocs = passedDocs - notRequiredApprovalDocs;
+    return requiredDocs > 0 ? requiredDocs : 0;
   }
 
   bool _isTaskRelevantToPeriod(

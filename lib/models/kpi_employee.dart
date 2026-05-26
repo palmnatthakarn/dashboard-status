@@ -10,6 +10,7 @@ class KpiEmployee {
   final int assignedDocuments;
   final int pendingDocuments;
   final int completedDocuments;
+  final int requiredToRecordDocuments;
   final int passedDocuments; // เอกสารที่ผ่านการตรวจสอบ (Status 1)
   final int remainingDocuments; // เอกสารคงเหลือ (Status 0)
   final int notRecordedDocuments; // เอกสารที่ไม่บันทึก (Status 3)
@@ -50,6 +51,7 @@ class KpiEmployee {
     required this.assignedDocuments,
     required this.pendingDocuments,
     required this.completedDocuments,
+    this.requiredToRecordDocuments = 0,
     this.passedDocuments = 0,
     this.remainingDocuments = 0,
     this.notRecordedDocuments = 0,
@@ -135,6 +137,7 @@ class KpiCompanyDetail {
   final int waitingVerify;
   final int waitingFix; // Added
   final int completed;
+  final int requiredToRecord;
   final int passed; // Status 1
   final int remaining; // Status 0
   final int notRecorded; // Status 3
@@ -158,6 +161,7 @@ class KpiCompanyDetail {
     required this.waitingVerify,
     required this.waitingFix,
     required this.completed,
+    this.requiredToRecord = 0,
     this.passed = 0,
     this.remaining = 0,
     this.notRecorded = 0,
