@@ -3,6 +3,7 @@ import 'package:moniter/components/financial_report/report_content.dart';
 import 'package:moniter/components/financial_report/report_empty_state.dart';
 import 'package:moniter/components/financial_report/report_filter_section.dart';
 import 'package:moniter/components/financial_report/report_header.dart';
+import 'package:moniter/services/multi_shop_service.dart';
 import 'package:moniter/services/pdf_export_service.dart';
 import 'package:moniter/services/report_data_provider.dart';
 
@@ -24,9 +25,17 @@ class BaseReportPage extends StatefulWidget {
 }
 
 class _BaseReportPageState extends State<BaseReportPage> {
+  static const Duration _reportTimeout = Duration(seconds: 30);
   DateTime? _startDate;
   DateTime? _endDate;
+  List<Map<String, dynamic>> _shops = const [];
+  String? _selectedShopId;
+  bool _isLoadingShops = false;
   String? _selectedReportType;
+  DateTime? _appliedStartDate;
+  DateTime? _appliedEndDate;
+  String? _appliedReportType;
+  int _queryVersion = 0;
 
   @override
   void initState() {
@@ -36,6 +45,21 @@ class _BaseReportPageState extends State<BaseReportPage> {
     final now = DateTime.now();
     _startDate = DateTime(now.year, now.month, 1);
     _endDate = now;
+    _loadShops();
+    if (_selectedReportType != null) {
+      _applySearch();
+    }
+  }
+
+  Future<void> _loadShops() async {
+    setState(() => _isLoadingShops = true);
+    final shops = await MultiShopService.listShops();
+    if (!mounted) return;
+    setState(() {
+      _shops = shops;
+      _selectedShopId = shops.length == 1 ? _shopId(shops.first) : null;
+      _isLoadingShops = false;
+    });
   }
 
   @override
@@ -62,7 +86,9 @@ class _BaseReportPageState extends State<BaseReportPage> {
           children: [
             ReportFilterSection(
               reportTypes: widget.reportTypes,
+              shops: _shops,
               selectedReportType: _selectedReportType,
+              selectedShopId: _selectedShopId,
               startDate: _startDate,
               endDate: _endDate,
               onReportTypeChanged: (value) {
@@ -70,20 +96,33 @@ class _BaseReportPageState extends State<BaseReportPage> {
                   _selectedReportType = value;
                 });
               },
+              onShopChanged: (value) {
+                setState(() {
+                  _selectedShopId = value;
+                });
+              },
               onStartDateTap: () => _selectDate(true),
               onEndDateTap: () => _selectDate(false),
+              onSearch: _applySearch,
+              isLoadingShops: _isLoadingShops,
             ),
             const SizedBox(height: 24),
-            if (_selectedReportType != null) ...[
+            if (_appliedReportType != null) ...[
               ReportHeader(
-                selectedReportType: _selectedReportType,
-                startDate: _startDate,
-                endDate: _endDate,
+                selectedReportType: _appliedReportType,
+                startDate: _appliedStartDate,
+                endDate: _appliedEndDate,
                 onFullScreen: _openReportFullScreen,
                 onExport: _handleExport,
               ),
               const SizedBox(height: 16),
-              ReportContent(selectedReportType: _selectedReportType),
+              ReportContent(
+                selectedReportType: _appliedReportType,
+                shopId: _selectedShopId,
+                startDate: _appliedStartDate,
+                endDate: _appliedEndDate,
+                queryVersion: _queryVersion,
+              ),
             ] else
               const ReportEmptyState(),
           ],
@@ -125,9 +164,37 @@ class _BaseReportPageState extends State<BaseReportPage> {
   }
 
   void _handleExport(String type) async {
-    if (type == 'PDF' && _selectedReportType != null) {
-      final tableData = ReportDataProvider.getTableData(_selectedReportType!);
-      if (tableData != null) {
+    if (_appliedReportType == null) {
+      _showSnack('กรุณาค้นหารายงานก่อนดาวน์โหลด', const Color(0xFFF59E0B));
+      return;
+    }
+
+    final tableData = await ReportDataProvider.fetchReportData(
+      reportType: _appliedReportType!,
+      shopId: _selectedShopId,
+      startDate: _appliedStartDate,
+      endDate: _appliedEndDate,
+    ).timeout(
+      _reportTimeout,
+      onTimeout: () => const ReportTableData(
+        status: ReportDataStatus.unsupported,
+        source: ReportDataSource.live,
+        message:
+            'โหลดรายงานเกิน 30 วินาที กรุณาลองเลือกช่วงวันที่ให้แคบลงหรือค้นหาใหม่',
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (tableData.status != ReportDataStatus.ready) {
+      _showSnack(
+        tableData.message ?? 'ไม่มีข้อมูลสำหรับดาวน์โหลด',
+        const Color(0xFFF59E0B),
+      );
+      return;
+    }
+
+    if (type == 'PDF') {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Row(
@@ -155,41 +222,28 @@ class _BaseReportPageState extends State<BaseReportPage> {
         );
 
         await PdfExportService.exportTableToPdf(
-          title: _selectedReportType!,
-          headers: tableData['headers'] as List<String>,
-          rows: tableData['rows'] as List<List<String>>,
-          startDate: _startDate,
-          endDate: _endDate,
+          title: _appliedReportType!,
+          headers: tableData.headers,
+          rows: tableData.rows,
+          startDate: _appliedStartDate,
+          endDate: _appliedEndDate,
         );
-      }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white),
-              const SizedBox(width: 12),
-              Text('กำลังดาวน์โหลดรายงาน $type...'),
-            ],
-          ),
-          backgroundColor: const Color(0xFF10B981),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          margin: const EdgeInsets.all(24),
-        ),
+      _showSnack(
+        'เตรียมข้อมูล $type แล้ว (${tableData.rows.length} รายการ)',
+        const Color(0xFF10B981),
       );
     }
   }
 
   void _openReportFullScreen() {
+    if (_appliedReportType == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (context) => Scaffold(
           appBar: AppBar(
-            title: Text('$_selectedReportType'),
+            title: Text('$_appliedReportType'),
             backgroundColor: Colors.white,
             foregroundColor: const Color(0xFF1E293B),
             elevation: 0,
@@ -202,11 +256,63 @@ class _BaseReportPageState extends State<BaseReportPage> {
             color: const Color(0xFFF8FAFC),
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
-              child: ReportContent(selectedReportType: _selectedReportType),
+              child: ReportContent(
+                selectedReportType: _appliedReportType,
+                shopId: _selectedShopId,
+                startDate: _appliedStartDate,
+                endDate: _appliedEndDate,
+                queryVersion: _queryVersion,
+              ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  void _applySearch() {
+    if (_selectedShopId == null || _selectedShopId!.isEmpty) {
+      _showSnack('กรุณาเลือกร้านก่อนค้นหารายงาน', const Color(0xFFF59E0B));
+      return;
+    }
+
+    if (_selectedReportType == null) {
+      _showSnack('กรุณาเลือกประเภทรายงาน', const Color(0xFFF59E0B));
+      return;
+    }
+
+    if (_startDate != null &&
+        _endDate != null &&
+        _startDate!.isAfter(_endDate!)) {
+      _showSnack('วันที่เริ่มต้นต้องไม่เกินวันที่สิ้นสุด', const Color(0xFFEF4444));
+      return;
+    }
+
+    setState(() {
+      _appliedReportType = _selectedReportType;
+      _appliedStartDate = _startDate;
+      _appliedEndDate = _endDate;
+      _queryVersion++;
+    });
+  }
+
+  void _showSnack(String message, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(24),
+      ),
+    );
+  }
+
+  String _shopId(Map<String, dynamic> shop) {
+    return shop['shopid']?.toString() ??
+        shop['shop_id']?.toString() ??
+        shop['id']?.toString() ??
+        '';
   }
 }

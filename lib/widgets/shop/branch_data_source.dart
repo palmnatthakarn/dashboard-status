@@ -29,8 +29,9 @@ class BranchDataSource extends DataTableSource {
 
     final shopId = branchData.keys.elementAt(index);
     final shops = branchData[shopId]!;
+    final rowShopId = _extractShopId(shops, shopId);
 
-    final shopName = _extractShopName(shops, shopId);
+    final shopName = _extractShopName(shops, rowShopId);
     final dailyAmount = _getDailyAmount(shops);
     final monthlyAmount = _getMonthlyAmount(shops);
     final yearlyAmount = _getYearlyAmount(shops);
@@ -45,16 +46,15 @@ class BranchDataSource extends DataTableSource {
       onSelectChanged: (selected) {
         if (selected == true) {
           HapticFeedback.lightImpact();
-          _showJournalDialogForBranch(shopId, shops);
+          _showJournalDialogForBranch(rowShopId, shops);
         }
       },
       cells: [
         DataCell(_buildStatusIndicator(yearlyAmount)),
-        DataCell(_buildBranchNameCell(shopId, shopName, shops)),
-        // Removed shop code cell - code now shows under shop name
+        DataCell(_buildBranchNameCell(rowShopId, shopName, shops)),
         DataCell(
           InkWell(
-            onTap: () => _showBranchDetail(shopId, shops),
+            onTap: () => _showBranchDetail(rowShopId, shops),
             borderRadius: BorderRadius.circular(6),
             child: _buildAmountChip(
               dailyAmount,
@@ -65,7 +65,7 @@ class BranchDataSource extends DataTableSource {
         ),
         DataCell(
           InkWell(
-            onTap: () => _showBranchDetail(shopId, shops),
+            onTap: () => _showBranchDetail(rowShopId, shops),
             borderRadius: BorderRadius.circular(6),
             child: _buildAmountChip(
               monthlyAmount,
@@ -76,7 +76,7 @@ class BranchDataSource extends DataTableSource {
         ),
         DataCell(
           InkWell(
-            onTap: () => _showBranchDetail(shopId, shops),
+            onTap: () => _showBranchDetail(rowShopId, shops),
             borderRadius: BorderRadius.circular(6),
             child: _buildAmountChip(
               yearlyAmount,
@@ -85,9 +85,7 @@ class BranchDataSource extends DataTableSource {
             ),
           ),
         ),
-        //DataCell(_buildJournalCell(shopId, shops, totalIncome)),
-        DataCell(_buildUploadCell(shopId, shops)),
-        //DataCell(_buildResponsibleCell()),
+        DataCell(_buildUploadCell(rowShopId, shops)),
       ],
     );
   }
@@ -97,7 +95,7 @@ class BranchDataSource extends DataTableSource {
     if (amount >= 1000000) return const Color(0xFFF59E0B);
     return const Color(0xFF10B981);
   }
-
+  
   Widget _buildStatusIndicator(double amount) {
     final Color statusColor;
     final IconData statusIcon;
@@ -281,13 +279,13 @@ class BranchDataSource extends DataTableSource {
   void _showImageGallery(String shopId, List<DocDetails> shops) {
     if (shops.isEmpty) return;
 
-    // Use passed shopId instead of extracting from shops list
-    // final shopId = shops.first.shopid ?? '';
-    final shopName = _extractShopName(shops, shopId);
+    final rowShopId = _extractShopId(shops, shopId);
+    final shopName = _extractShopName(shops, rowShopId);
 
     showDialog(
       context: context,
-      builder: (context) => ImageGalleryDialog(title: shopName, shopId: shopId),
+      builder: (context) =>
+          ImageGalleryDialog(title: shopName, shopId: rowShopId),
     );
   }
 
@@ -402,6 +400,16 @@ class BranchDataSource extends DataTableSource {
 
     // Final fallback to shopid
     return shopId;
+  }
+
+  String _extractShopId(List<DocDetails> shops, String fallbackShopId) {
+    for (final shop in shops) {
+      final rowShopId = shop.shopid?.trim();
+      if (rowShopId != null && rowShopId.isNotEmpty) {
+        return rowShopId;
+      }
+    }
+    return fallbackShopId;
   }
 
   // Dialog methods

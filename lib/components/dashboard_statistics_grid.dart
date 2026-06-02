@@ -122,7 +122,6 @@ class DashboardStatisticsGrid extends StatelessWidget {
             child: EnhancedDocumentCard(
               documentCounts: getDocumentCounts(shops) as Map<String, int>,
               numFmt: numFmt,
-              shops: shops,
             ),
           ),
         ];
@@ -363,12 +362,10 @@ class EnhancedDocumentCard extends StatefulWidget {
     super.key,
     required this.documentCounts,
     required this.numFmt,
-    required this.shops,
   });
 
   final Map<String, int> documentCounts;
   final NumberFormat numFmt;
-  final List shops;
 
   @override
   State<EnhancedDocumentCard> createState() => _EnhancedDocumentCardState();
@@ -381,8 +378,6 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
   @override
   Widget build(BuildContext context) {
     final totalDocs = widget.documentCounts['total'] ?? 0;
-    final depositDocs = widget.documentCounts['deposit'] ?? 0;
-    final withdrawDocs = widget.documentCounts['withdraw'] ?? 0;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -390,8 +385,8 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
-        transform: Matrix4.identity()..scale(_isHovered ? 1.02 : 1.0),
-        padding: const EdgeInsets.all(10),
+        transform: Matrix4.identity()..scale(_isHovered ? 1.01 : 1.0),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
@@ -412,11 +407,20 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
         child: LayoutBuilder(
           builder: (context, constraints) {
             final isCompact = constraints.maxWidth < 250;
+            final hoverResponsive = _isHovered && !isCompact;
 
-            return Column(
-              mainAxisSize: MainAxisSize.max,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            return BlocBuilder<KpiBloc, KpiState>(
+              builder: (context, kpiState) {
+                final kpiLoaded = kpiState is KpiLoaded ? kpiState : null;
+                final kpiTotalDocs = kpiLoaded?.totalDocuments ?? totalDocs;
+                final requiredToRecord =
+                    kpiLoaded?.requiredToRecordDocuments ?? 0;
+                final recordedDocs = kpiLoaded?.recordedDocuments ?? 0;
+
+                return Column(
+                  mainAxisSize: MainAxisSize.max,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                 // Header
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -430,8 +434,8 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: isCompact
-                                  ? (_isHovered ? 11.0 : 10.0)
-                                  : (_isHovered ? 12.0 : 11.0),
+                                  ? 10.0
+                                  : (hoverResponsive ? 12.0 : 11.0),
                               fontWeight: FontWeight.w500,
                             ),
                             child: Text(
@@ -446,15 +450,18 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
                             child: TweenAnimationBuilder<double>(
                               duration: const Duration(milliseconds: 1000),
                               curve: Curves.easeOutCubic,
-                              tween: Tween(begin: 0, end: totalDocs.toDouble()),
+                              tween: Tween(
+                                begin: 0,
+                                end: kpiTotalDocs.toDouble(),
+                              ),
                               builder: (context, value, child) {
                                 return AnimatedDefaultTextStyle(
                                   duration: const Duration(milliseconds: 200),
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: isCompact
-                                        ? (_isHovered ? 18.0 : 16.0)
-                                        : (_isHovered ? 22.0 : 20.0),
+                                        ? 16.0
+                                        : (hoverResponsive ? 22.0 : 20.0),
                                     fontWeight: FontWeight.w700,
                                     height: 1.2,
                                   ),
@@ -484,21 +491,23 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
                       duration: const Duration(milliseconds: 200),
                       curve: Curves.easeInOut,
                       padding: EdgeInsets.all(
-                        isCompact ? 6 : (_isHovered ? 12 : 8),
+                        isCompact ? 6 : (hoverResponsive ? 12 : 8),
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(
-                          alpha: _isHovered ? 0.25 : 0.2,
+                          alpha: hoverResponsive ? 0.25 : 0.2,
                         ),
                         borderRadius: BorderRadius.circular(isCompact ? 8 : 12),
                       ),
                       child: AnimatedRotation(
                         duration: const Duration(milliseconds: 200),
-                        turns: _isHovered ? 0.05 : 0,
+                        turns: hoverResponsive ? 0.05 : 0,
                         child: Icon(
                           Icons.folder_rounded,
                           color: Colors.white,
-                          size: isCompact ? 28.0 : (_isHovered ? 40.0 : 36.0),
+                          size: isCompact
+                              ? 28.0
+                              : (hoverResponsive ? 40.0 : 36.0),
                         ),
                       ),
                     ),
@@ -508,68 +517,47 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
                 const Spacer(),
 
                 // Details
-                if (!isCompact) ...[
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      // รายรับ
+                SizedBox(height: isCompact ? 6 : 10),
+                Row(
+                  children: [
+                      // เอกสารที่ต้องบันทึก
                       Expanded(
                         child: _buildDetailItem(
-                          'รายรับ',
-                          widget.numFmt.format(depositDocs),
+                          isCompact ? 'ต้องบันทึก' : 'เอกสารที่ต้องบันทึก',
+                          widget.numFmt.format(requiredToRecord),
                           const Color.fromARGB(255, 211, 245, 18),
                           isCompact,
-                          _isHovered,
+                          hoverResponsive,
                         ),
                       ),
                       // เส้นคั่น
                       Container(width: 1, height: 30, color: Colors.white24),
-                      // รายจ่าย
+                      // บันทึกแล้ว
                       Expanded(
                         child: _buildDetailItem(
-                          'รายจ่าย',
-                          widget.numFmt.format(withdrawDocs),
+                          isCompact ? 'บันทึก' : 'บันทึกแล้ว',
+                          widget.numFmt.format(recordedDocs),
                           const Color(0xFFEF4444),
                           isCompact,
-                          _isHovered,
+                          hoverResponsive,
                         ),
                       ),
                       // เส้นคั่น
                       Container(width: 1, height: 30, color: Colors.white24),
                       // จัดการแล้ว
                       Expanded(
-                        child:
-                            BlocBuilder<ImageApprovalBloc, ImageApprovalState>(
-                              builder: (context, approvalState) {
-                                int approvedFilesCount = 0;
-                                int totalFilesCount = 0;
-
-                                for (final shop in widget.shops) {
-                                  final shopId = shop.shopid ?? '';
-                                  approvedFilesCount += approvalState
-                                      .getApprovedCount(shopId);
-
-                                  final count = shop.imageCount;
-                                  if (count is int) {
-                                    totalFilesCount += count;
-                                  } else if (count is num) {
-                                    totalFilesCount += count.toInt();
-                                  }
-                                }
-
-                                return _buildFileProgressItem(
-                                  approvedFilesCount,
-                                  totalFilesCount,
-                                  isCompact,
-                                  _isHovered,
-                                );
-                              },
-                            ),
+                        child: _buildFileProgressItem(
+                          recordedDocs,
+                          requiredToRecord,
+                          isCompact,
+                          hoverResponsive,
+                        ),
                       ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
               ],
+            );
+              },
             );
           },
         ),
@@ -603,7 +591,7 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: isCompact
-                      ? (isHovered ? 9.0 : 8.0)
+                      ? (isHovered ? 8.0 : 7.0)
                       : (isHovered ? 10.0 : 9.0),
                   fontWeight: FontWeight.w400,
                 ),
@@ -624,7 +612,7 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
             style: TextStyle(
               color: Colors.white,
               fontSize: isCompact
-                  ? (isHovered ? 12.0 : 10.0)
+                  ? (isHovered ? 10.0 : 9.0)
                   : (isHovered ? 14.0 : 12.0),
               fontWeight: FontWeight.w600,
             ),
@@ -692,7 +680,7 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: isCompact
-                          ? (isHovered ? 10.0 : 9.0)
+                          ? (isHovered ? 9.0 : 8.0)
                           : (isHovered ? 12.0 : 11.0),
                       fontWeight: FontWeight.w600,
                     ),
@@ -706,7 +694,7 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: isCompact
-                        ? (isHovered ? 6.0 : 5.0)
+                        ? (isHovered ? 5.5 : 5.0)
                         : (isHovered ? 7.0 : 6.0),
                     fontWeight: FontWeight.w400,
                   ),

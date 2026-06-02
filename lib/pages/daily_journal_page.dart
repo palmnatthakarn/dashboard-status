@@ -20,7 +20,6 @@ class DailyJournalPage extends StatelessWidget {
     return const BaseReportPage(
       title: 'สมุดรายวัน (Daily Journal)',
       reportTypes: _reportTypes,
-      defaultReportType: 'ทุกสมุดรายวัน',
     );
   }
 }

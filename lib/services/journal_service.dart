@@ -8,6 +8,7 @@ import '../models/journal_book.dart';
 
 class JournalService {
   static const String baseUrl = AuthRepository.baseUrl;
+  static const Duration _requestTimeout = Duration(seconds: 15);
 
   /// GET /api/journals - Get all journals
   static Future<JournalResponse> getAllJournals({
@@ -56,7 +57,9 @@ class JournalService {
       final headers = <String, String>{'Content-Type': 'application/json'};
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
-      final response = await http.get(uri, headers: headers);
+      final response = await http
+          .get(uri, headers: headers)
+          .timeout(_requestTimeout);
       dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -109,7 +112,9 @@ class JournalService {
       final headers = <String, String>{'Content-Type': 'application/json'};
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
-      final response = await http.get(Uri.parse(url), headers: headers);
+      final response = await http
+          .get(Uri.parse(url), headers: headers)
+          .timeout(_requestTimeout);
       dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -155,7 +160,9 @@ class JournalService {
       final headers = <String, String>{'Content-Type': 'application/json'};
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
-      final response = await http.get(Uri.parse(url), headers: headers);
+      final response = await http
+          .get(Uri.parse(url), headers: headers)
+          .timeout(_requestTimeout);
       dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -184,7 +191,9 @@ class JournalService {
       final headers = <String, String>{'Content-Type': 'application/json'};
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
-      final response = await http.get(Uri.parse(url), headers: headers);
+      final response = await http
+          .get(Uri.parse(url), headers: headers)
+          .timeout(_requestTimeout);
       dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -324,7 +333,9 @@ class JournalService {
       final headers = <String, String>{'Content-Type': 'application/json'};
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
-      final response = await http.get(uri, headers: headers);
+      final response = await http
+          .get(uri, headers: headers)
+          .timeout(_requestTimeout);
       // ignore: avoid_print
       print('[KPI_DEBUG] 📡 GL Journal status=${response.statusCode} url=$uri');
       // ignore: avoid_print
@@ -355,7 +366,9 @@ class JournalService {
       final headers = <String, String>{'Content-Type': 'application/json'};
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
-      final response = await http.get(Uri.parse(url), headers: headers);
+      final response = await http
+          .get(Uri.parse(url), headers: headers)
+          .timeout(_requestTimeout);
       dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
@@ -387,7 +400,9 @@ class JournalService {
       final headers = <String, String>{'Content-Type': 'application/json'};
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
-      final response = await http.get(Uri.parse(url), headers: headers);
+      final response = await http
+          .get(Uri.parse(url), headers: headers)
+          .timeout(_requestTimeout);
       dLog('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {

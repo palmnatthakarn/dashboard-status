@@ -114,6 +114,7 @@ class MultiShopSummaryResponse {
 /// Service to fetch multi-shop summary data from the cloud API
 class MultiShopService {
   static const String baseUrl = AuthRepository.baseUrl;
+  static const Duration _requestTimeout = Duration(seconds: 15);
 
   // Track if shop has been selected in this session
   static bool _shopSelected = false;
@@ -134,20 +135,19 @@ class MultiShopService {
     dLog('📋 Fetching shop list from: $url');
 
     try {
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+      final response = await http
+          .get(
+            Uri.parse(url),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(_requestTimeout);
 
       dLog('📡 List shop response status: ${response.statusCode}');
 
-      // Log full response for debugging (can be removed later)
-      if (response.statusCode == 200) {
-        dLog('📄 Full list shop response: ${response.body}');
-      } else {
+      if (response.statusCode != 200) {
         dLog('❌ Error response: ${response.body}');
       }
 
@@ -160,24 +160,6 @@ class MultiShopService {
           _availableShops = shops;
 
           dLog('✅ Found ${shops.length} shops');
-
-          // Log details of each shop for verification
-          for (var i = 0; i < shops.length; i++) {
-            final shop = shops[i];
-            final shopId = shop['shopid'] ?? shop['shop_id'] ?? shop['id'];
-            final hasNames = shop['names'] != null;
-            final namesCount = hasNames ? (shop['names'] as List).length : 0;
-            dLog(
-              '  Shop $i: ID=$shopId, hasNames=$hasNames, namesCount=$namesCount',
-            );
-
-            if (hasNames && namesCount > 0) {
-              final names = shop['names'] as List;
-              for (var name in names) {
-                dLog('    - code: ${name['code']}, name: ${name['name']}');
-              }
-            }
-          }
 
           return shops;
         }
@@ -226,14 +208,16 @@ class MultiShopService {
     dLog('🏪 Selecting shop $selectedShopId from: $url');
 
     try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: json.encode({'shopid': selectedShopId}),
-      );
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: json.encode({'shopid': selectedShopId}),
+          )
+          .timeout(_requestTimeout);
 
       dLog('📡 Select shop response status: ${response.statusCode}');
       dLog('📄 Select shop response body: ${response.body}');
@@ -296,13 +280,15 @@ class MultiShopService {
         '🔑 Using token for API: ${token.substring(0, token.length > 30 ? 30 : token.length)}...',
       );
 
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+      final response = await http
+          .get(
+            Uri.parse(url),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(_requestTimeout);
 
       dLog('📡 Response status: ${response.statusCode}');
       dLog(

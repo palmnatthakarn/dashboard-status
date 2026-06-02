@@ -2,6 +2,7 @@
 import '../utils/app_logger.dart';
 import 'package:http/http.dart' as http;
 import 'auth_repository.dart';
+import 'multi_shop_service.dart';
 
 /// Model for individual document image
 class DocumentImage {
@@ -120,13 +121,20 @@ class DocumentImageService {
       return [];
     }
 
-    final url = '$baseUrl/documentimage?shopid=$shopId&limit=$limit';
+    await MultiShopService.selectShop(shopId: shopId);
+
+    final uri = Uri.parse('$baseUrl/documentimage').replace(
+      queryParameters: {
+        'shopid': shopId,
+        'limit': limit.toString(),
+      },
+    );
     dLog('📸 Fetching shop images for ID: "$shopId"');
-    dLog('📸 Full URL: $url');
+    dLog('📸 Full URL: $uri');
 
     try {
       final response = await http.get(
-        Uri.parse(url),
+        uri,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -150,18 +158,21 @@ class DocumentImageService {
               dLog('🖼️ Processing image item: $item'); // Debug each item
               return DocumentImage.fromJson(item);
             }).toList();
+            final shopImages = _filterImagesByShop(images, shopId);
 
-            dLog('✅ Loaded ${images.length} images for shop $shopId');
+            dLog(
+              '✅ Loaded ${shopImages.length}/${images.length} images for shop $shopId',
+            );
 
             // Debug: log first image details
-            if (images.isNotEmpty) {
-              final first = images.first;
+            if (shopImages.isNotEmpty) {
+              final first = shopImages.first;
               dLog(
-                '🔍 First image: id=${first.imageId}, url=${first.imageUrl}, category=${first.category}',
+                '🔍 First image: id=${first.imageId}, shopId=${first.shopId}, url=${first.imageUrl}, category=${first.category}',
               );
             }
 
-            return images;
+            return shopImages;
           } else {
             dLog('⚠️ Data is not a List, it is: ${data['data'].runtimeType}');
           }
@@ -181,6 +192,26 @@ class DocumentImageService {
       dLog('📍 Stack trace: $stackTrace');
       return [];
     }
+  }
+
+  static List<DocumentImage> _filterImagesByShop(
+    List<DocumentImage> images,
+    String shopId,
+  ) {
+    final normalizedShopId = _normalizeShopId(shopId);
+    final taggedImages = images
+        .where((image) => (image.shopId ?? '').trim().isNotEmpty)
+        .toList();
+    if (taggedImages.isEmpty) return images;
+
+    final matchedImages = taggedImages
+        .where((image) => _normalizeShopId(image.shopId) == normalizedShopId)
+        .toList();
+    return matchedImages.isEmpty ? images : matchedImages;
+  }
+
+  static String _normalizeShopId(String? value) {
+    return (value ?? '').trim().toLowerCase();
   }
 
   /// Fetch document image groups for all shops

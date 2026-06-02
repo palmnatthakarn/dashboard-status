@@ -392,7 +392,7 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
       ),
       DataColumn2(
         label: _buildHeaderCellColored(
-          'ไม่ต้องผ่านขั้นตอน',
+          'ไม่ต้องอนุมัติ',
           KpiColors.section2Background.withValues(alpha: 0.5),
         ),
         size: ColumnSize.S,
@@ -551,12 +551,8 @@ class _KpiEmployeeTableState extends State<KpiEmployeeTable> {
           ),
         ),
 
-        // ความล่าช้า
-        DataCell(
-          Center(
-            child: _buildDelayIndicator(employee.delayStep, employee.delayDays),
-          ),
-        ),
+        // ความล่าช้า: main row is an aggregate, so it should not show a status.
+        const DataCell(SizedBox()),
         // Expand icon
         DataCell(
           AnimatedRotation(

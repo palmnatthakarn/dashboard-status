@@ -12,6 +12,11 @@ export 'image_approval_bloc.dart';
 export 'image_approval_event.dart';
 export 'image_approval_state.dart';
 
+// KPI BLoC
+export 'kpi/kpi_bloc.dart';
+export 'kpi/kpi_event.dart';
+export 'kpi/kpi_state.dart';
+
 // Journal BLoC (includes event and state via part files)
 export 'journal_bloc.dart';
 

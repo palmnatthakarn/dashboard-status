@@ -65,6 +65,10 @@ class KpiLoaded extends KpiState {
       employees.fold(0, (sum, e) => sum + e.pendingDocuments);
   int get completedDocuments =>
       employees.fold(0, (sum, e) => sum + e.completedDocuments);
+  int get requiredToRecordDocuments =>
+      employees.fold(0, (sum, e) => sum + e.requiredToRecordDocuments);
+  int get recordedDocuments =>
+      employees.fold(0, (sum, e) => sum + e.referenceCount);
 
   // Detailed status breakdown aggregates
   int get cancelledDocuments =>

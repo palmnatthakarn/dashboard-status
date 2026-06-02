@@ -31,6 +31,7 @@ class _DashboardContentState extends State<DashboardContent> {
         BlocProvider(
           create: (context) => DashboardBloc()..add(FetchDashboardData()),
         ),
+        BlocProvider(create: (context) => KpiBloc()..add(LoadKpiData())),
         BlocProvider(create: (context) => ImageApprovalBloc()),
       ],
       child: Scaffold(
@@ -67,6 +68,7 @@ class _DashboardContentState extends State<DashboardContent> {
                 return RefreshIndicator(
                   onRefresh: () async {
                     context.read<DashboardBloc>().add(FetchDashboardData());
+                    context.read<KpiBloc>().add(LoadKpiData());
                   },
                   child: CustomScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),

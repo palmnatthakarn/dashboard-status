@@ -29,6 +29,7 @@ class CustomPagination extends StatelessWidget {
     required this.rowsPerPage,
     required this.onPageChanged,
     required this.onRowsPerPageChanged,
+    this.totalLabel,
     this.rowsPerPageOptions = const [10, 20, 50],
   });
 
@@ -47,6 +48,9 @@ class CustomPagination extends StatelessWidget {
   /// Callback when rows per page is changed
   final Function(int) onRowsPerPageChanged;
 
+  /// Optional total text shown in the pagination bar.
+  final String? totalLabel;
+
   /// Available options for rows per page dropdown
   final List<int> rowsPerPageOptions;
 
@@ -64,6 +68,19 @@ class CustomPagination extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          if (totalLabel != null) ...[
+            Expanded(
+              child: Text(
+                totalLabel!,
+                style: const TextStyle(
+                  color: Color(0xFF334155),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+          ],
           // Previous button
           _buildNavButton(
             icon: Icons.chevron_left_rounded,
