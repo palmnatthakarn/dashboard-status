@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../services/document_image_service.dart';
+import '../../utils/app_logger.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
@@ -32,7 +33,7 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
   }
 
   Future<void> _fetchImages() async {
-    print('🔄 Starting _fetchImages for shopId: ${widget.shopId}');
+    dLog('🔄 Starting _fetchImages for shopId: ${widget.shopId}');
 
     setState(() {
       _isLoading = true;
@@ -42,20 +43,20 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
     });
 
     try {
-      print('📞 Calling DocumentImageService.fetchShopImages...');
+      dLog('📞 Calling DocumentImageService.fetchShopImages...');
       final images = await DocumentImageService.fetchShopImages(
         shopId: widget.shopId,
       );
 
-      print('📥 Received ${images.length} images from service');
+      dLog('📥 Received ${images.length} images from service');
 
       if (!mounted) {
-        print('⚠️ Widget not mounted, returning');
+        dLog('⚠️ Widget not mounted, returning');
         return;
       }
 
       if (images.isEmpty) {
-        print('❌ No images received, showing error');
+        dLog('❌ No images received, showing error');
         setState(() {
           _isLoading = false;
           _errorMessage = 'ไม่พบรูปภาพ';
@@ -63,11 +64,11 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
         return;
       }
 
-      print('✅ Processing ${images.length} images...');
+      dLog('✅ Processing ${images.length} images...');
 
       // Categorize images by file type
       for (final img in images) {
-        print(
+        dLog(
           '🖼️ Image: id=${img.imageId}, url=${img.imageUrl}, category=${img.category}',
         );
 
@@ -78,14 +79,14 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
 
           _categorizedImages.putIfAbsent(category, () => []);
           _categorizedImages[category]!.add(img);
-          print('  ✓ Added to category: $category');
+          dLog('  ✓ Added to category: $category');
         } else {
-          print('  ✗ Skipped (no imageUrl)');
+          dLog('  ✗ Skipped (no imageUrl)');
         }
       }
 
-      print('📊 Categories: ${_categorizedImages.keys.toList()}');
-      print(
+      dLog('📊 Categories: ${_categorizedImages.keys.toList()}');
+      dLog(
         '📊 Total categorized images: ${_categorizedImages.values.fold(0, (sum, list) => sum + list.length)}',
       );
 
@@ -95,19 +96,19 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
         _selectedCategory = _categorizedImages.containsKey('รูปภาพ (JPG/PNG)')
             ? 'รูปภาพ (JPG/PNG)'
             : _categorizedImages.keys.first;
-        print('✅ Selected category: $_selectedCategory');
+        dLog('✅ Selected category: $_selectedCategory');
       } else {
-        print('⚠️ No categories after processing!');
+        dLog('⚠️ No categories after processing!');
       }
 
       setState(() {
         _isLoading = false;
       });
 
-      print('✅ _fetchImages completed successfully');
+      dLog('✅ _fetchImages completed successfully');
     } catch (e, stackTrace) {
-      print('💥 Error in _fetchImages: $e');
-      print('📍 Stack trace: $stackTrace');
+      dLog('💥 Error in _fetchImages: $e');
+      dLog('📍 Stack trace: $stackTrace');
 
       if (!mounted) return;
       setState(() {
@@ -141,7 +142,7 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
         // Background overlay
         GestureDetector(
           onTap: () => Navigator.of(context).pop(),
-          child: Container(color: Colors.black.withOpacity(0.5)),
+          child: Container(color: Colors.black.withValues(alpha: 0.5)),
         ),
         // Draggable dialog
         Positioned(
@@ -163,7 +164,7 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
+                      color: Colors.black.withValues(alpha: 0.15),
                       blurRadius: 30,
                       offset: const Offset(0, 10),
                     ),
@@ -649,10 +650,10 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
-        print('❌ Could not launch URL: $url');
+        dLog('❌ Could not launch URL: $url');
       }
     } catch (e) {
-      print('❌ Error opening PDF: $e');
+      dLog('❌ Error opening PDF: $e');
     }
   }
 
@@ -833,3 +834,5 @@ class _ImageGalleryDialogState extends State<ImageGalleryDialog> {
     }
   }
 }
+
+

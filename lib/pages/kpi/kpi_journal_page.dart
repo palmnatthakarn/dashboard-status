@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:data_table_2/data_table_2.dart';
 
+import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/kpi_journal/kpi_journal_bloc.dart';
 import '../../blocs/kpi_journal/kpi_journal_event.dart';
 import '../../blocs/kpi_journal/kpi_journal_state.dart';
@@ -12,7 +13,9 @@ import '../../components/dashboard_loading_widgets.dart';
 import 'kpi_constants.dart';
 import 'kpi_text_styles.dart';
 import 'widgets/kpi_journal_filter_section.dart';
+import '../../services/auth_repository.dart';
 import '../../services/employee_mapping_service.dart';
+import '../../services/pdf_export_service.dart';
 
 class KpiJournalPage extends StatelessWidget {
   const KpiJournalPage({super.key});
@@ -48,7 +51,15 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<KpiJournalBloc, KpiJournalState>(
+    return BlocConsumer<KpiJournalBloc, KpiJournalState>(
+      listener: (context, state) {
+        // Same unrecoverable-session handling as the Overview page: don't
+        // leave the user on a retry button that will fail forever.
+        if (state is KpiJournalError &&
+            AuthRepository.isSessionExpiredError(state.message)) {
+          context.read<AuthBloc>().add(LogoutRequested());
+        }
+      },
       builder: (context, state) {
         return Stack(
           children: [
@@ -86,6 +97,7 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
                               onRefresh: () => ctx
                                   .read<KpiJournalBloc>()
                                   .add(LoadKpiJournalData()),
+                              onExportPdf: () => _exportPdf(state),
                               nameMappings: _nameMappings,
                               onSearch: (shopIds, shopNames, startDate, endDate) {
                                 // 0 or 1 shop → server-side filter; 2+ → fetch all + client-side
@@ -361,7 +373,6 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
   }
 
   DataRow _empRow(KpiJournalEmployee emp, int idx, bool isExpanded) {
-    final fmt = NumberFormat('#,###');
     return DataRow(
       color: WidgetStateProperty.resolveWith<Color?>((s) {
         if (s.contains(WidgetState.hovered)) return const Color(0xFFEEF2FF);
@@ -475,10 +486,11 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
     return DataRow(
       color: WidgetStateProperty.all(Colors.transparent),
       onSelectChanged: (_) => setState(() {
-        if (isExpanded)
+        if (isExpanded) {
           _expandedIds.remove(shopKey);
-        else
+        } else {
           _expandedIds.add(shopKey);
+        }
       }),
       cells: [
         // ร้าน (indented with tree lines)
@@ -816,8 +828,10 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
     ),
   );
 
-  Widget _buildTable(KpiJournalLoaded state) {
-    // ── filters ──
+  /// Applies the same name / shop / book-code client-side filters used by
+  /// the on-screen table, so any consumer (table, PDF export, ...) sees
+  /// identical, consistent results.
+  List<KpiJournalEmployee> _getDisplayEmployees(KpiJournalLoaded state) {
     final nameFiltered = _filterEmployees.isEmpty
         ? state.filteredEmployees
         : state.filteredEmployees
@@ -831,12 +845,82 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
               .toList()
         : nameFiltered;
     // Multi-book-code client-side filter — deep-filter details & recalc totals
-    final displayEmployees = _filterBookCodes.isEmpty
+    return _filterBookCodes.isEmpty
         ? shopFiltered
         : shopFiltered
               .map((e) => _applyBookCodeFilter(e, _filterBookCodes))
               .where((e) => e.totalJournals > 0)
               .toList();
+  }
+
+  Future<void> _exportPdf(KpiJournalLoaded state) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(width: 12),
+            Text('กำลังสร้างไฟล์ PDF...'),
+          ],
+        ),
+        backgroundColor: const Color(0xFF3B82F6),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(24),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    // Each employee gets its own bold name banner (with a quick summary),
+    // followed by a small table listing exactly which shop(s) they keyed
+    // journals for — so it's unambiguous who keyed what, where, instead of
+    // one long flat table where employee/shop rows look almost identical.
+    const subHeaders = ['ร้าน', 'ต้องบันทึก', 'คีย์', 'ตรวจสอบ', 'แก้ไข'];
+
+    final groups = <KpiPdfGroup>[];
+    for (final emp in _getDisplayEmployees(state)) {
+      final displayName = _nameMappings[emp.name] ?? emp.name;
+
+      final shopRows = <List<String>>[
+        for (final stat in emp.shopStats)
+          [
+            stat.shopName,
+            '${stat.totalDocument}',
+            '${stat.count}',
+            '${stat.totalChecked}',
+            '${stat.totalUpdated}',
+          ],
+      ];
+
+      groups.add(
+        KpiPdfGroup(
+          name: displayName,
+          summary:
+              'คีย์ ${emp.totalJournals} รายการ · ตรวจสอบ ${emp.totalChecked} · แก้ไข ${emp.totalUpdated}',
+          rows: shopRows,
+        ),
+      );
+    }
+
+    await PdfExportService.exportGroupedTableToPdf(
+      title: 'รายงาน KPI บันทึกบัญชี',
+      subHeaders: subHeaders,
+      groups: groups,
+      startDate: state.startDate,
+      endDate: state.endDate,
+      userName: AuthRepository.username ?? 'ผู้ใช้งาน',
+    );
+  }
+
+  Widget _buildTable(KpiJournalLoaded state) {
+    final displayEmployees = _getDisplayEmployees(state);
 
     final filteredJournalCount = displayEmployees.fold(
       0,
@@ -941,7 +1025,6 @@ class _KpiJournalPageContentState extends State<_KpiJournalPageContent> {
                   final double totalW = bc.maxWidth < minTableW
                       ? minTableW
                       : bc.maxWidth;
-                  final double scrollW = totalW - fixedW;
 
                   return Column(
                     children: [

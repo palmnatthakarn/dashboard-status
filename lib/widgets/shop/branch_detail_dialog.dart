@@ -554,8 +554,6 @@ class _BranchDetailDialogState extends State<BranchDetailDialog> {
     List<BarChartGroupData> bars = [];
     outMonthLabels.clear();
 
-    final now = DateTime.now();
-
     for (int i = 0; i < last6.length; i++) {
         final mKey = last6[i]; // e.g., "2026-03"
         try {

@@ -29,11 +29,6 @@ class AppSidebar extends StatefulWidget {
       icon: Icons.analytics_outlined,
       selectedIcon: Icons.analytics_rounded,
     ),
-    SidebarMenuItem(
-      title: 'KPI Journal',
-      icon: Icons.edit_note_outlined,
-      selectedIcon: Icons.edit_note_rounded,
-    ),
 
     SidebarMenuItem(
       title: 'Reports',
@@ -444,27 +439,25 @@ class _AppSidebarState extends State<AppSidebar> {
           const SizedBox(
             width: 8,
           ), // Additional spacing/visual cue for sub-items
-        Container(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? Colors.white.withValues(alpha: 0.2)
-                  : isHovered
-                  ? const Color(0xFF6366F1).withValues(alpha: 0.1)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              isSelected ? selectedIcon : icon,
-              color: isSelected
-                  ? Colors.white
-                  : isHovered
-                  ? const Color(0xFF6366F1)
-                  : Colors.grey.shade600,
-              size: isSubItem ? 16 : 18,
-            ),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? Colors.white.withValues(alpha: 0.2)
+                : isHovered
+                ? const Color(0xFF6366F1).withValues(alpha: 0.1)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            isSelected ? selectedIcon : icon,
+            color: isSelected
+                ? Colors.white
+                : isHovered
+                ? const Color(0xFF6366F1)
+                : Colors.grey.shade600,
+            size: isSubItem ? 16 : 18,
           ),
         ),
         const SizedBox(width: 8),

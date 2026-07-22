@@ -31,7 +31,45 @@ class TaskWithShop {
   String get effectiveOwner => journalCreatedBy ?? task.ownerBy;
 }
 
+/// Cached result of [KpiBloc._fetchShopTasksAndJournals] for a given set of
+/// shops AND date range (the GL journal fetch is scoped to the date range
+/// server-side, so the cache key includes it too — see _shopCacheKey).
+/// Branch/status/search filters are still applied client-side on top of
+/// this raw fetch and don't need a re-fetch of their own.
+class _ShopFetchCacheEntry {
+  final List<TaskWithShop> tasks;
+  final Map<String, Map<String, int>> journalMap;
+  final DateTime cachedAt;
+
+  _ShopFetchCacheEntry(this.tasks, this.journalMap, this.cachedAt);
+}
+
 class KpiBloc extends Bloc<KpiEvent, KpiState> {
+  /// How long a fetched (tasks + GL journals) result stays valid before a
+  /// fresh fetch is triggered again for the same set of shops.
+  static const Duration _cacheTtl = Duration(minutes: 2);
+
+  // NOTE: shop fetches (both tasks AND GL journals) are intentionally kept
+  // strictly SEQUENTIAL, one shop fully at a time. Confirmed by live testing
+  // against the real API (2026-07) that /gl/journal ignores the `shopids`
+  // query param entirely and instead returns data for whichever shop was
+  // last selected via POST /select-shop on this session/token. Running
+  // these concurrently across shops would race on that shared session state
+  // and silently mix up / drop data between shops. Do not parallelize this
+  // without a backend change that makes shop scoping stateless per-request.
+  static const int _glJournalPageLimit = 1000;
+
+  // static (not instance) so the cache survives KpiBloc being disposed and
+  // recreated — which happens every time the user navigates away from the
+  // KPI page and back, since KpiPage builds a brand-new BlocProvider/KpiBloc
+  // each time. An instance field here would never actually get reused.
+  static final Map<String, _ShopFetchCacheEntry> _fetchCache = {};
+
+  /// Call this on logout / account switch so the next login doesn't briefly
+  /// show a previous account's cached KPI data (the cache above is static
+  /// and otherwise survives across BlocProvider recreation).
+  static void clearCache() => _fetchCache.clear();
+
   KpiBloc() : super(KpiInitial()) {
     on<LoadKpiData>(_onLoadKpiData);
     on<LoadShops>(_onLoadShops);
@@ -50,6 +88,13 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
       List<KpiShopItem> shops = [];
       List<KpiEmployee> employees = [];
 
+      // Default view = current month, same as KPI Journal. Computed up
+      // front so the GL journal fetch can be scoped to it (see
+      // _fetchShopTasksAndJournals) instead of pulling every GL journal
+      // row the shop has ever had.
+      final now = DateTime.now();
+      final startDate = DateTime(now.year, now.month, 1);
+      final endDate = DateTime(now.year, now.month + 1, 0);
 
       // Load shop list from /list-shop API
       if (AuthRepository.isAuthenticated) {
@@ -62,18 +107,29 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
 
             dLog('🏪 Loading tasks for all shops (default)...');
             try {
-              final fetched = await _fetchShopTasksAndJournals(shops);
+              final fetched = await _fetchShopTasksAndJournals(
+                shops,
+                startDate: startDate,
+                endDate: endDate,
+              );
               final allTasks = fetched.tasks;
               final allJournalCountMap = fetched.journalMap;
 
               dLog('📊 Tasks: ${allTasks.length}, JournalMap keys: ${allJournalCountMap.length}');
 
-              if (allTasks.isNotEmpty) {
-                _applyJournalExtras(allTasks, allJournalCountMap);
-                _cacheKnownEmployees(allTasks);
-                employees = _groupTasksByOwner(allTasks);
-                dLog('✅ Loaded ${employees.length} employees (grouped) for all shops');
-              }
+              // Same ownerAt-based filtering + grouping pipeline used by
+              // _onSelectShopAndSearch, so the initial view is actually
+              // scoped to [startDate, endDate] too — previously this step
+              // was skipped on first load, so the date picker showed "this
+              // month" while the table still showed every task ever (since
+              // /task itself isn't date-scoped server-side).
+              employees = _buildEmployees(
+                allTasks,
+                allJournalCountMap,
+                startDate: startDate,
+                endDate: endDate,
+              );
+              dLog('✅ Loaded ${employees.length} employees (grouped) for all shops');
             } catch (e) {
               dLog('⚠️ Failed to load tasks for all shops: $e');
             }
@@ -83,14 +139,16 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         }
       } // end if (AuthRepository.isAuthenticated)
 
-      final now = DateTime.now();
-      final startDate = DateTime(now.year, now.month, 1);
-      final endDate = DateTime(now.year, now.month + 1, 0);
+      final filteredEmployees = _applyFilters(
+        employees,
+        startDate: startDate,
+        endDate: endDate,
+      );
 
       emit(
         KpiLoaded(
           employees: employees,
-          filteredEmployees: employees,
+          filteredEmployees: filteredEmployees,
           startDate: startDate,
           endDate: endDate,
           shops: shops,
@@ -147,25 +205,21 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
           ? currentState.shops
           : currentState.shops.where((s) => event.shopIds.contains(s.shopId)).toList();
 
-      final fetched = await _fetchShopTasksAndJournals(targetShops);
+      final fetched = await _fetchShopTasksAndJournals(
+        targetShops,
+        startDate: event.startDate,
+        endDate: event.endDate,
+      );
       final allTasks = fetched.tasks;
       final allJournalCountMap = fetched.journalMap;
 
       if (allTasks.isNotEmpty) {
-        List<TaskWithShop> filteredTasks = allTasks;
-
-        if (event.startDate != null && event.endDate != null) {
-          final start = DateTime(event.startDate!.year, event.startDate!.month, event.startDate!.day);
-          final end = DateTime(event.endDate!.year, event.endDate!.month, event.endDate!.day, 23, 59, 59);
-          filteredTasks = allTasks.where((item) {
-            return item.task.ownerAt.isAfter(start.subtract(const Duration(seconds: 1))) &&
-                item.task.ownerAt.isBefore(end);
-          }).toList();
-        }
-
-        _applyJournalExtras(filteredTasks, allJournalCountMap);
-        _cacheKnownEmployees(filteredTasks);
-        employees = _groupTasksByOwner(filteredTasks);
+        employees = _buildEmployees(
+          allTasks,
+          allJournalCountMap,
+          startDate: event.startDate,
+          endDate: event.endDate,
+        );
         dLog('✅ Loaded ${employees.length} employees (grouped)');
       } else {
         dLog('📋 No tasks found for selected shops');
@@ -222,15 +276,83 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
     return KpiShopItem(shopId: shopId, shopName: shopName);
   }
 
+  /// Cache key for a set of shops + date range: sorted shop IDs joined
+  /// together plus the date bounds, so different shop sets AND different
+  /// date windows each get their own cache slot.
+  String _shopCacheKey(
+    List<KpiShopItem> shops, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) {
+    final ids = shops.map((s) => s.shopId).toList()..sort();
+    final s = startDate != null ? JournalService.formatDate(startDate) : '-';
+    final e = endDate != null ? JournalService.formatDate(endDate) : '-';
+    return '${ids.join(',')}|$s|$e';
+  }
+
+  /// Fetches tasks + GL journals for [shops]. When [startDate]/[endDate]
+  /// are given, the GL journal fetch (which supports server-side date
+  /// filtering) is scoped to that window instead of pulling a shop's
+  /// entire GL journal history — pass null to fetch all-time (e.g. for
+  /// callers that don't have a date filter yet). Note tasks themselves
+  /// can't be date-scoped server-side; /task has no date param.
   Future<({List<TaskWithShop> tasks, Map<String, Map<String, int>> journalMap})>
-      _fetchShopTasksAndJournals(List<KpiShopItem> shops) async {
+      _fetchShopTasksAndJournals(
+    List<KpiShopItem> shops, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final cacheKey = _shopCacheKey(shops, startDate: startDate, endDate: endDate);
+    final cached = _fetchCache[cacheKey];
+    if (cached != null &&
+        DateTime.now().difference(cached.cachedAt) < _cacheTtl) {
+      dLog(
+        '📋 Using cached KPI data for ${shops.length} shop(s) '
+        '(${DateTime.now().difference(cached.cachedAt).inSeconds}s old)',
+      );
+      return (tasks: cached.tasks, journalMap: cached.journalMap);
+    }
+
+    final startStr =
+        startDate != null ? JournalService.formatDate(startDate) : null;
+    final endStr = endDate != null ? JournalService.formatDate(endDate) : null;
+
+    // Fetch each shop fully SEQUENTIALLY: select-shop (inside
+    // fetchTasksForShop) -> fetch tasks -> fetch ALL GL journal pages for
+    // THAT SAME shop, then move to the next shop. This ordering matters:
+    // /gl/journal ignores its own shopId/shopids param and just returns
+    // data for whatever shop the session currently has selected, so the GL
+    // fetch for a shop must happen immediately after that shop was
+    // selected, with nothing else touching the session in between.
     final List<TaskWithShop> allTasks = [];
     final Map<String, Map<String, int>> allJournalCountMap = {};
 
     for (final shop in shops) {
-      final result = await _fetchOneShop(shop);
-      allTasks.addAll(result.tasks);
-      result.journalMap.forEach((guid, keyers) {
+      try {
+        final response = await TaskService.fetchTasksForShop(
+          shopId: shop.shopId,
+          limit: 5000,
+          status: [0, 1, 2, 3, 4, 5, 6],
+        );
+        if (response.success && response.tasks.isNotEmpty) {
+          allTasks.addAll(
+            response.tasks.map((t) => TaskWithShop(t, shop.shopName)),
+          );
+        }
+      } catch (e) {
+        dLog('⚠️ Failed to load tasks for shop ${shop.shopName}: $e');
+      }
+
+      // GL fetch right after this shop's task-fetch (which just selected
+      // it), scoped to [startStr, endStr] when given, while still looping
+      // through every page (fixes the previous bug of only reading page 1
+      // / the first ~1000 rows).
+      final journalMap = await _fetchAllGLJournalsForShop(
+        shop,
+        startStr: startStr,
+        endStr: endStr,
+      );
+      journalMap.forEach((guid, keyers) {
         keyers.forEach((keyer, count) {
           allJournalCountMap
               .putIfAbsent(guid, () => {})
@@ -238,35 +360,55 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
         });
       });
     }
+
+    _fetchCache[cacheKey] =
+        _ShopFetchCacheEntry(allTasks, allJournalCountMap, DateTime.now());
+
     return (tasks: allTasks, journalMap: allJournalCountMap);
   }
 
-  Future<({List<TaskWithShop> tasks, Map<String, Map<String, int>> journalMap})>
-      _fetchOneShop(KpiShopItem shop) async {
-    final List<TaskWithShop> tasks = [];
+  /// Fetches every page of GL journals for a single shop and groups the
+  /// result by (task guid → creator → count). Loops through all pages
+  /// instead of only reading the first ~1000 rows. When [startStr]/[endStr]
+  /// are given, scopes the fetch server-side to that date window.
+  Future<Map<String, Map<String, int>>> _fetchAllGLJournalsForShop(
+    KpiShopItem shop, {
+    String? startStr,
+    String? endStr,
+  }) async {
     final Map<String, Map<String, int>> journalMap = {};
 
     try {
-      final response = await TaskService.fetchTasksForShop(
-        shopId: shop.shopId,
-        limit: 5000,
-        status: [0, 1, 2, 3, 4, 5, 6],
-      );
-      if (response.success && response.tasks.isNotEmpty) {
-        tasks.addAll(response.tasks.map((t) => TaskWithShop(t, shop.shopName)));
-      }
-    } catch (e) {
-      dLog('⚠️ Failed to load tasks for shop ${shop.shopName}: $e');
-    }
+      int page = 1;
+      int totalPages = 1;
+      int fetchedCount = 0;
 
-    try {
-      final glResp = await JournalService.getAllGLJournals(
-        task: 'GL Journal',
-        shopId: shop.shopId.isNotEmpty ? shop.shopId : null,
-      );
-      dLog('📋 GL Journals for shop ${shop.shopName}: ${glResp.journals?.length ?? 0}');
-      if (glResp.success == true && glResp.journals != null) {
-        for (final journal in glResp.journals!) {
+      do {
+        final glResp = await JournalService.getAllGLJournals(
+          task: 'GL Journal',
+          shopId: shop.shopId.isNotEmpty ? shop.shopId : null,
+          page: page,
+          limit: _glJournalPageLimit,
+          startDate: startStr,
+          endDate: endStr,
+        );
+
+        if (glResp.success != true || glResp.journals == null) break;
+
+        final journals = glResp.journals!;
+        fetchedCount += journals.length;
+
+        if (page == 1) {
+          final p = glResp.pagination;
+          if (p != null) {
+            totalPages = p.totalPages ??
+                (p.total != null && p.total! > 0
+                    ? ((p.total! + _glJournalPageLimit - 1) ~/ _glJournalPageLimit)
+                    : 1);
+          }
+        }
+
+        for (final journal in journals) {
           if (journal.jobGuidfixed != null &&
               journal.jobGuidfixed!.isNotEmpty &&
               journal.createdBy != null) {
@@ -275,12 +417,50 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
                 .update(journal.createdBy!, (c) => c + 1, ifAbsent: () => 1);
           }
         }
-      }
+
+        if (journals.length < _glJournalPageLimit) break;
+        page++;
+      } while (page <= totalPages);
+
+      dLog(
+        '📋 GL Journals for shop ${shop.shopName}: $fetchedCount row(s) '
+        'across ${page.clamp(1, totalPages)} page(s)',
+      );
     } catch (e) {
       dLog('⚠️ Failed to fetch GL Journals for shop ${shop.shopName}: $e');
     }
 
-    return (tasks: tasks, journalMap: journalMap);
+    return journalMap;
+  }
+
+  /// Filters [allTasks] by ownerAt within [startDate, endDate] (inclusive,
+  /// when both given), merges in GL journal keyer extras, caches known
+  /// employee names, and groups into KpiEmployee rows. Shared by the
+  /// initial load (_onLoadKpiData) and the search/filter pipeline
+  /// (_onSelectShopAndSearch) so both stay consistent — previously only the
+  /// latter applied this filtering, so the very first load showed every
+  /// task ever regardless of what the date picker displayed.
+  List<KpiEmployee> _buildEmployees(
+    List<TaskWithShop> allTasks,
+    Map<String, Map<String, int>> journalMap, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) {
+    if (allTasks.isEmpty) return [];
+
+    List<TaskWithShop> filteredTasks = allTasks;
+    if (startDate != null && endDate != null) {
+      final start = DateTime(startDate.year, startDate.month, startDate.day);
+      final end = DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
+      filteredTasks = allTasks.where((item) {
+        return item.task.ownerAt.isAfter(start.subtract(const Duration(seconds: 1))) &&
+            item.task.ownerAt.isBefore(end);
+      }).toList();
+    }
+
+    _applyJournalExtras(filteredTasks, journalMap);
+    _cacheKnownEmployees(filteredTasks);
+    return _groupTasksByOwner(filteredTasks);
   }
 
   void _cacheKnownEmployees(List<TaskWithShop> tasks) {
@@ -588,24 +768,22 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
     return value > 0 ? value : 0;
   }
 
+  /// Changing the date range now re-fetches (scoped to the new range) rather
+  /// than only re-filtering already-loaded data client-side, since GL
+  /// journal fetches are date-scoped server-side (see
+  /// _fetchShopTasksAndJournals). Reuses the SelectShopAndSearch pipeline
+  /// with the current shop selection so there's only one fetch code path.
   void _onFilterByDateRange(FilterByDateRange event, Emitter<KpiState> emit) {
     if (state is KpiLoaded) {
       final currentState = state as KpiLoaded;
-      final filtered = _applyFilters(
-        currentState.employees,
-        startDate: event.startDate,
-        endDate: event.endDate,
-        branch: currentState.selectedBranch,
-        status: currentState.selectedStatus,
-        query: currentState.searchQuery,
-        selectedEmployeeIds: currentState.selectedEmployeeIds,
-      );
-
-      emit(
-        currentState.copyWith(
+      add(
+        SelectShopAndSearch(
+          shopIds: currentState.selectedShopIds,
+          shopNames: currentState.selectedShopNames,
           startDate: event.startDate,
           endDate: event.endDate,
-          filteredEmployees: filtered,
+          query: currentState.searchQuery,
+          selectedEmployeeIds: currentState.selectedEmployeeIds,
         ),
       );
     }

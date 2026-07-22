@@ -65,48 +65,97 @@ class CustomPagination extends StatelessWidget {
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          if (totalLabel != null) ...[
-            Expanded(
-              child: Text(
-                totalLabel!,
-                style: const TextStyle(
-                  color: Color(0xFF334155),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 560;
+
+          if (isCompact) {
+            return Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                if (totalLabel != null)
+                  SizedBox(
+                    width: constraints.maxWidth,
+                    child: Text(
+                      totalLabel!,
+                      style: const TextStyle(
+                        color: Color(0xFF334155),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildNavButton(
+                      icon: Icons.chevron_left_rounded,
+                      onTap: currentPage > 1
+                          ? () => onPageChanged(currentPage - 1)
+                          : null,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'หน้า $currentPage / $_totalPages',
+                      style: const TextStyle(
+                        color: Color(0xFF334155),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    _buildNavButton(
+                      icon: Icons.chevron_right_rounded,
+                      onTap: currentPage < _totalPages
+                          ? () => onPageChanged(currentPage + 1)
+                          : null,
+                    ),
+                  ],
                 ),
+                _buildRowsPerPageDropdown(),
+              ],
+            );
+          }
+
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (totalLabel != null) ...[
+                Expanded(
+                  child: Text(
+                    totalLabel!,
+                    style: const TextStyle(
+                      color: Color(0xFF334155),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+              ],
+              _buildNavButton(
+                icon: Icons.chevron_left_rounded,
+                onTap: currentPage > 1
+                    ? () => onPageChanged(currentPage - 1)
+                    : null,
               ),
-            ),
-            const SizedBox(width: 16),
-          ],
-          // Previous button
-          _buildNavButton(
-            icon: Icons.chevron_left_rounded,
-            onTap: currentPage > 1
-                ? () => onPageChanged(currentPage - 1)
-                : null,
-          ),
-          const SizedBox(width: 8),
-
-          // Page numbers
-          ..._buildPageNumbers(),
-
-          const SizedBox(width: 8),
-          // Next button
-          _buildNavButton(
-            icon: Icons.chevron_right_rounded,
-            onTap: currentPage < _totalPages
-                ? () => onPageChanged(currentPage + 1)
-                : null,
-          ),
-
-          const SizedBox(width: 24),
-
-          // Rows per page dropdown
-          _buildRowsPerPageDropdown(),
-        ],
+              const SizedBox(width: 8),
+              ..._buildPageNumbers(),
+              const SizedBox(width: 8),
+              _buildNavButton(
+                icon: Icons.chevron_right_rounded,
+                onTap: currentPage < _totalPages
+                    ? () => onPageChanged(currentPage + 1)
+                    : null,
+              ),
+              const SizedBox(width: 24),
+              _buildRowsPerPageDropdown(),
+            ],
+          );
+        },
       ),
     );
   }

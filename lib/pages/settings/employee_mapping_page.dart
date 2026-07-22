@@ -153,6 +153,7 @@ class _EmployeeMappingPageState extends State<EmployeeMappingPage> {
                   username.trim(),
                   displayController.text.trim(),
                 );
+                if (!context.mounted) return;
                 Navigator.pop(context);
                 _loadData();
               }

@@ -336,10 +336,8 @@ class JournalService {
       final response = await http
           .get(uri, headers: headers)
           .timeout(_requestTimeout);
-      // ignore: avoid_print
-      print('[KPI_DEBUG] 📡 GL Journal status=${response.statusCode} url=$uri');
-      // ignore: avoid_print
-      print('[KPI_DEBUG] 📄 body=${response.body.substring(0, response.body.length > 300 ? 300 : response.body.length)}');
+      dLog('[KPI_DEBUG] 📡 GL Journal status=${response.statusCode} url=$uri');
+      dLog('[KPI_DEBUG] 📄 body=${response.body.substring(0, response.body.length > 300 ? 300 : response.body.length)}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -350,8 +348,7 @@ class JournalService {
         );
       }
     } catch (e) {
-      // ignore: avoid_print
-      print('[KPI_DEBUG] 💥 GL Journal error: $e');
+      dLog('[KPI_DEBUG] 💥 GL Journal error: $e');
       rethrow;
     }
   }
@@ -419,3 +416,4 @@ class JournalService {
     }
   }
 }
+

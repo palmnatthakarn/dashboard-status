@@ -2,6 +2,27 @@ import 'package:pdf/pdf.dart'; // Trigger rebuild
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+/// One person's section in a grouped report (see [PdfExportService.
+/// exportGroupedTableToPdf]) — a bold name/summary banner followed by a
+/// small table of that person's rows (e.g. one row per shop).
+class KpiPdfGroup {
+  final String name;
+  final String summary;
+  final List<List<String>> rows;
+  final List<List<String>>? totalRows;
+  final Set<int> contextRowIndexes;
+  final bool showColumnTotals;
+
+  const KpiPdfGroup({
+    required this.name,
+    required this.summary,
+    this.rows = const [],
+    this.totalRows,
+    this.contextRowIndexes = const {},
+    this.showColumnTotals = false,
+  });
+}
+
 class PdfExportService {
   static Future<void> exportTableToPdf({
     required String title,
@@ -48,6 +69,357 @@ class PdfExportService {
     );
   }
 
+  /// Report grouped by person (e.g. employee), each with its own bold
+  /// name/summary banner followed by a small breakdown table (e.g. one row
+  /// per shop). Use this instead of [exportTableToPdf] whenever a flat
+  /// table would make it hard to tell which rows belong to which person —
+  /// the banner makes "who did what, where" unambiguous at a glance.
+  static Future<void> exportGroupedTableToPdf({
+    required String title,
+    required List<String> subHeaders,
+    required List<KpiPdfGroup> groups,
+    DateTime? startDate,
+    DateTime? endDate,
+    String userName = 'ผู้ใช้งาน',
+  }) async {
+    final font = await PdfGoogleFonts.sarabunRegular();
+    final fontBold = await PdfGoogleFonts.sarabunBold();
+
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(28),
+        // The default is 20 pages. A full KPI export can contain more than
+        // that once each employee's shop table is laid out and paginated.
+        maxPages: 200,
+        theme: pw.ThemeData.withFont(base: font, bold: fontBold),
+        header: (context) => _buildFormalHeader(
+          title: title,
+          startDate: startDate,
+          endDate: endDate,
+          userName: userName,
+          pageNumber: context.pageNumber,
+          pagesCount: context.pagesCount,
+          font: font,
+          fontBold: fontBold,
+        ),
+        build: (context) => [
+          pw.SizedBox(height: 10),
+          for (var i = 0; i < groups.length; i++)
+            ..._buildGroupBlocks(i, groups[i], subHeaders, font, fontBold),
+        ],
+      ),
+    );
+
+    final pdfBytes = await pdf.save();
+
+    await Printing.layoutPdf(
+      onLayout: (_) async => pdfBytes,
+      name:
+          '${title.replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.pdf',
+    );
+  }
+
+  /// Groups with a lot of shop rows can exceed a full page's height on
+  /// their own; pw.Inseparable throws in that case ("widget won't fit into
+  /// the page"), so only atomically-glue small/medium groups together.
+  /// Oversized groups fall back to normal flowing behavior — the banner
+  /// may still get separated from its table in that rare case, but the
+  /// export won't crash.
+  // A shop name may wrap onto several lines, so row count alone
+  // underestimates a group's physical height. Keep only compact groups
+  // together; larger reports must be allowed to flow onto the next page.
+  static const int _rowsPerGroupChunk = 8;
+
+  static List<pw.Widget> _buildGroupBlocks(
+    int index,
+    KpiPdfGroup group,
+    List<String> subHeaders,
+    pw.Font font,
+    pw.Font fontBold,
+  ) {
+    final chunks = <pw.Widget>[];
+    for (var start = 0; start < group.rows.length; start += _rowsPerGroupChunk) {
+      final end = (start + _rowsPerGroupChunk).clamp(0, group.rows.length);
+      final isLastChunk = end == group.rows.length;
+      final contextRowIndexes = group.contextRowIndexes
+          .where((rowIndex) => rowIndex >= start && rowIndex < end)
+          .map((rowIndex) => rowIndex - start)
+          .toSet();
+      chunks.add(
+        pw.Inseparable(
+          child: pw.Padding(
+            padding: pw.EdgeInsets.only(bottom: 12, top: index == 0 ? 0 : 3),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                _buildGroupBanner(index + 1, group, font, fontBold),
+                pw.SizedBox(height: 4),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.only(left: 12),
+                  child: _buildGroupTable(
+                    subHeaders,
+                    group.rows.sublist(start, end),
+                    font,
+                    fontBold,
+                    group.showColumnTotals && isLastChunk,
+                    totalRows: group.totalRows ?? group.rows,
+                    contextRowIndexes: contextRowIndexes,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    if (chunks.isEmpty) {
+      chunks.add(_buildGroupBanner(index + 1, group, font, fontBold));
+    }
+
+    // pw.Column spans across pages by default in this package, which was
+    // splitting the employee banner from its own shop table whenever the
+    // table didn't fit the remaining page — leaving the banner orphaned
+    // above a page break with a big blank gap below it. pw.Inseparable
+    // forces the whole group (banner + table) to move to the next page
+    // together instead of breaking mid-group.
+    return chunks;
+  }
+
+  static pw.Widget _buildGroupBanner(
+    int index,
+    KpiPdfGroup group,
+    pw.Font font,
+    pw.Font fontBold,
+  ) {
+    return pw.Container(
+      width: double.infinity,
+      padding: const pw.EdgeInsets.only(bottom: 3),
+      decoration: const pw.BoxDecoration(
+        border: pw.Border(
+          bottom: pw.BorderSide(width: 0.75, color: PdfColors.black),
+        ),
+      ),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: pw.CrossAxisAlignment.end,
+        children: [
+          pw.Text(
+            '$index. ${group.name}',
+            style: pw.TextStyle(font: fontBold, fontSize: 11),
+          ),
+          pw.Text(
+            group.summary,
+            style: pw.TextStyle(
+              font: font,
+              fontSize: 9,
+              color: PdfColors.grey700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Formal header: centered document title/date range, then a metadata
+  /// row (printer, print date, page number), separated by a solid rule —
+  /// styled to read like an official printed report rather than an
+  /// in-app card.
+  static pw.Widget _buildFormalHeader({
+    required String title,
+    required DateTime? startDate,
+    required DateTime? endDate,
+    required String userName,
+    required int pageNumber,
+    required int pagesCount,
+    required pw.Font font,
+    required pw.Font fontBold,
+  }) {
+    final now = DateTime.now();
+    String dateRange = '';
+    if (startDate != null && endDate != null) {
+      dateRange =
+          'ช่วงข้อมูล ${_formatThaiDate(startDate)} ถึง ${_formatThaiDate(endDate)}';
+    }
+
+    return pw.Container(
+      padding: const pw.EdgeInsets.only(bottom: 10),
+      decoration: const pw.BoxDecoration(
+        border: pw.Border(
+          bottom: pw.BorderSide(width: 1.2, color: PdfColors.black),
+        ),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        children: [
+          pw.Text(
+            title,
+            style: pw.TextStyle(font: fontBold, fontSize: 16),
+            textAlign: pw.TextAlign.center,
+          ),
+          if (dateRange.isNotEmpty) ...[
+            pw.SizedBox(height: 3),
+            pw.Text(
+              dateRange,
+              style: pw.TextStyle(
+                font: font,
+                fontSize: 10,
+                color: PdfColors.grey700,
+              ),
+            ),
+          ],
+          pw.SizedBox(height: 8),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'ผู้จัดพิมพ์ $userName',
+                    style: pw.TextStyle(font: font, fontSize: 9),
+                  ),
+                  pw.SizedBox(height: 2),
+                  pw.Text(
+                    'วันที่จัดพิมพ์ ${_formatThaiDate(now)}',
+                    style: pw.TextStyle(font: font, fontSize: 9),
+                  ),
+                ],
+              ),
+              pw.Text(
+                'หน้า $pageNumber / $pagesCount',
+                style: pw.TextStyle(font: font, fontSize: 9),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _buildGroupTable(
+    List<String> headers,
+    List<List<String>> rows,
+    pw.Font font,
+    pw.Font fontBold,
+    bool showColumnTotals, {
+    List<List<String>>? totalRows,
+    Set<int> contextRowIndexes = const {},
+  }) {
+    if (rows.isEmpty) {
+      return pw.Text(
+        'ไม่มีข้อมูลรายละเอียด',
+        style: pw.TextStyle(
+          font: font,
+          fontSize: 8,
+          color: PdfColors.grey500,
+        ),
+      );
+    }
+    final rowsToTotal = totalRows ?? rows;
+    final totals = List<String>.generate(headers.length, (index) {
+      if (index == 0) return 'รวม';
+      return rowsToTotal
+          .map((row) => int.tryParse(row[index].replaceAll(',', '')) ?? 0)
+          .fold(0, (sum, value) => sum + value)
+          .toString();
+    });
+
+    pw.TableRow totalRow() => pw.TableRow(
+      decoration: const pw.BoxDecoration(color: PdfColors.blue50),
+      children: totals.asMap().entries.map((entry) {
+        final isFirst = entry.key == 0;
+        return pw.Container(
+          decoration: const pw.BoxDecoration(color: PdfColors.blue50),
+          padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          alignment: isFirst ? pw.Alignment.centerLeft : pw.Alignment.centerRight,
+          child: pw.Text(
+            entry.value,
+            style: pw.TextStyle(font: fontBold, fontSize: 8),
+            textAlign: isFirst ? pw.TextAlign.left : pw.TextAlign.right,
+          ),
+        );
+      }).toList(),
+    );
+
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.grey600, width: 0.5),
+      columnWidths: {
+        0: const pw.FlexColumnWidth(2.2),
+        for (var i = 1; i < headers.length; i++) i: const pw.FlexColumnWidth(1),
+      },
+      children: [
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+          children: headers.asMap().entries
+              .map(
+                (entry) {
+                  final index = entry.key;
+                  final h = entry.value;
+                  final color = index == 0 || index == 1
+                      ? PdfColors.blue100
+                      : index <= 6
+                      ? PdfColors.amber100
+                  : index <= 10
+                      ? PdfColors.green100
+                      : PdfColors.indigo100;
+                  return pw.Container(
+                    decoration: pw.BoxDecoration(color: color),
+                    height: 38,
+                    padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 4,
+                    ),
+                    alignment: pw.Alignment.center,
+                    child: pw.Text(
+                      h,
+                      style: pw.TextStyle(font: fontBold, fontSize: 7),
+                      textAlign: pw.TextAlign.center,
+                    ),
+                  );
+                },
+              )
+              .toList(),
+        ),
+        ...rows.asMap().entries.map(
+          (rowEntry) => pw.TableRow(
+            children: rowEntry.value.asMap().entries.map((entry) {
+              final isFirst = entry.key == 0;
+              final isContextMetric =
+                  contextRowIndexes.contains(rowEntry.key) &&
+                  entry.key >= 1 &&
+                  entry.key <= 10 &&
+                  entry.value != '0' &&
+                  entry.value != '-';
+              return pw.Container(
+                padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 4,
+                  vertical: 3,
+                ),
+                alignment: isFirst
+                    ? pw.Alignment.centerLeft
+                    : pw.Alignment.centerRight,
+                child: pw.Text(
+                  entry.value,
+                  style: pw.TextStyle(
+                    font: font,
+                    fontSize: 8,
+                    color: isContextMetric ? PdfColors.deepOrange : null,
+                  ),
+                  textAlign: isFirst ? pw.TextAlign.left : pw.TextAlign.right,
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        if (showColumnTotals) totalRow(),
+      ],
+    );
+  }
+
   static pw.Widget _buildHeader({
     required String title,
     required DateTime? startDate,
@@ -80,7 +452,7 @@ class PdfExportService {
             children: [
               pw.Expanded(
                 child: pw.Text(
-                  'รายงานข้อมูลรายวัน $dateRange',
+                  dateRange.isEmpty ? title : '$title $dateRange',
                   style: pw.TextStyle(font: fontBold, fontSize: 11),
                 ),
               ),

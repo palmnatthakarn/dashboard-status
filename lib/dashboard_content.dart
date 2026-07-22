@@ -2,11 +2,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'blocs/auth/auth_bloc.dart';
 import 'blocs/bloc_exports.dart';
 import 'components/shop_data_table.dart';
 import 'components/dashboard_filter_section.dart';
 import 'components/dashboard_statistics_grid.dart';
 import 'components/dashboard_loading_widgets.dart';
+import 'services/auth_repository.dart';
 import 'utils/dashboard_helper.dart';
 
 class DashboardContent extends StatefulWidget {
@@ -31,7 +33,10 @@ class _DashboardContentState extends State<DashboardContent> {
         BlocProvider(
           create: (context) => DashboardBloc()..add(FetchDashboardData()),
         ),
-        BlocProvider(create: (context) => KpiBloc()..add(LoadKpiData())),
+        BlocProvider(
+          create: (context) =>
+              KpiCombinedBloc()..add(const LoadKpiCombinedData()),
+        ),
         BlocProvider(create: (context) => ImageApprovalBloc()),
       ],
       child: Scaffold(
@@ -50,7 +55,18 @@ class _DashboardContentState extends State<DashboardContent> {
           centerTitle: false,
         ),
         body: SafeArea(
-          child: BlocBuilder<DashboardBloc, DashboardState>(
+          child: BlocConsumer<DashboardBloc, DashboardState>(
+            listener: (context, state) {
+              // A "Token หมดอายุ" error is unrecoverable — retrying the
+              // same fetch will just fail again forever, leaving the user
+              // stuck on a dead-end error screen (this is what other,
+              // non-owner users were hitting in production). Force a
+              // logout so the app routes back to the login screen instead.
+              if (state is DashboardError &&
+                  AuthRepository.isSessionExpiredError(state.message)) {
+                context.read<AuthBloc>().add(LogoutRequested());
+              }
+            },
             builder: (context, state) {
               // Debug: แสดง state ปัจจุบัน
               log('📊 Current Dashboard State: ${state.runtimeType}');
@@ -68,7 +84,9 @@ class _DashboardContentState extends State<DashboardContent> {
                 return RefreshIndicator(
                   onRefresh: () async {
                     context.read<DashboardBloc>().add(FetchDashboardData());
-                    context.read<KpiBloc>().add(LoadKpiData());
+                    context.read<KpiCombinedBloc>().add(
+                      const LoadKpiCombinedData(),
+                    );
                   },
                   child: CustomScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),

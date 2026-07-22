@@ -24,6 +24,7 @@ class KpiFilterSection extends StatefulWidget {
   final VoidCallback onSearch;
   final VoidCallback onClearSearch;
   final VoidCallback onRefresh;
+  final VoidCallback? onExportPdf;
 
   final List<String> selectedEmployeeIds;
   final Function(KpiEmployee) onEmployeeSelected;
@@ -48,6 +49,7 @@ class KpiFilterSection extends StatefulWidget {
     required this.onSearch,
     required this.onClearSearch,
     required this.onRefresh,
+    this.onExportPdf,
     this.selectedEmployeeIds = const [],
     required this.onEmployeeSelected,
     required this.onEmployeeRemoved,
@@ -609,6 +611,17 @@ class _KpiFilterSectionState extends State<KpiFilterSection> {
             widget.onRefresh();
           },
         ),
+        if (widget.onExportPdf != null) ...[
+          const SizedBox(width: 8),
+          _buildToolButton(
+            icon: Icons.picture_as_pdf_rounded,
+            tooltip: 'ดาวน์โหลด PDF',
+            onTap: () {
+              _searchFocusNode.unfocus();
+              widget.onExportPdf!();
+            },
+          ),
+        ],
         const SizedBox(width: 8),
         // Search button
         Material(

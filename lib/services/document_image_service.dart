@@ -105,6 +105,31 @@ class DocumentImageGroup {
   }
 }
 
+/// One GL journal reference attached to a document image group — the
+/// `references[]` entries seen on `/documentimagegroup`. `docNo` is what
+/// lets a GL journal row (matched by its own `docno`) be traced back to
+/// the document/task that produced it, entirely separately from
+/// `jobguidfixed`.
+class DocumentImageGroupReference {
+  final String guidfixed;
+  final String module;
+  final String docNo;
+
+  const DocumentImageGroupReference({
+    required this.guidfixed,
+    required this.module,
+    required this.docNo,
+  });
+
+  factory DocumentImageGroupReference.fromJson(Map<String, dynamic> json) {
+    return DocumentImageGroupReference(
+      guidfixed: json['guidfixed']?.toString() ?? '',
+      module: json['module']?.toString() ?? '',
+      docNo: json['docno']?.toString() ?? '',
+    );
+  }
+}
+
 /// Service to fetch document image group data
 class DocumentImageService {
   static const String baseUrl = AuthRepository.baseUrl;
@@ -313,5 +338,321 @@ class DocumentImageService {
       dLog('💥 Error fetching document images: $e');
       return {};
     }
+  }
+
+  /// Builds a docNo → taskGuid lookup from `/documentimagegroup`, covering
+  /// a link between a task and a GL journal that never goes through
+  /// `journal.jobguidfixed` at all: a document image group carries its own
+  /// `taskguid` (confirmed via a real API response — GET
+  /// `/documentimagegroup?taskguid={guid}` returns items shaped like
+  /// `{guidfixed, title, billcount, references: [{module, docno}],
+  /// taskguid, ...}`), and each item's `references[]` lists the GL journal
+  /// rows (by `docno`) that were keyed FROM that image. So: task →
+  /// (taskguid) → document image group → (references[].docno) → GL
+  /// journal, entirely separate from the task → (jobguidfixed) → GL
+  /// journal path the rest of this bloc already handles.
+  ///
+  /// Root-caused 2026-07: a GL journal recorded through the
+  /// photo-upload/OCR flow had `jobguidfixed` completely empty, so the KPI
+  /// page's "is this journal linked to a task" check had no way to trace
+  /// it back to the task it visibly belonged to in the source system —
+  /// it was flagged "ไม่ผูกงาน" (unlinked) even though a real task existed
+  /// and owned the document that produced it.
+  static Future<
+    ({
+      Map<String, String> docNoToTaskGuid,
+      int totalItemsSeen,
+      int? apiReportedTotal,
+    })
+  >
+  fetchDocNoToTaskGuidMap({
+    int page = 1,
+    int perPage = 9999,
+    String? fromDate,
+    String? toDate,
+  }) async {
+    final token = AuthRepository.token;
+    if (token == null || token.isEmpty) {
+      dLog('❌ No auth token available for documentimagegroup (docno map)');
+      return (docNoToTaskGuid: <String, String>{}, totalItemsSeen: 0, apiReportedTotal: null);
+    }
+
+    // Sends BOTH `limit` and `perPage` for the page-size param — a real
+    // request captured from the browser (GET /documentimagegroup?
+    // limit=100&page=1&sort=...&taskguid=...) used `limit`, not `perPage`,
+    // while the pre-existing fetchDocumentImageGroups() above (and this
+    // method, originally) only ever sent `perPage`. If the API silently
+    // ignores an unrecognized param name and falls back to its own small
+    // default page size, a broad "every group in the date range" call
+    // would quietly return only the first page and miss whichever group
+    // isn't in it — exactly matching "the fix didn't do anything" being
+    // reported after this was wired up. Sending both covers either name
+    // without needing to confirm which one the backend actually reads.
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'perPage': perPage.toString(),
+      'limit': perPage.toString(),
+      // NOTE: previously sent 'sort': 'xorder:1,guidfixed:1' here to match
+      // the confirmed-working scoped (taskguid=...) request exactly.
+      // Reverted — adding it to this UNSCOPED bulk call collapsed the
+      // result from 299 mapped docNo(s) down to 17, so the backend clearly
+      // treats `sort` on this endpoint as more than cosmetic ordering when
+      // there's no taskguid filter (likely re-scoping or erroring the
+      // query rather than just re-ordering it). Whatever was causing the
+      // two specific docnos to still be missing is NOT a pagination
+      // ordering gap — see totalItemsSeen/apiReportedTotal below for the
+      // actual diagnostic.
+    };
+    if (fromDate != null && fromDate.isNotEmpty) {
+      queryParams['fromdate'] = fromDate;
+    }
+    if (toDate != null && toDate.isNotEmpty) {
+      queryParams['todate'] = toDate;
+    }
+
+    final Map<String, String> docNoToTaskGuid = {};
+    var totalItemsSeen = 0;
+    int? apiReportedTotal;
+    try {
+      // Loops pages using the server's OWN reported page count/size, not
+      // the perPage/limit value we merely requested. A prior version broke
+      // out of this loop as soon as one page returned fewer than 9999
+      // items — which is every page, since the backend evidently caps
+      // page size well below that regardless of what's asked for (a real
+      // captured response for this same endpoint showed
+      // `"perPage": 100` even when the request used `limit=100`). That
+      // made this loop silently stop after page 1 every time, exactly
+      // reproducing the "map never contains the docNo I need" symptom
+      // even after the fromDate/toDate and limit/perPage fixes — an
+      // unscoped "every document ever" query can easily span many pages,
+      // and task "mai"'s May-dated documents aren't guaranteed to be on
+      // page 1 of however this endpoint sorts by default.
+      var page = 1;
+      var totalPages = 1;
+      int? actualPageSize;
+      // Hard cap so a miscomputed/garbage totalPage value can't spin this
+      // into an unbounded loop.
+      const maxPages = 500;
+      do {
+        final pagedParams = Map<String, String>.from(queryParams)
+          ..['page'] = page.toString();
+        final uri = Uri.parse(
+          '$baseUrl/documentimagegroup',
+        ).replace(queryParameters: pagedParams);
+        dLog('🔗 Fetching docNo→taskGuid map page $page from: $uri');
+
+        final response = await http.get(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        );
+
+        if (response.statusCode != 200) {
+          dLog(
+            '❌ Failed to fetch documentimagegroup for docno map: '
+            '${response.statusCode}',
+          );
+          break;
+        }
+
+        final data = json.decode(response.body);
+        if (data['success'] != true || data['data'] is! List) break;
+
+        final items = data['data'] as List;
+        totalItemsSeen += items.length;
+        for (final item in items) {
+          if (item is! Map) continue;
+          final map = Map<String, dynamic>.from(item);
+          final taskGuid = map['taskguid']?.toString().trim() ?? '';
+          if (taskGuid.isEmpty) continue;
+
+          final refsRaw = map['references'];
+          if (refsRaw is! List) continue;
+          for (final r in refsRaw) {
+            if (r is! Map) continue;
+            final ref = DocumentImageGroupReference.fromJson(
+              Map<String, dynamic>.from(r),
+            );
+            final docNo = ref.docNo.trim();
+            if (docNo.isNotEmpty) {
+              docNoToTaskGuid[docNo] = taskGuid;
+            }
+          }
+        }
+
+        if (page == 1) {
+          final p = data['pagination'];
+          if (p is Map) {
+            if (p['totalPage'] != null) {
+              totalPages = int.tryParse(p['totalPage'].toString()) ?? 1;
+            }
+            if (p['perPage'] != null) {
+              actualPageSize = int.tryParse(p['perPage'].toString());
+            }
+            if (p['total'] != null) {
+              apiReportedTotal = int.tryParse(p['total'].toString());
+            }
+          }
+          // Fall back to whatever this first page actually returned if the
+          // response didn't declare its own page size.
+          actualPageSize ??= items.length;
+          dLog(
+            '📄 documentimagegroup pagination: totalPage=$totalPages, '
+            'actualPageSize=$actualPageSize (requested perPage/limit=$perPage)',
+          );
+        }
+
+        // Stop once a page comes back short of a FULL page — using the
+        // real observed/declared page size, not the (possibly ignored)
+        // requested one.
+        if (actualPageSize != null &&
+            actualPageSize! > 0 &&
+            items.length < actualPageSize!) {
+          break;
+        }
+        page++;
+      } while (page <= totalPages && page <= maxPages);
+
+      dLog(
+        '✅ Built docNo→taskGuid map with ${docNoToTaskGuid.length} entries '
+        'from $totalItemsSeen raw item(s) across ${page.clamp(1, totalPages)} '
+        'page(s) (API reports $apiReportedTotal total item(s) exist)',
+      );
+    } catch (e) {
+      dLog('💥 Error building docNo→taskGuid map: $e');
+      return (
+        docNoToTaskGuid: docNoToTaskGuid,
+        totalItemsSeen: totalItemsSeen,
+        apiReportedTotal: apiReportedTotal,
+      );
+    }
+
+    return (
+      docNoToTaskGuid: docNoToTaskGuid,
+      totalItemsSeen: totalItemsSeen,
+      apiReportedTotal: apiReportedTotal,
+    );
+  }
+
+  /// Total `billcount` across every `/documentimagegroup` item for the
+  /// CURRENTLY SELECTED shop — feeds "ต้องบันทึก(รูปภาพ)" in the KPI page.
+  ///
+  /// Root-caused 2026-07: the pre-existing [fetchDocumentImageGroups] above
+  /// tries to build a shop-keyed map by reading `guidfixedid`/`shopid`/
+  /// `shop_id`/`shopname` off each response item — but a real captured
+  /// response for this endpoint has NONE of those fields (only `guidfixed`,
+  /// `title`, `billcount`, `references[]`, `taskguid`, ...), so that lookup
+  /// has always silently produced an empty map and "ต้องบันทึก(รูปภาพ)" has
+  /// always shown 0 for every shop. There is no shop identifier anywhere in
+  /// the response to key a map by in the first place.
+  ///
+  /// Instead of trying to parse a shop out of the response, this mirrors
+  /// [fetchDocNoToTaskGuidMap]'s fix for the exact same endpoint: call it
+  /// ONCE PER SHOP, right after that shop is selected via
+  /// [MultiShopService.selectShop] (already happens as a side effect of
+  /// TaskService.fetchTasksForShop in the per-shop fetch loop), and let the
+  /// CALLER attribute the returned total to whichever shop it just
+  /// selected — the response never has to self-identify its shop, and
+  /// /documentimagegroup evidently reads the session-selected shop the same
+  /// way /gl/journal does (ignores query params, keyed off POST
+  /// /select-shop instead).
+  ///
+  /// Also fixes the same pagination-early-exit bug [fetchDocNoToTaskGuidMap]
+  /// had before its own fix: loops using the response's own declared
+  /// `pagination.perPage`, not the (possibly ignored) requested `perPage`/
+  /// `limit`.
+  static Future<int> fetchShopBillCount({
+    int perPage = 9999,
+    String? fromDate,
+    String? toDate,
+    int ref = 1,
+  }) async {
+    final token = AuthRepository.token;
+    if (token == null || token.isEmpty) {
+      dLog('❌ No auth token available for documentimagegroup (bill count)');
+      return 0;
+    }
+
+    final queryParams = <String, String>{
+      'page': '1',
+      'perPage': perPage.toString(),
+      'limit': perPage.toString(),
+      'ref': ref.toString(),
+    };
+    if (fromDate != null && fromDate.isNotEmpty) {
+      queryParams['fromdate'] = fromDate;
+    }
+    if (toDate != null && toDate.isNotEmpty) {
+      queryParams['todate'] = toDate;
+    }
+
+    var total = 0;
+    try {
+      var page = 1;
+      var totalPages = 1;
+      int? actualPageSize;
+      const maxPages = 500;
+      do {
+        final pagedParams = Map<String, String>.from(queryParams)
+          ..['page'] = page.toString();
+        final uri = Uri.parse(
+          '$baseUrl/documentimagegroup',
+        ).replace(queryParameters: pagedParams);
+        dLog('🔗 Fetching documentimagegroup bill count page $page from: $uri');
+
+        final response = await http.get(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        );
+
+        if (response.statusCode != 200) {
+          dLog(
+            '❌ Failed to fetch documentimagegroup for bill count: '
+            '${response.statusCode}',
+          );
+          break;
+        }
+
+        final data = json.decode(response.body);
+        if (data['success'] != true || data['data'] is! List) break;
+
+        final items = data['data'] as List;
+        for (final item in items) {
+          if (item is! Map) continue;
+          final map = Map<String, dynamic>.from(item);
+          total += DocumentImageGroup._parseInt(map['billcount']);
+        }
+
+        if (page == 1) {
+          final p = data['pagination'];
+          if (p is Map) {
+            if (p['totalPage'] != null) {
+              totalPages = int.tryParse(p['totalPage'].toString()) ?? 1;
+            }
+            if (p['perPage'] != null) {
+              actualPageSize = int.tryParse(p['perPage'].toString());
+            }
+          }
+          actualPageSize ??= items.length;
+        }
+
+        if (actualPageSize != null &&
+            actualPageSize! > 0 &&
+            items.length < actualPageSize!) {
+          break;
+        }
+        page++;
+      } while (page <= totalPages && page <= maxPages);
+
+      dLog('✅ documentimagegroup bill count for current shop: $total');
+    } catch (e) {
+      dLog('💥 Error fetching documentimagegroup bill count: $e');
+    }
+    return total;
   }
 }

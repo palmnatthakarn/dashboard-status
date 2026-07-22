@@ -10,6 +10,7 @@ class KpiJournalFilterSection extends StatefulWidget {
   final DateTime? initialStartDate;
   final DateTime? initialEndDate;
   final VoidCallback onRefresh;
+  final VoidCallback? onExportPdf;
   final void Function(
     List<String> shopIds,
     List<String> shopNames,
@@ -29,6 +30,7 @@ class KpiJournalFilterSection extends StatefulWidget {
     this.initialStartDate,
     this.initialEndDate,
     required this.onRefresh,
+    this.onExportPdf,
     required this.onSearch,
     required this.onLocalFilterChanged,
     this.nameMappings,
@@ -589,6 +591,31 @@ class _KpiJournalFilterSectionState extends State<KpiJournalFilterSection> {
             ),
           ),
         ),
+        if (widget.onExportPdf != null) ...[
+          const SizedBox(width: 8),
+          Tooltip(
+            message: 'ดาวน์โหลด PDF',
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  _searchFocusNode.unfocus();
+                  widget.onExportPdf!();
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: const SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: Icon(
+                    Icons.picture_as_pdf_rounded,
+                    size: 18,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(width: 8),
         Material(
           color: Colors.transparent,

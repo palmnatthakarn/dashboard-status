@@ -106,10 +106,22 @@ class AuthRepository {
         log('🔐 Session restored for user: $_username');
 
         // Check if token is expired
-        if (isTokenExpired && _refreshToken != null) {
-          log('⏰ Token expired, attempting refresh...');
-          final refreshed = await refreshTokenWithCredentials();
-          return refreshed;
+        if (isTokenExpired) {
+          if (_refreshToken != null) {
+            log('⏰ Token expired, attempting refresh...');
+            final refreshed = await refreshTokenWithCredentials();
+            return refreshed;
+          }
+          // Expired token with no refresh token to fall back on: this is
+          // NOT a valid session. Previously this fell through to
+          // `return true`, which let AuthBloc emit AuthSuccess (showing
+          // the dashboard shell as if logged in) even though every real
+          // API call would immediately fail with "Token หมดอายุ
+          // กรุณาเข้าสู่ระบบใหม่" — leaving the user stuck on a dead-end
+          // error screen. Correctly report no session so the app routes
+          // back to the login screen instead.
+          log('⏰ Token expired and no refresh token available — session invalid');
+          return false;
         }
 
         return true;
@@ -118,6 +130,17 @@ class AuthRepository {
       log('💥 Error checking session: $e');
     }
     return false;
+  }
+
+  /// True if [message] looks like it came from the "Token หมดอายุ
+  /// กรุณาเข้าสู่ระบบใหม่" exception thrown by the API services
+  /// (task_service.dart, multi_shop_service.dart, journal_service.dart)
+  /// when a token refresh attempt fails. UI code can use this to detect an
+  /// unrecoverable session and force a logout instead of offering a retry
+  /// button that will just fail again forever.
+  static bool isSessionExpiredError(String message) {
+    return message.contains('Token หมดอายุ') ||
+        message.contains('กรุณาเข้าสู่ระบบใหม่');
   }
 
   Future<void> _persistSession(

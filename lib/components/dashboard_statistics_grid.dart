@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../blocs/bloc_exports.dart';
@@ -206,7 +206,12 @@ class _ModernStatCardState extends State<ModernStatCard>
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeInOut,
           transform: Matrix4.identity()
-            ..scale((_isHovered || widget.isSelected) ? 1.02 : 1.0),
+            ..scaleByDouble(
+              (_isHovered || widget.isSelected) ? 1.02 : 1.0,
+              (_isHovered || widget.isSelected) ? 1.02 : 1.0,
+              (_isHovered || widget.isSelected) ? 1.02 : 1.0,
+              1.0,
+            ),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             gradient: widget.gradient,
@@ -385,7 +390,7 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
-        transform: Matrix4.identity()..scale(_isHovered ? 1.01 : 1.0),
+        transform: Matrix4.identity()..scaleByDouble(_isHovered ? 1.01 : 1.0, _isHovered ? 1.01 : 1.0, _isHovered ? 1.01 : 1.0, 1.0),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
@@ -409,9 +414,11 @@ class _EnhancedDocumentCardState extends State<EnhancedDocumentCard>
             final isCompact = constraints.maxWidth < 250;
             final hoverResponsive = _isHovered && !isCompact;
 
-            return BlocBuilder<KpiBloc, KpiState>(
+            return BlocBuilder<KpiCombinedBloc, KpiCombinedState>(
               builder: (context, kpiState) {
-                final kpiLoaded = kpiState is KpiLoaded ? kpiState : null;
+                final kpiLoaded = kpiState is KpiCombinedLoaded
+                    ? kpiState
+                    : null;
                 final kpiTotalDocs = kpiLoaded?.totalDocuments ?? totalDocs;
                 final requiredToRecord =
                     kpiLoaded?.requiredToRecordDocuments ?? 0;
@@ -767,3 +774,4 @@ class _StaggeredCardState extends State<StaggeredCard>
     );
   }
 }
+

@@ -12,10 +12,16 @@ export 'image_approval_bloc.dart';
 export 'image_approval_event.dart';
 export 'image_approval_state.dart';
 
-// KPI BLoC
+// KPI BLoC (superseded by KpiCombinedBloc for navigation — kept unused as a
+// reference implementation, not wired into any page)
 export 'kpi/kpi_bloc.dart';
 export 'kpi/kpi_event.dart';
 export 'kpi/kpi_state.dart';
+
+// Merged KPI BLoC (combines what used to be KPI + KPI Journal into one page)
+export 'kpi_combined/kpi_combined_bloc.dart';
+export 'kpi_combined/kpi_combined_event.dart';
+export 'kpi_combined/kpi_combined_state.dart';
 
 // Journal BLoC (includes event and state via part files)
 export 'journal_bloc.dart';

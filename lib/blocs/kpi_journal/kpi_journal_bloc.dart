@@ -1,4 +1,4 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
+﻿import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../models/journal.dart';
 import '../../utils/app_logger.dart';
 import '../../services/auth_repository.dart';
@@ -41,6 +41,15 @@ typedef KpiJournalFetchGLJournals =
       String? endDate,
     });
 
+/// Cached result of [KpiJournalBloc._fetchAndGroupUncached] for a given
+/// combination of shop selection + date range.
+class _JournalFetchCacheEntry {
+  final _FetchResult result;
+  final DateTime cachedAt;
+
+  _JournalFetchCacheEntry(this.result, this.cachedAt);
+}
+
 class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
   final KpiJournalAuthCheck _isAuthenticated;
   final KpiJournalListShops _listShops;
@@ -48,6 +57,32 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
   final KpiJournalFetchImageGroups _fetchDocumentImageGroups;
   final KpiJournalFetchTasksForShop _fetchTasksForShop;
   final KpiJournalFetchGLJournals _fetchGLJournals;
+
+  /// How long a fetched result stays valid before a fresh fetch runs again
+  /// for the same (shop, date range) combination.
+  static const Duration _cacheTtl = Duration(minutes: 2);
+
+  // NOTE: shop fetches (tasks AND GL journals) are intentionally kept
+  // strictly SEQUENTIAL, one shop fully at a time. Confirmed by live testing
+  // against the real API (2026-07) that /gl/journal ignores its own
+  // shopId/shopids query param entirely and instead returns data for
+  // whichever shop was last selected via POST /select-shop on this
+  // session/token. Parallelizing across shops would race on that shared
+  // session state and silently mix up / drop data between shops. Do not
+  // parallelize this without a backend change that makes shop scoping
+  // stateless per-request.
+
+  // static (not instance) so the cache survives KpiJournalBloc being
+  // disposed and recreated — which happens every time the user navigates
+  // away from the KPI Journal page and back, since KpiJournalPage builds a
+  // brand-new BlocProvider/KpiJournalBloc each time. An instance field here
+  // would never actually get reused.
+  static final Map<String, _JournalFetchCacheEntry> _resultCache = {};
+
+  /// Call this on logout / account switch so the next login doesn't briefly
+  /// show a previous account's cached KPI Journal data (the cache above is
+  /// static and otherwise survives across BlocProvider recreation).
+  static void clearCache() => _resultCache.clear();
 
   KpiJournalBloc({
     KpiJournalAuthCheck? isAuthenticated,
@@ -157,16 +192,14 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
         endDate: endDate,
       );
       final totalJournalsFound = result.employees.fold(0, (sum, emp) => sum + emp.totalJournals);
-      // ignore: avoid_print
-      print('[KPI_DEBUG] 🔎 Shop "${event.shopName}" (${event.shopId}): employees=${result.employees.length}, totalJournals=$totalJournalsFound');
+      dLog('[KPI_DEBUG] 🔎 Shop "${event.shopName}" (${event.shopId}): employees=${result.employees.length}, totalJournals=$totalJournalsFound');
 
       final selectedShopHasNoJournals =
           event.shopId?.isNotEmpty == true &&
           event.shopName?.isNotEmpty == true &&
           totalJournalsFound == 0;
       if (selectedShopHasNoJournals) {
-        // ignore: avoid_print
-        print('[KPI_DEBUG] ⚠️ No GL journals found by shopId=${event.shopId}; retrying by branch name "${event.shopName}"');
+        dLog('[KPI_DEBUG] ⚠️ No GL journals found by shopId=${event.shopId}; retrying by branch name "${event.shopName}"');
         result = await _fetchAndGroup(
           shops: [
             KpiJournalShopItem(
@@ -181,8 +214,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
           skipShopSelection: true,
         );
         final retryTotal = result.employees.fold(0, (sum, emp) => sum + emp.totalJournals);
-        // ignore: avoid_print
-        print('[KPI_DEBUG] 🔁 Retry result: employees=${result.employees.length}, totalJournals=$retryTotal');
+        dLog('[KPI_DEBUG] 🔁 Retry result: employees=${result.employees.length}, totalJournals=$retryTotal');
       }
 
       final query = event.query ?? current.searchQuery;
@@ -235,8 +267,62 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
     add(LoadKpiJournalData());
   }
 
-  /// Fetch GL Journals for given shop(s) and group by createdBy
+  /// Cache key covering everything that affects the fetched result: which
+  /// shop(s), the date range, and the special retry-by-branch-name path.
+  String _resultCacheKey({
+    required String? shopId,
+    required DateTime? startDate,
+    required DateTime? endDate,
+    String? journalShopNameFilter,
+    required bool skipShopSelection,
+  }) {
+    final s = startDate != null ? JournalService.formatDate(startDate) : '-';
+    final e = endDate != null ? JournalService.formatDate(endDate) : '-';
+    return '${shopId ?? 'ALL'}|$s|$e|${journalShopNameFilter ?? ''}|$skipShopSelection';
+  }
+
+  /// Fetch GL Journals for given shop(s) and group by createdBy, using a
+  /// short-lived cache so switching filters back and forth (or minor UI
+  /// re-renders) doesn't always trigger a brand-new full re-fetch.
   Future<_FetchResult> _fetchAndGroup({
+    required List<KpiJournalShopItem> shops,
+    required String? shopId,
+    required DateTime? startDate,
+    required DateTime? endDate,
+    String? journalShopNameFilter,
+    bool skipShopSelection = false,
+  }) async {
+    final cacheKey = _resultCacheKey(
+      shopId: shopId,
+      startDate: startDate,
+      endDate: endDate,
+      journalShopNameFilter: journalShopNameFilter,
+      skipShopSelection: skipShopSelection,
+    );
+    final cached = _resultCache[cacheKey];
+    if (cached != null &&
+        DateTime.now().difference(cached.cachedAt) < _cacheTtl) {
+      dLog(
+        '📋 Using cached KPI Journal data for key="$cacheKey" '
+        '(${DateTime.now().difference(cached.cachedAt).inSeconds}s old)',
+      );
+      return cached.result;
+    }
+
+    final result = await _fetchAndGroupUncached(
+      shops: shops,
+      shopId: shopId,
+      startDate: startDate,
+      endDate: endDate,
+      journalShopNameFilter: journalShopNameFilter,
+      skipShopSelection: skipShopSelection,
+    );
+
+    _resultCache[cacheKey] = _JournalFetchCacheEntry(result, DateTime.now());
+    return result;
+  }
+
+  Future<_FetchResult> _fetchAndGroupUncached({
     required List<KpiJournalShopItem> shops,
     required String? shopId,
     required DateTime? startDate,
@@ -365,6 +451,13 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
         );
       }
     } else {
+      // Fetch each shop fully SEQUENTIALLY: select-shop -> fetch tasks ->
+      // fetch ALL GL journal pages for THAT SAME shop, then move to the
+      // next shop. /gl/journal ignores its own shopId/shopids param and
+      // just returns data for whatever shop the session currently has
+      // selected, so the GL fetch for a shop must happen immediately after
+      // that shop was selected, with nothing else touching the session in
+      // between — see the NOTE near _cacheTtl above.
       for (final shop in targetShops) {
         List<TaskItem> shopTasks = [];
         try {
@@ -377,7 +470,7 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
             shopTasks = resp.tasks;
             int shopPassedDocs = 0;
             Set<String> processedTasks = {};
-            
+
             for (final t in resp.tasks) {
               final requiredDocs = _requiredDocsToRecord(t);
 
@@ -639,6 +732,11 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
     );
   }
 
+  /// Selects the shop (if needed), fetches every GL journal page for it,
+  /// then accumulates the results. Called once per shop, sequentially, from
+  /// both the fallback path and the main multi-shop loop in
+  /// [_fetchAndGroupUncached] — see the NOTE near _cacheTtl for why this
+  /// can't be parallelized across shops.
   Future<void> _fetchPagesIntoMap({
     required Map<String, _Accumulator> accMap,
     required Map<String, int> checkedCount,
@@ -663,16 +761,55 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
         ? DateTime(rangeEnd.year, rangeEnd.month, rangeEnd.day, 23, 59, 59, 999)
         : null;
 
-    try {
-      final queryShopId =
-          journalShopNameFilter?.isNotEmpty == true ? null : shopId;
-
-      if (!skipShopSelection) {
-        await _selectShop(
-          shopId: shopId?.isNotEmpty == true ? shopId : null,
-        );
+    if (!skipShopSelection) {
+      try {
+        await _selectShop(shopId: shopId?.isNotEmpty == true ? shopId : null);
+      } catch (e) {
+        dLog('⚠️ Failed to select shop "$shopName" before GL fetch: $e');
       }
+    }
 
+    final queryShopId =
+        journalShopNameFilter?.isNotEmpty == true ? null : shopId;
+    final journals = await _fetchAllJournalPagesForShop(
+      shopId: queryShopId,
+      shopName: shopName,
+      startStr: startStr,
+      endStr: endStr,
+      journalShopNameFilter: journalShopNameFilter,
+    );
+
+    _accumulateJournalsIntoMaps(
+      journals: journals,
+      shopName: shopName,
+      accMap: accMap,
+      checkedCount: checkedCount,
+      updatedCount: updatedCount,
+      dayStart: dayStart,
+      dayEnd: dayEnd,
+      taskDocCountMap: taskDocCountMap,
+      taskNameMap: taskNameMap,
+      activeTaskGuids: activeTaskGuids,
+      journalShopNameFilter: journalShopNameFilter,
+    );
+  }
+
+  /// Fetches every page of GL journals for one shop and returns the raw
+  /// list. Despite taking a `shopId` param, the real API ignores it and
+  /// returns data for whichever shop is currently selected on the session
+  /// (confirmed by live testing) — so the caller MUST call selectShop for
+  /// this shop immediately beforehand and must not call this concurrently
+  /// for other shops. See [_fetchPagesIntoMap], which does exactly that.
+  Future<List<Journal>> _fetchAllJournalPagesForShop({
+    required String? shopId,
+    required String shopName,
+    required String? startStr,
+    required String? endStr,
+    String? journalShopNameFilter,
+  }) async {
+    final List<Journal> allJournals = [];
+
+    try {
       const pageLimit = 500;
       int page = 1;
       int totalPages = 1;
@@ -683,18 +820,18 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
           limit: pageLimit,
           sort: 'docdate:-1',
           timezone: '+07',
-          shopId: queryShopId?.isNotEmpty == true ? queryShopId : null,
+          shopId: shopId?.isNotEmpty == true ? shopId : null,
           startDate: startStr,
           endDate: endStr,
         );
 
         if (resp.success != true || resp.journals == null) {
-          // ignore: avoid_print
-          print('[KPI_DEBUG] ❌ Break! Shop "$shopName" ($shopId) page=$page success=${resp.success} journals=${resp.journals == null ? "NULL" : "empty?"}');
+          dLog('[KPI_DEBUG] ❌ Break! Shop "$shopName" ($shopId) page=$page success=${resp.success} journals=${resp.journals == null ? "NULL" : "empty?"}');
           break;
         }
 
         final journals = resp.journals!;
+        allJournals.addAll(journals);
 
         if (page == 1) {
           final p = resp.pagination;
@@ -706,66 +843,10 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
                     ? ((p.total! + pageLimit - 1) ~/ pageLimit)
                     : 1);
           }
-          // ignore: avoid_print
-          print('[KPI_DEBUG] 📄 Shop "$shopName" ($shopId): totalPages=$totalPages, total=${resp.pagination?.total}');
+          dLog('[KPI_DEBUG] 📄 Shop "$shopName" ($shopId): totalPages=$totalPages, total=${resp.pagination?.total}');
         }
 
-        int skippedNoCreator = 0;
-        int skippedNameMismatch = 0;
-        int accepted = 0;
-
-        for (final j in journals) {
-          final creator = (j.createdBy ?? '').trim();
-          if (creator.isEmpty) {
-            skippedNoCreator++;
-            continue;
-          }
-
-          if (journalShopNameFilter?.isNotEmpty == true) {
-            final expected = _normalizeShopName(journalShopNameFilter!);
-            final actual = _normalizeShopName(j.branchName ?? j.shopName ?? '');
-            if (actual != expected) {
-              skippedNameMismatch++;
-              if (skippedNameMismatch <= 3) {
-                // ignore: avoid_print
-                print('[KPI_DEBUG]   🔍 name mismatch: expected="$expected" actual="$actual" (branchName="${j.branchName}")');
-              }
-              continue;
-            }
-          }
-          accepted++;
-
-          // Filter by doc_date — only when the user has picked a date range
-          if (dayStart != null && dayEnd != null && j.docDatetime != null) {
-            try {
-              final docDate = DateTime.parse(j.docDatetime!);
-              if (docDate.isBefore(dayStart) || docDate.isAfter(dayEnd)) {
-                continue;
-              }
-            } catch (_) {}
-          }
-
-          final taskGuid = (j.jobGuidfixed ?? '').toString().trim();
-          if (taskGuid.isNotEmpty) {
-            activeTaskGuids.add(taskGuid);
-          }
-
-          accMap.putIfAbsent(creator, () => _Accumulator(creator));
-          accMap[creator]!.add(j, shopName, taskDocCountMap, taskNameMap);
-
-          // track checkedBy / updatedBy counts
-          final checked = (j.checkedBy ?? '').trim();
-          if (checked.isNotEmpty) {
-            checkedCount[checked] = (checkedCount[checked] ?? 0) + 1;
-          }
-          final updated = (j.updatedBy ?? '').trim();
-          if (updated.isNotEmpty) {
-            updatedCount[updated] = (updatedCount[updated] ?? 0) + 1;
-          }
-        }
-
-        // ignore: avoid_print
-        print('[KPI_DEBUG]   📊 Page $page | total=${journals.length} | accepted=$accepted | skipped(noCreator)=$skippedNoCreator | skipped(nameMismatch)=$skippedNameMismatch');
+        dLog('[KPI_DEBUG]   📊 Page $page | fetched=${journals.length}');
 
         // If the server returned fewer records than requested, this is the last page
         if (journals.length < pageLimit) break;
@@ -773,10 +854,92 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
         page++;
       } while (page <= totalPages);
 
-      dLog('✅ Shop "$shopName": fetched ${page - 1} page(s), accMap size=${accMap.length}');
+      dLog('✅ Shop "$shopName": fetched ${allJournals.length} journal row(s) across pages');
     } catch (e) {
       dLog('⚠️ Failed to fetch GL for shop "$shopName": $e');
     }
+
+    return allJournals;
+  }
+
+  /// Filters and accumulates a shop's already-fetched journals into the
+  /// shared maps. Pure in-memory work (no awaits), so calling it
+  /// sequentially per shop after a parallel fetch phase is cheap and avoids
+  /// any concurrent-mutation concerns on accMap/checkedCount/updatedCount.
+  void _accumulateJournalsIntoMaps({
+    required List<Journal> journals,
+    required String shopName,
+    required Map<String, _Accumulator> accMap,
+    required Map<String, int> checkedCount,
+    required Map<String, int> updatedCount,
+    required DateTime? dayStart,
+    required DateTime? dayEnd,
+    required Map<String, int> taskDocCountMap,
+    required Map<String, String> taskNameMap,
+    required Set<String> activeTaskGuids,
+    String? journalShopNameFilter,
+  }) {
+    int skippedNoCreator = 0;
+    int skippedNameMismatch = 0;
+    int accepted = 0;
+
+    for (final j in journals) {
+      final creator = (j.createdBy ?? '').trim();
+      if (creator.isEmpty) {
+        skippedNoCreator++;
+        continue;
+      }
+
+      if (journalShopNameFilter?.isNotEmpty == true) {
+        final expected = _normalizeShopName(journalShopNameFilter!);
+        final actual = _normalizeShopName(j.branchName ?? j.shopName ?? '');
+        if (actual != expected) {
+          skippedNameMismatch++;
+          if (skippedNameMismatch <= 3) {
+            dLog('[KPI_DEBUG]   🔍 name mismatch: expected="$expected" actual="$actual" (branchName="${j.branchName}")');
+          }
+          continue;
+        }
+      }
+      accepted++;
+
+      // Filter by doc_date — only when the user has picked a date range.
+      // Rows with a missing/unparseable docdate are excluded too (not
+      // skipped), since previously they always bypassed this filter and
+      // showed up regardless of the selected date range.
+      if (dayStart != null && dayEnd != null) {
+        DateTime? docDate;
+        if (j.docDatetime != null) {
+          try {
+            docDate = DateTime.parse(j.docDatetime!);
+          } catch (_) {}
+        }
+        if (docDate == null ||
+            docDate.isBefore(dayStart) ||
+            docDate.isAfter(dayEnd)) {
+          continue;
+        }
+      }
+
+      final taskGuid = (j.jobGuidfixed ?? '').toString().trim();
+      if (taskGuid.isNotEmpty) {
+        activeTaskGuids.add(taskGuid);
+      }
+
+      accMap.putIfAbsent(creator, () => _Accumulator(creator));
+      accMap[creator]!.add(j, shopName, taskDocCountMap, taskNameMap);
+
+      // track checkedBy / updatedBy counts
+      final checked = (j.checkedBy ?? '').trim();
+      if (checked.isNotEmpty) {
+        checkedCount[checked] = (checkedCount[checked] ?? 0) + 1;
+      }
+      final updated = (j.updatedBy ?? '').trim();
+      if (updated.isNotEmpty) {
+        updatedCount[updated] = (updatedCount[updated] ?? 0) + 1;
+      }
+    }
+    dLog('[KPI_DEBUG]   📊 Shop "$shopName" | total=${journals.length} | accepted=$accepted | skipped(noCreator)=$skippedNoCreator | skipped(nameMismatch)=$skippedNameMismatch');
   }
 
   List<KpiJournalEmployee> _applySearch(
@@ -1092,3 +1255,4 @@ class _FetchResult {
     required this.allUpdaters,
   });
 }
+

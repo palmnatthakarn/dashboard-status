@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:moniter/pages/daily_journal_page.dart';
 
@@ -7,8 +7,7 @@ import 'package:moniter/pages/tax_page.dart';
 import '../pages/financial_statements_page.dart';
 import '../components/app_sidebar.dart';
 import '../dashboard_content.dart';
-import '../pages/kpi/kpi_page.dart';
-import '../pages/kpi/kpi_journal_page.dart';
+import '../pages/kpi/kpi_combined_page.dart';
 
 import '../pages/settings_page.dart';
 import '../blocs/auth/auth_bloc.dart';
@@ -95,19 +94,6 @@ class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
   bool _isSidebarExpanded = true;
 
-  final List<Widget> _pages = [
-    const DashboardContent(),
-    const KpiPage(),
-    const KpiJournalPage(),
-
-    const ReportPage(title: 'รายงานภาพรวม'),
-    const FinancialStatementsPage(),
-    const TaxPage(),
-
-    const DailyJournalPage(),
-    const SettingsPage(),
-  ];
-
   void _onItemSelected(int index) {
     setState(() {
       _selectedIndex = index;
@@ -178,18 +164,16 @@ class _MainLayoutState extends State<MainLayout> {
       case 0:
         return const DashboardContent();
       case 1:
-        return const KpiPage();
+        return const KpiCombinedPage();
       case 2:
-        return const KpiJournalPage();
-      case 3:
         return const ReportPage(title: 'รายงานภาพรวม');
-      case 4:
+      case 3:
         return const FinancialStatementsPage();
-      case 5:
+      case 4:
         return const TaxPage();
-      case 6:
+      case 5:
         return const DailyJournalPage();
-      case 7:
+      case 6:
         return const SettingsPage();
       default:
         return const DashboardContent();
@@ -272,3 +256,5 @@ class ResponsiveValue<T> {
     }
   }
 }
+
+

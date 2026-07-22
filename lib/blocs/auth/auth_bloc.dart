@@ -1,6 +1,9 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../services/auth_repository.dart';
+import '../kpi/kpi_bloc.dart';
+import '../kpi_journal/kpi_journal_bloc.dart';
+import '../kpi_combined/kpi_combined_bloc.dart';
 
 part 'auth_event.dart';
 part 'auth_state.dart';
@@ -63,9 +66,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     try {
       await authRepository.logout();
+      KpiBloc.clearCache();
+      KpiJournalBloc.clearCache();
+      KpiCombinedBloc.clearCache();
       emit(AuthInitial());
     } catch (e) {
       // Even if logout fails on server, we reset state to initial on client
+      KpiBloc.clearCache();
+      KpiJournalBloc.clearCache();
+      KpiCombinedBloc.clearCache();
       emit(AuthInitial());
     }
   }

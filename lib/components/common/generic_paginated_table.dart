@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'custom_pagination.dart';
 
 class CustomColumn {
@@ -88,7 +88,7 @@ class _GenericPaginatedTableState<T> extends State<GenericPaginatedTable<T>> {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
@@ -120,7 +120,7 @@ class _GenericPaginatedTableState<T> extends State<GenericPaginatedTable<T>> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10),
         ],
         // border: Border.all(color: const Color(0xFFE2E8F0)), // KPI table doesn't have outer border, just shadow
       ),
@@ -150,8 +150,9 @@ class _GenericPaginatedTableState<T> extends State<GenericPaginatedTable<T>> {
                       itemBuilder: (context, index) {
                         final actualIndex =
                             (_currentPage - 1) * _rowsPerPage + index;
-                        if (actualIndex >= widget.items.length)
+                        if (actualIndex >= widget.items.length) {
                           return const SizedBox();
+                        }
 
                         final item = widget.items[actualIndex];
                         return _buildItemRow(item, index);
@@ -262,3 +263,4 @@ class _GenericPaginatedTableState<T> extends State<GenericPaginatedTable<T>> {
     );
   }
 }
+

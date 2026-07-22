@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../models/doc_details.dart';
 
 class DashboardFilterSection extends StatefulWidget {
@@ -156,7 +156,7 @@ class _StatusFilterChipState extends State<StatusFilterChip> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeInOut,
-          transform: Matrix4.identity()..scale(_isHovered ? 1.05 : 1.0),
+          transform: Matrix4.identity()..scaleByDouble(_isHovered ? 1.05 : 1.0, _isHovered ? 1.05 : 1.0, _isHovered ? 1.05 : 1.0, 1.0),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
             color: widget.isSelected
@@ -244,3 +244,4 @@ class _StatusFilterChipState extends State<StatusFilterChip> {
     );
   }
 }
+
