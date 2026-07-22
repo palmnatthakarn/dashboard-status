@@ -55,6 +55,19 @@
         return;
       }
 
+      const originalHeadAppend = document.head.append.bind(document.head);
+      document.head.append = (...nodes) => {
+        for (const node of nodes) {
+          if (node instanceof HTMLScriptElement &&
+              new URL(node.src, location.href).pathname.endsWith('/main.dart.js')) {
+            const mainUrl = new URL(node.src, location.href);
+            mainUrl.searchParams.set('v', '20260722-smlai-prod');
+            node.src = mainUrl.toString();
+          }
+        }
+        return originalHeadAppend(...nodes);
+      };
+
       const bootstrap = document.createElement('script');
       bootstrap.src = 'flutter_bootstrap.js?v=20260722-smlai-prod';
       bootstrap.async = true;
