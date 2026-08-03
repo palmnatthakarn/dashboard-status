@@ -1383,8 +1383,15 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
         break;
     }
 
-    acc.recorded += taskRecordedCount;
     if (!isContributorRow) {
+      // recorded now rolls up here too (was unconditional before) — the
+      // task drill-down row (_taskWorkCell in kpi_combined_page.dart)
+      // already tells the viewer a contributor row's "บันทึกแล้ว" is just
+      // context from the owner and isn't counted into this employee's
+      // total, so the aggregate needs to actually honor that instead of
+      // silently adding the contributor's glRecordedCount on top of what
+      // the owner's row already contributes.
+      acc.recorded += taskRecordedCount;
       acc.passed += taskPassed;
       acc.requiredToRecord += taskRequiredToRecord;
       acc.remaining += taskRemaining;

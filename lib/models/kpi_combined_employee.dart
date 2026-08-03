@@ -116,12 +116,13 @@ class KpiCombinedTaskItem {
   // ── สถานะการตรวจสอบ / สถานะการบันทึกบัญชี (task workflow breakdown) ──
   // Same figures KpiCombinedBloc already computes per task to roll up into
   // the shop/employee totals — kept here too so the task drill-down row can
-  // show its own status columns instead of leaving them blank. Every field
-  // except [recorded] describes the task itself, so it's identical whether
-  // this is the owner row or a contributor row for the same task (the same
-  // way [totalDocument] already is). [recorded] is the one figure that
-  // legitimately differs per row — it's "how much THIS row's person
-  // recorded", not the task's total.
+  // show its own status columns instead of leaving them blank. All 9 fields
+  // (including [recorded]) describe the task itself and only roll up into
+  // the owner's shop/employee total (see KpiCombinedBloc._applyTaskToShopAcc)
+  // — a contributor row still reports its own [recorded] count here for
+  // display, matching the "บริบทงาน" tooltip in kpi_combined_page.dart, but
+  // that value is context only and isn't added a second time into the
+  // contributor's own employee total.
   final int waitingVerify;
   final int passed;
   final int cancelled;
