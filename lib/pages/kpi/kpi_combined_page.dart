@@ -643,55 +643,57 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
         accent: const Color(0xFF7C3AED),
         icon: Icons.functions_rounded,
       ),
+      _SummaryCardData(
+        // Deliberately a SEPARATE card from "จำนวนบิลทั้งหมด" (cards[1]),
+        // not a replacement — totalUploaded (who personally uploaded the
+        // photo) and totalDocuments (documents in tasks this
+        // employee/shop OWNS) answer different questions and aren't
+        // guaranteed to relate to each other (an employee can upload into
+        // tasks they don't own at all). The other cards here (คงเหลือ/
+        // รอตรวจ/ต้องบันทึกทั้งหมด) are task-workflow STATUS figures with
+        // no per-uploader breakdown in the underlying data (/task's
+        // totalDocumentStatus is per-task, not per-image-uploader), so
+        // they stay task-based regardless of which employee is filtered —
+        // replacing "จำนวนบิลทั้งหมด" with an upload count would make
+        // those cards visually disagree with the top card for no real
+        // reason. 2026-08.
+        label: 'รูปที่อัปโหลด',
+        value: sum((e) => e.totalUploaded),
+        bg: const Color(0xFFE0F2FE),
+        accent: const Color(0xFF0369A1),
+        icon: Icons.upload_file_outlined,
+      ),
     ];
-    final visibleCards = [cards[1], cards[0], cards[2], cards[3], cards[7]];
+    final visibleCards = [
+      cards[1], // จำนวนบิลทั้งหมด
+      cards[8], // รูปที่อัปโหลด
+      cards[0], // คงเหลือ
+      cards[2], // รอตรวจ
+      cards[3], // ต้องบันทึกทั้งหมด
+      cards[7], // คีย์รวม
+    ];
 
     return LayoutBuilder(
       builder: (ctx, bc) {
         if (bc.maxWidth > 1180) {
-          return Row(
-            children: [
+          // Generated from visibleCards instead of one hardcoded Expanded
+          // per index (was 5 fixed slots) — 2026-08, when a 6th card
+          // (uploaded photos) was added, so a future card count change
+          // doesn't require hand-editing this Row to match.
+          final children = <Widget>[];
+          for (var i = 0; i < visibleCards.length; i++) {
+            if (i > 0) children.add(const SizedBox(width: 12));
+            children.add(
               Expanded(
                 child: _summaryCard(
-                  visibleCards[0],
+                  visibleCards[i],
                   priority: true,
                   loading: !state.summaryReady,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _summaryCard(
-                  visibleCards[1],
-                  priority: true,
-                  loading: !state.summaryReady,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _summaryCard(
-                  visibleCards[2],
-                  priority: true,
-                  loading: !state.summaryReady,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _summaryCard(
-                  visibleCards[3],
-                  priority: true,
-                  loading: !state.summaryReady,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _summaryCard(
-                  visibleCards[4],
-                  priority: true,
-                  loading: !state.summaryReady,
-                ),
-              ),
-            ],
-          );
+            );
+          }
+          return Row(children: children);
         }
 
         final perRow = bc.maxWidth > 900 ? 3 : (bc.maxWidth > 560 ? 2 : 1);
@@ -819,6 +821,7 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
     const subHeaders = [
       'ร้าน',
       'จำนวน',
+      'รูปที่อัปโหลด',
       'รอตรวจสอบ',
       'ผ่าน',
       'ไม่ผ่าน',
@@ -908,6 +911,7 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
   ) => [
     shop.shopName,
     '${shop.totalDocuments}',
+    '${shop.uploadedCount}',
     '${shop.waitingVerify}',
     '${shop.passed}',
     '${shop.cancelled}',
@@ -946,6 +950,7 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
     return [
       '  งาน: $label (${_dateFmt.format(task.ownerAt)})',
       '${task.totalDocument}',
+      '-', // รูปที่อัปโหลด — tracked per shop/employee only, not per task
       '${task.waitingVerify}',
       '${task.passed}',
       '${task.cancelled}',
@@ -977,6 +982,7 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
     return [
       '$labelPrefix: ${journal.docNo} · ${journal.accountName}',
       '1',
+      '-', // รูปที่อัปโหลด — tracked per shop/employee only, not per journal entry
       ...List.generate(9, (_) => '0'),
       journal.createdBy.isNotEmpty && !noPhoto ? '1' : '0',
       journal.createdBy.isNotEmpty && noPhoto ? '1' : '0',
@@ -1457,6 +1463,30 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
     );
   }
 
+  // Badge showing how many images this employee personally uploaded
+  // (emp.totalUploaded / s.uploadedCount — see KpiCombinedShopStat.
+  // uploadedCount doc comment) — deliberately a DIFFERENT color from
+  // _taskCountBadge so "how many tasks" and "how many photos uploaded"
+  // aren't visually confused; an employee can have uploads without owning
+  // any task at all. 2026-08.
+  Widget _uploadCountBadge(int count) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0F2FE),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        'อัปโหลด $count รูป',
+        style: const TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF0369A1),
+        ),
+      ),
+    );
+  }
+
   // Badge for a shop row that has GL journal activity but no task rows at
   // all (see orphanJournalEntries) — styled with the journal group's color
   // instead of the neutral task badge so it reads as "these come from the
@@ -1836,6 +1866,10 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
                   _taskCountBadge(_totalTaskCount(emp)),
                   const SizedBox(width: 6),
                 ],
+                if (emp.totalUploaded > 0) ...[
+                  _uploadCountBadge(emp.totalUploaded),
+                  const SizedBox(width: 6),
+                ],
               ],
             ),
           ),
@@ -1958,6 +1992,10 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
                   const SizedBox(width: 6),
                 ] else if (hasOrphans) ...[
                   _orphanCountBadge(s.orphanJournalEntries.length),
+                  const SizedBox(width: 6),
+                ],
+                if (s.uploadedCount > 0) ...[
+                  _uploadCountBadge(s.uploadedCount),
                   const SizedBox(width: 6),
                 ],
               ],
@@ -2111,16 +2149,17 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
                                 ),
                               ),
                             ] else ...[
-                              Tooltip(
-                                message:
-                                    'พนักงานแถวนี้คีย์ ${t.keyedByThisEmployee} รายการในงานของ $ownerDisplay',
-                                child: _taskMetaChip(
-                                  'ร่วมคีย์ ${t.keyedByThisEmployee}',
-                                  bg: _journalGroupColor,
-                                  fg: const Color(0xFF4F46E5),
-                                  maxWidth: 135,
+                              if (t.keyedByThisEmployee > 0)
+                                Tooltip(
+                                  message:
+                                      'พนักงานแถวนี้คีย์ ${t.keyedByThisEmployee} รายการในงานของ $ownerDisplay',
+                                  child: _taskMetaChip(
+                                    'ร่วมคีย์ ${t.keyedByThisEmployee}',
+                                    bg: _journalGroupColor,
+                                    fg: const Color(0xFF4F46E5),
+                                    maxWidth: 135,
+                                  ),
                                 ),
-                              ),
                               Tooltip(
                                 message:
                                     'ตัวเลขฝั่งงานเป็นบริบทของงานจากเจ้าของ $ownerDisplay และไม่ถูกนับเข้า total ของแถวนี้',
@@ -2131,6 +2170,26 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
                                 ),
                               ),
                             ],
+                            // อัปโหลดรูป — who actually put the photo(s) into
+                            // this task, separate from who opened it
+                            // (เจ้าของงาน) or who keyed the GL entry (ร่วมคีย์).
+                            // Shown on EITHER the owner row (owner uploaded
+                            // their own task's photos) or a contributor row
+                            // (someone else uploaded into this task) —
+                            // whichever row this employee's uploads actually
+                            // landed on. 2026-08.
+                            if (t.uploadedByThisEmployee > 0)
+                              Tooltip(
+                                message: t.isOwner
+                                    ? 'เจ้าของงานอัปโหลดรูปเอง ${t.uploadedByThisEmployee} รูปในงานนี้'
+                                    : 'พนักงานแถวนี้อัปโหลดรูป ${t.uploadedByThisEmployee} รูปในงานของ $ownerDisplay',
+                                child: _taskMetaChip(
+                                  'อัปโหลด ${t.uploadedByThisEmployee}',
+                                  bg: const Color(0xFFE0F2FE),
+                                  fg: const Color(0xFF0369A1),
+                                  maxWidth: 135,
+                                ),
+                              ),
                             Text(
                               _dateFmt.format(t.ownerAt),
                               style: const TextStyle(

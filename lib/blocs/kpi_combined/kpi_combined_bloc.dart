@@ -37,6 +37,11 @@ typedef _ShopFetchResult = ({
   List<_ShopRawData> raw,
   Map<String, int> imageGroupDocCounts,
   Map<String, String> docNoToTaskGuid,
+  // taskGuid -> (uploader -> image count) — see
+  // DocumentImageService.fetchDocNoToTaskGuidMap's taskUploaderCounts doc
+  // comment. Piggybacks on the exact same /documentimagegroup fetch as
+  // docNoToTaskGuid, so it's threaded through every spot that field is.
+  Map<String, Map<String, int>> taskUploaderCounts,
   int docNoMapTotalItemsSeen,
   int? docNoMapApiReportedTotal,
 });
@@ -49,6 +54,9 @@ class _FetchCacheEntry {
   // goes through journal.jobguidfixed at all (the "recorded from photo"
   // path). See DocumentImageService.fetchDocNoToTaskGuidMap.
   final Map<String, String> docNoToTaskGuid;
+  // taskGuid -> (uploader -> image count) — see _ShopFetchResult's field of
+  // the same name.
+  final Map<String, Map<String, int>> taskUploaderCounts;
   // Raw item count actually paged through, and what the API's own
   // pagination metadata says the true total is — kept alongside the map
   // itself (not just logged) so the UI can show "map has N entries, built
@@ -63,6 +71,7 @@ class _FetchCacheEntry {
     this.raw,
     this.imageGroupDocCounts,
     this.docNoToTaskGuid,
+    this.taskUploaderCounts,
     this.docNoMapTotalItemsSeen,
     this.docNoMapApiReportedTotal,
     this.cachedAt,
@@ -99,6 +108,9 @@ class _ShopAcc {
   int journalChecked = 0;
   int journalUpdated = 0;
 
+  // รูปภาพที่อัปโหลด — see KpiCombinedShopStat.uploadedCount doc comment.
+  int uploadedCount = 0;
+
   // The actual tasks behind the totals above — powers the drill-down UI.
   final List<KpiCombinedTaskItem> tasks = [];
 
@@ -129,6 +141,7 @@ class _ShopAcc {
       journalCountNoPhoto: journalCountNoPhoto,
       journalChecked: journalChecked,
       journalUpdated: journalUpdated,
+      uploadedCount: uploadedCount,
       tasks: sortedTasks,
       orphanJournalEntries: orphanJournals,
     );
@@ -206,6 +219,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
           final raw = <_ShopRawData>[];
           final imageGroupDocCounts = <String, int>{};
           final docNoToTaskGuid = <String, String>{};
+          final taskUploaderCounts = <String, Map<String, int>>{};
           var docNoMapTotalItemsSeen = 0;
           int? docNoMapApiReportedTotal;
           for (final shop in shops) {
@@ -222,6 +236,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
               raw,
               imageGroupDocCounts,
               const {},
+              taskUploaderCounts: const {},
               startDate: startDate,
               endDate: endDate,
               includeDetails: false,
@@ -245,6 +260,10 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
           for (final shop in shops) {
             final docNoResult = await _fetchDocNoMapForSelectedShop(shop);
             docNoToTaskGuid.addAll(docNoResult.docNoToTaskGuid);
+            _mergeTaskUploaderCounts(
+              taskUploaderCounts,
+              docNoResult.taskUploaderCounts,
+            );
             docNoMapTotalItemsSeen += docNoResult.totalItemsSeen;
             if (docNoResult.apiReportedTotal != null) {
               docNoMapApiReportedTotal =
@@ -256,6 +275,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
             raw,
             imageGroupDocCounts,
             docNoToTaskGuid,
+            taskUploaderCounts: taskUploaderCounts,
             docNoMapTotalItemsSeen: docNoMapTotalItemsSeen,
             docNoMapApiReportedTotal: docNoMapApiReportedTotal,
             startDate: startDate,
@@ -315,11 +335,16 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
         includeDocNoMap: false,
       );
       final docNoToTaskGuid = <String, String>{};
+      final taskUploaderCounts = <String, Map<String, int>>{};
       var docNoMapTotalItemsSeen = 0;
       int? docNoMapApiReportedTotal;
       for (final shop in targetShops) {
         final docNoResult = await _fetchDocNoMapForSelectedShop(shop);
         docNoToTaskGuid.addAll(docNoResult.docNoToTaskGuid);
+        _mergeTaskUploaderCounts(
+          taskUploaderCounts,
+          docNoResult.taskUploaderCounts,
+        );
         docNoMapTotalItemsSeen += docNoResult.totalItemsSeen;
         if (docNoResult.apiReportedTotal != null) {
           docNoMapApiReportedTotal =
@@ -330,6 +355,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
         fetched.raw,
         fetched.imageGroupDocCounts,
         docNoToTaskGuid,
+        taskUploaderCounts: taskUploaderCounts,
         docNoMapTotalItemsSeen: docNoMapTotalItemsSeen,
         docNoMapApiReportedTotal: docNoMapApiReportedTotal,
         startDate: startDate,
@@ -415,6 +441,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
         fetched.raw,
         fetched.imageGroupDocCounts,
         fetched.docNoToTaskGuid,
+        taskUploaderCounts: fetched.taskUploaderCounts,
         docNoMapTotalItemsSeen: fetched.docNoMapTotalItemsSeen,
         docNoMapApiReportedTotal: fetched.docNoMapApiReportedTotal,
         startDate: current.startDate,
@@ -507,6 +534,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
         raw: cached.raw,
         imageGroupDocCounts: cached.imageGroupDocCounts,
         docNoToTaskGuid: cached.docNoToTaskGuid,
+        taskUploaderCounts: cached.taskUploaderCounts,
         docNoMapTotalItemsSeen: cached.docNoMapTotalItemsSeen,
         docNoMapApiReportedTotal: cached.docNoMapApiReportedTotal,
       );
@@ -600,6 +628,10 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
     // already selected that exact shop, is the same fix already applied to
     // tasks and GL journals for this identical class of bug.
     final Map<String, String> docNoToTaskGuid = {};
+    // taskGuid -> (uploader -> image count), accumulated across shops the
+    // same way docNoToTaskGuid is — see DocumentImageService.
+    // fetchDocNoToTaskGuidMap's taskUploaderCounts doc comment.
+    final Map<String, Map<String, int>> taskUploaderCounts = {};
     var docNoMapTotalItemsSeen = 0;
     int? docNoMapApiReportedTotal;
 
@@ -675,12 +707,14 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
               );
               return (
                 docNoToTaskGuid: <String, String>{},
+                taskUploaderCounts: <String, Map<String, int>>{},
                 totalItemsSeen: 0,
                 apiReportedTotal: null,
               );
             })
           : Future.value((
               docNoToTaskGuid: <String, String>{},
+              taskUploaderCounts: <String, Map<String, int>>{},
               totalItemsSeen: 0,
               apiReportedTotal: null,
             ));
@@ -706,6 +740,10 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
 
       final shopDocNoResult = await docNoFuture;
       docNoToTaskGuid.addAll(shopDocNoResult.docNoToTaskGuid);
+      _mergeTaskUploaderCounts(
+        taskUploaderCounts,
+        shopDocNoResult.taskUploaderCounts,
+      );
       docNoMapTotalItemsSeen += shopDocNoResult.totalItemsSeen;
       if (shopDocNoResult.apiReportedTotal != null) {
         docNoMapApiReportedTotal =
@@ -739,6 +777,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
         raw,
         imageGroupDocCounts,
         docNoToTaskGuid,
+        taskUploaderCounts,
         docNoMapTotalItemsSeen,
         docNoMapApiReportedTotal,
         DateTime.now(),
@@ -755,9 +794,27 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
       raw: raw,
       imageGroupDocCounts: imageGroupDocCounts,
       docNoToTaskGuid: docNoToTaskGuid,
+      taskUploaderCounts: taskUploaderCounts,
       docNoMapTotalItemsSeen: docNoMapTotalItemsSeen,
       docNoMapApiReportedTotal: docNoMapApiReportedTotal,
     );
+  }
+
+  /// Merges [src]'s per-task uploader counts into [dest] in place, summing
+  /// counts when the same (taskGuid, uploader) pair appears in both — same
+  /// shape of merge as `docNoToTaskGuid.addAll(...)` right next to every
+  /// call site of this, just one level deeper since each value here is
+  /// itself a map instead of a single string.
+  void _mergeTaskUploaderCounts(
+    Map<String, Map<String, int>> dest,
+    Map<String, Map<String, int>> src,
+  ) {
+    src.forEach((taskGuid, uploaders) {
+      final target = dest.putIfAbsent(taskGuid, () => <String, int>{});
+      uploaders.forEach((uploader, count) {
+        target.update(uploader, (c) => c + count, ifAbsent: () => count);
+      });
+    });
   }
 
   Future<({List<Journal> journals, bool complete})> _fetchAllGLJournalsForShop(
@@ -841,6 +898,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
   Future<
     ({
       Map<String, String> docNoToTaskGuid,
+      Map<String, Map<String, int>> taskUploaderCounts,
       int totalItemsSeen,
       int? apiReportedTotal,
     })
@@ -852,6 +910,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
         dLog('⚠️ Failed to select shop before docNo map: ${shop.shopName}');
         return (
           docNoToTaskGuid: <String, String>{},
+          taskUploaderCounts: <String, Map<String, int>>{},
           totalItemsSeen: 0,
           apiReportedTotal: null,
         );
@@ -864,6 +923,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
       dLog('⚠️ Failed to fetch docNo map for ${shop.shopName}: $e');
       return (
         docNoToTaskGuid: <String, String>{},
+        taskUploaderCounts: <String, Map<String, int>>{},
         totalItemsSeen: 0,
         apiReportedTotal: null,
       );
@@ -880,6 +940,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
     List<_ShopRawData> raw,
     Map<String, int> imageGroupDocCounts,
     Map<String, String> docNoToTaskGuid, {
+    Map<String, Map<String, int>> taskUploaderCounts = const {},
     int docNoMapTotalItemsSeen = 0,
     int? docNoMapApiReportedTotal,
     DateTime? startDate,
@@ -930,6 +991,14 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
     final Map<String, String> normalizedDocNoToTaskGuid = {
       for (final entry in docNoToTaskGuid.entries)
         if (entry.key.trim().isNotEmpty) entry.key.trim(): entry.value,
+    };
+    // taskGuid -> (uploader -> count), keyed the same normalized way as
+    // knownTaskGuids above so a lookup by task.guidfixed always matches
+    // regardless of casing/whitespace differences between /task and
+    // /documentimagegroup.
+    final Map<String, Map<String, int>> normalizedTaskUploaderCounts = {
+      for (final entry in taskUploaderCounts.entries)
+        if (entry.key.trim().isNotEmpty) normalizeGuid(entry.key): entry.value,
     };
 
     // A journal's real task guid, resolving through BOTH known link paths:
@@ -1105,6 +1174,18 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
           if (keyer != ownerBy) totalKeyedByOthers += count;
         });
 
+        // Who actually uploaded the IMAGES behind this task, from
+        // /documentimagegroup's imagereferences[].uploadedby — a
+        // completely separate action from opening the task (ownerBy) or
+        // keying the GL journal (combinedKeyerMap above). Requested 2026-08:
+        // "the person who opens a task and the person who puts the photo
+        // into it are sometimes different people, and we need to see who
+        // uploaded" — this is the map that answers that, per task.
+        final Map<String, int> uploaderMapForTask =
+            normalizedTaskUploaderCounts[normalizeGuid(task.guidfixed)] ??
+            const {};
+        final int ownerUploadedCount = uploaderMapForTask[ownerBy] ?? 0;
+
         // Owner row ("Row A") — full task context, referenceCount excludes
         // whatever other people already keyed. Shown with EVERY in-range
         // journal entry linked to the task, since the owner is the task's
@@ -1119,6 +1200,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
           isContributorRow: false,
           keyedDocumentCount: 0,
           totalKeyedByOthers: totalKeyedByOthers,
+          uploadedByThisEmployee: ownerUploadedCount,
           journalEntries: mergedJournals,
           includeDetails: includeDetails,
         );
@@ -1127,30 +1209,41 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
           lastActiveMap[ownerBy] = task.ownerAt;
         }
 
-        // Contributor rows ("Row B") — someone else keyed part of this
-        // task's documents; they get credit for exactly what they keyed,
-        // and their journal drill-down is scoped to just the entries THEY
-        // created (not the whole task's entries, which would misleadingly
-        // suggest they touched documents they never keyed).
-        combinedKeyerMap.forEach((keyer, count) {
-          if (keyer == ownerBy) return;
-          final keyerJournals = mergedJournals
-              .where((j) => (j.createdBy ?? '').trim() == keyer)
+        // Contributor rows ("Row B") — someone else keyed and/or uploaded
+        // part of this task's documents; they get credit for exactly what
+        // they did, and their journal drill-down is scoped to just the
+        // entries THEY created (not the whole task's entries, which would
+        // misleadingly suggest they touched documents they never keyed).
+        // Keyer and uploader are merged onto ONE row per (employee, task)
+        // — union of both maps' keys, minus the owner (already handled
+        // above) — so an employee who both keyed AND uploaded for this
+        // task doesn't show up as two separate confusing rows.
+        final Set<String> contributors = {
+          ...combinedKeyerMap.keys,
+          ...uploaderMapForTask.keys,
+        }..remove(ownerBy);
+        for (final contributor in contributors) {
+          final keyedCount = combinedKeyerMap[contributor] ?? 0;
+          final uploadedCount = uploaderMapForTask[contributor] ?? 0;
+          if (keyedCount == 0 && uploadedCount == 0) continue;
+          final contributorJournals = mergedJournals
+              .where((j) => (j.createdBy ?? '').trim() == contributor)
               .toList();
           _applyTaskToShopAcc(
-            accFor(keyer, shopName),
+            accFor(contributor, shopName),
             task,
             isContributorRow: true,
-            keyedDocumentCount: count,
+            keyedDocumentCount: keyedCount,
             totalKeyedByOthers: 0,
-            journalEntries: keyerJournals,
+            uploadedByThisEmployee: uploadedCount,
+            journalEntries: contributorJournals,
             includeDetails: includeDetails,
           );
-          final keyerLast = lastActiveMap[keyer];
-          if (keyerLast == null || task.ownerAt.isAfter(keyerLast)) {
-            lastActiveMap[keyer] = task.ownerAt;
+          final contributorLast = lastActiveMap[contributor];
+          if (contributorLast == null || task.ownerAt.isAfter(contributorLast)) {
+            lastActiveMap[contributor] = task.ownerAt;
           }
-        });
+        }
       }
 
       // ── JOURNAL SIDE: creator = คีย์, checkedBy = ตรวจสอบ, updatedBy = แก้ไข ──
@@ -1308,6 +1401,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
           totalJournalsNoPhoto: sum((s) => s.journalCountNoPhoto),
           totalChecked: sum((s) => s.journalChecked),
           totalUpdated: sum((s) => s.journalUpdated),
+          totalUploaded: sum((s) => s.uploadedCount),
           shopStats: shopStats,
         ),
       );
@@ -1330,6 +1424,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
     required bool isContributorRow,
     required int keyedDocumentCount,
     required int totalKeyedByOthers,
+    int uploadedByThisEmployee = 0,
     List<Journal> journalEntries = const [],
     bool includeDetails = true,
   }) {
@@ -1339,6 +1434,12 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
     if (!isContributorRow) {
       acc.totalDocuments += docCount;
     }
+
+    // Personal action count, independent of task ownership/contributor
+    // status — rolls into this row's own employee/shop total either way,
+    // same as journalCount does for keying (see the separate "JOURNAL
+    // SIDE" loop below).
+    acc.uploadedCount += uploadedByThisEmployee;
 
     int taskWaitingVerify = 0;
     int taskCompleted = 0;
@@ -1414,6 +1515,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
         ownerBy: task.ownerBy.trim(),
         isOwner: !isContributorRow,
         keyedByThisEmployee: isContributorRow ? keyedDocumentCount : 0,
+        uploadedByThisEmployee: uploadedByThisEmployee,
         // Task-status breakdown for the drill-down row's own สถานะการตรวจสอบ
         // / สถานะการบันทึกบัญชี columns — same values as what gets rolled
         // into acc above (full task context on every row, owner or
@@ -1581,6 +1683,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
       totalJournalsNoPhoto: sum((s) => s.journalCountNoPhoto),
       totalChecked: sum((s) => s.journalChecked),
       totalUpdated: sum((s) => s.journalUpdated),
+      totalUploaded: sum((s) => s.uploadedCount),
       shopStats: shopStats,
     );
   }

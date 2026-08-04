@@ -361,6 +361,16 @@ class DocumentImageService {
   static Future<
     ({
       Map<String, String> docNoToTaskGuid,
+      // taskGuid -> (uploader email -> image count), built from the SAME
+      // /documentimagegroup pass as docNoToTaskGuid — each item's
+      // `imagereferences[]` carries its own `uploadedby` per image, which
+      // can legitimately differ from both the item's own top-level
+      // `uploadedby` (whoever created the group/first image) and from the
+      // task's `ownerby` (whoever opened the task) — see the "who actually
+      // uploaded this photo" KPI request, 2026-08. Falls back to the
+      // item-level `uploadedby` when `imagereferences` is empty/missing so
+      // a group with no per-image breakdown still counts for someone.
+      Map<String, Map<String, int>> taskUploaderCounts,
       int totalItemsSeen,
       int? apiReportedTotal,
     })
@@ -374,7 +384,12 @@ class DocumentImageService {
     final token = AuthRepository.token;
     if (token == null || token.isEmpty) {
       dLog('❌ No auth token available for documentimagegroup (docno map)');
-      return (docNoToTaskGuid: <String, String>{}, totalItemsSeen: 0, apiReportedTotal: null);
+      return (
+        docNoToTaskGuid: <String, String>{},
+        taskUploaderCounts: <String, Map<String, int>>{},
+        totalItemsSeen: 0,
+        apiReportedTotal: null,
+      );
     }
 
     // Sends BOTH `limit` and `perPage` for the page-size param — a real
@@ -411,6 +426,7 @@ class DocumentImageService {
     }
 
     final Map<String, String> docNoToTaskGuid = {};
+    final Map<String, Map<String, int>> taskUploaderCounts = {};
     var totalItemsSeen = 0;
     int? apiReportedTotal;
     try {
@@ -469,15 +485,49 @@ class DocumentImageService {
           if (taskGuid.isEmpty) continue;
 
           final refsRaw = map['references'];
-          if (refsRaw is! List) continue;
-          for (final r in refsRaw) {
-            if (r is! Map) continue;
-            final ref = DocumentImageGroupReference.fromJson(
-              Map<String, dynamic>.from(r),
-            );
-            final docNo = ref.docNo.trim();
-            if (docNo.isNotEmpty) {
-              docNoToTaskGuid[docNo] = taskGuid;
+          if (refsRaw is List) {
+            for (final r in refsRaw) {
+              if (r is! Map) continue;
+              final ref = DocumentImageGroupReference.fromJson(
+                Map<String, dynamic>.from(r),
+              );
+              final docNo = ref.docNo.trim();
+              if (docNo.isNotEmpty) {
+                docNoToTaskGuid[docNo] = taskGuid;
+              }
+            }
+          }
+
+          // Per-image uploader — one increment per image actually uploaded
+          // by that person, not per group (a group can hold several images
+          // from different uploaders). Falls back to the group's own
+          // top-level `uploadedby` only when `imagereferences` is missing
+          // entirely, so a group still counts toward SOMEONE rather than
+          // silently vanishing from the uploader breakdown.
+          final imgRefsRaw = map['imagereferences'];
+          final uploaderCounts = taskUploaderCounts.putIfAbsent(
+            taskGuid,
+            () => <String, int>{},
+          );
+          if (imgRefsRaw is List && imgRefsRaw.isNotEmpty) {
+            for (final ir in imgRefsRaw) {
+              if (ir is! Map) continue;
+              final uploader = ir['uploadedby']?.toString().trim() ?? '';
+              if (uploader.isEmpty) continue;
+              uploaderCounts.update(
+                uploader,
+                (c) => c + 1,
+                ifAbsent: () => 1,
+              );
+            }
+          } else {
+            final uploader = map['uploadedby']?.toString().trim() ?? '';
+            if (uploader.isNotEmpty) {
+              uploaderCounts.update(
+                uploader,
+                (c) => c + 1,
+                ifAbsent: () => 1,
+              );
             }
           }
         }
@@ -524,6 +574,7 @@ class DocumentImageService {
       dLog('💥 Error building docNo→taskGuid map: $e');
       return (
         docNoToTaskGuid: docNoToTaskGuid,
+        taskUploaderCounts: taskUploaderCounts,
         totalItemsSeen: totalItemsSeen,
         apiReportedTotal: apiReportedTotal,
       );
@@ -531,6 +582,7 @@ class DocumentImageService {
 
     return (
       docNoToTaskGuid: docNoToTaskGuid,
+      taskUploaderCounts: taskUploaderCounts,
       totalItemsSeen: totalItemsSeen,
       apiReportedTotal: apiReportedTotal,
     );

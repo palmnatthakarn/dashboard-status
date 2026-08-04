@@ -111,6 +111,20 @@ class KpiCombinedTaskItem {
   final String ownerBy;
   final bool isOwner;
   final int keyedByThisEmployee; // only meaningful when isOwner == false
+
+  // How many IMAGES this employee personally uploaded onto this task —
+  // from /documentimagegroup's imagereferences[].uploadedby, which can
+  // legitimately differ from both [ownerBy] (who opened the task) and
+  // whoever keyed the GL journal (see [keyedByThisEmployee]). Meaningful
+  // on both the owner row (owner may have uploaded some/all of the
+  // photos themself) and a contributor row (someone else uploaded photos
+  // into the owner's task without ever keying anything) — the two are
+  // tracked on the SAME row per employee/task rather than a separate
+  // row, since an employee can be a keying contributor, an upload
+  // contributor, or both on one task. 2026-08: added to answer "who
+  // actually put the photo into this task" separately from "who opened
+  // the task".
+  final int uploadedByThisEmployee;
   final List<KpiCombinedJournalItem> journalEntries;
 
   // ── สถานะการตรวจสอบ / สถานะการบันทึกบัญชี (task workflow breakdown) ──
@@ -142,6 +156,7 @@ class KpiCombinedTaskItem {
     required this.ownerBy,
     required this.isOwner,
     this.keyedByThisEmployee = 0,
+    this.uploadedByThisEmployee = 0,
     this.journalEntries = const [],
     this.waitingVerify = 0,
     this.passed = 0,
@@ -187,6 +202,17 @@ class KpiCombinedShopStat {
   final int journalCountNoPhoto; // คีย์ (ไม่มีรูป)
   final int journalChecked; // ตรวจสอบ
   final int journalUpdated; // แก้ไข
+
+  // ── รูปภาพที่อัปโหลด (who actually put photos into a task) ──
+  // Total images this employee personally uploaded across every task in
+  // this shop — from /documentimagegroup's imagereferences[].uploadedby,
+  // NOT gated by task ownership: an employee who never opened a single
+  // task but uploaded 50 photos into other people's tasks still gets
+  // full credit here. Deliberately a separate figure from
+  // totalDocuments/totalJournals — "opened the task", "uploaded the
+  // photo", and "keyed the GL entry" are three different actions that
+  // can each be done by a different person. 2026-08.
+  final int uploadedCount;
 
   // คีย์รวม — journalCount + journalCountNoPhoto combined, so a viewer
   // doesn't have to add the two "คีย์" columns themselves to see total
@@ -234,6 +260,7 @@ class KpiCombinedShopStat {
     this.journalCountNoPhoto = 0,
     this.journalChecked = 0,
     this.journalUpdated = 0,
+    this.uploadedCount = 0,
     this.tasks = const [],
     this.orphanJournalEntries = const [],
   });
@@ -255,6 +282,7 @@ class KpiCombinedShopStat {
     int? journalCountNoPhoto,
     int? journalChecked,
     int? journalUpdated,
+    int? uploadedCount,
     List<KpiCombinedTaskItem>? tasks,
     List<KpiCombinedJournalItem>? orphanJournalEntries,
   }) {
@@ -275,6 +303,7 @@ class KpiCombinedShopStat {
       journalCountNoPhoto: journalCountNoPhoto ?? this.journalCountNoPhoto,
       journalChecked: journalChecked ?? this.journalChecked,
       journalUpdated: journalUpdated ?? this.journalUpdated,
+      uploadedCount: uploadedCount ?? this.uploadedCount,
       tasks: tasks ?? this.tasks,
       orphanJournalEntries: orphanJournalEntries ?? this.orphanJournalEntries,
     );
@@ -317,6 +346,11 @@ class KpiCombinedEmployee {
   final int totalChecked;
   final int totalUpdated;
 
+  // ── รูปภาพที่อัปโหลด — see KpiCombinedShopStat.uploadedCount doc comment.
+  // Summed across every shop this employee has activity in, regardless of
+  // whether they own any tasks at all.
+  final int totalUploaded;
+
   // Same pure derivations as KpiCombinedShopStat's journalCountTotal /
   // journalRemaining, just at the already-summed employee level.
   int get totalJournalsCombined => totalJournals + totalJournalsNoPhoto;
@@ -344,6 +378,7 @@ class KpiCombinedEmployee {
     this.totalJournalsNoPhoto = 0,
     this.totalChecked = 0,
     this.totalUpdated = 0,
+    this.totalUploaded = 0,
     this.shopStats = const [],
   });
 
@@ -365,6 +400,7 @@ class KpiCombinedEmployee {
     int? totalJournalsNoPhoto,
     int? totalChecked,
     int? totalUpdated,
+    int? totalUploaded,
     List<KpiCombinedShopStat>? shopStats,
   }) {
     return KpiCombinedEmployee(
@@ -387,6 +423,7 @@ class KpiCombinedEmployee {
       totalJournalsNoPhoto: totalJournalsNoPhoto ?? this.totalJournalsNoPhoto,
       totalChecked: totalChecked ?? this.totalChecked,
       totalUpdated: totalUpdated ?? this.totalUpdated,
+      totalUploaded: totalUploaded ?? this.totalUploaded,
       shopStats: shopStats ?? this.shopStats,
     );
   }
