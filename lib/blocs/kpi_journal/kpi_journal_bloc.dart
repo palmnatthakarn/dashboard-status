@@ -761,7 +761,11 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
         ? DateTime(rangeEnd.year, rangeEnd.month, rangeEnd.day, 23, 59, 59, 999)
         : null;
 
-    if (!skipShopSelection) {
+    final releaseShopSession = await MultiShopService.acquireShopSession();
+    try {
+    // Re-select even when the caller selected earlier: acquiring the shared
+    // lease may have waited behind another KPI request that changed session.
+    if (!skipShopSelection || shopId?.isNotEmpty == true) {
       try {
         await _selectShop(shopId: shopId?.isNotEmpty == true ? shopId : null);
       } catch (e) {
@@ -792,6 +796,9 @@ class KpiJournalBloc extends Bloc<KpiJournalEvent, KpiJournalState> {
       activeTaskGuids: activeTaskGuids,
       journalShopNameFilter: journalShopNameFilter,
     );
+    } finally {
+      releaseShopSession();
+    }
   }
 
   /// Fetches every page of GL journals for one shop and returns the raw
@@ -1255,4 +1262,3 @@ class _FetchResult {
     required this.allUpdaters,
   });
 }
-

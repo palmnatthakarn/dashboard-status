@@ -13,6 +13,7 @@ import '../../services/multi_shop_service.dart';
 import '../../services/task_service.dart';
 import '../../utils/app_logger.dart';
 import 'kpi_combined_event.dart';
+import 'kpi_fetch_scope.dart';
 import 'kpi_combined_state.dart';
 
 /// One shop's raw fetch result: every task and every GL journal row for
@@ -107,6 +108,8 @@ class _ShopAcc {
   int journalCountNoPhoto = 0;
   int journalChecked = 0;
   int journalUpdated = 0;
+  final Set<String> _journalDocKeys = {};
+  final Set<String> _journalNoPhotoDocKeys = {};
 
   // รูปภาพที่อัปโหลด — see KpiCombinedShopStat.uploadedCount doc comment.
   int uploadedCount = 0;
@@ -120,6 +123,29 @@ class _ShopAcc {
   final List<KpiCombinedJournalItem> orphanJournals = [];
 
   _ShopAcc(this.shopName);
+
+  void addKeyedJournal(Journal journal, {required bool noPhoto}) {
+    final key = journalCountKey(journal);
+    final targetSet = noPhoto ? _journalNoPhotoDocKeys : _journalDocKeys;
+    if (!targetSet.add(key)) return;
+    if (noPhoto) {
+      journalCountNoPhoto++;
+    } else {
+      journalCount++;
+    }
+  }
+
+  static String journalCountKey(Journal journal) {
+    final docNo = (journal.docNo ?? '').trim();
+    if (docNo.isNotEmpty) return 'doc:$docNo';
+
+    final createdAt = (journal.createdAt ?? '').trim();
+    final bookCode = (journal.bookCode ?? '').trim();
+    final accountCode = (journal.accountCode ?? '').trim();
+    final debit = journal.debit?.toString() ?? '';
+    final credit = journal.credit?.toString() ?? '';
+    return 'row:$createdAt|$bookCode|$accountCode|$debit|$credit';
+  }
 
   KpiCombinedShopStat build() {
     final sortedTasks = [...tasks]
@@ -192,10 +218,24 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
   /// show a previous account's cached data.
   static void clearCache() => _fetchCache.clear();
 
-  KpiCombinedBloc() : super(KpiCombinedInitial()) {
+  KpiCombinedBloc() : super(_initialLoadedState()) {
     on<LoadKpiCombinedData>(_onLoad);
     on<SelectShopAndSearchCombined>(_onSelectShopAndSearch);
     on<LoadKpiCombinedShopDetails>(_onLoadShopDetails);
+  }
+
+  static KpiCombinedLoaded _initialLoadedState() {
+    final now = DateTime.now();
+    final startDate = DateTime(now.year, now.month, 1);
+    final endDate = DateTime(now.year, now.month + 1, 0);
+    return KpiCombinedLoaded(
+      employees: const [],
+      filteredEmployees: const [],
+      shops: const [],
+      startDate: startDate,
+      endDate: endDate,
+      hasSearched: false,
+    );
   }
 
   Future<void> _onLoad(
@@ -228,18 +268,32 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
               startDate: startDate,
               endDate: endDate,
               forceRefresh: event.forceRefresh,
-              includeDocNoMap: false,
+              includeDocNoMap: true,
             );
             raw.addAll(fetched.raw);
             imageGroupDocCounts.addAll(fetched.imageGroupDocCounts);
+            docNoToTaskGuid.addAll(fetched.docNoToTaskGuid);
+            _mergeTaskUploaderCounts(
+              taskUploaderCounts,
+              fetched.taskUploaderCounts,
+            );
+            docNoMapTotalItemsSeen += fetched.docNoMapTotalItemsSeen;
+            if (fetched.docNoMapApiReportedTotal != null) {
+              docNoMapApiReportedTotal =
+                  (docNoMapApiReportedTotal ?? 0) +
+                  fetched.docNoMapApiReportedTotal!;
+            }
             employees = _buildCombinedEmployees(
               raw,
               imageGroupDocCounts,
-              const {},
-              taskUploaderCounts: const {},
+              docNoToTaskGuid,
+              taskUploaderCounts: taskUploaderCounts,
+              docNoMapTotalItemsSeen: docNoMapTotalItemsSeen,
+              docNoMapApiReportedTotal: docNoMapApiReportedTotal,
               startDate: startDate,
               endDate: endDate,
               includeDetails: false,
+              resolveNoPhoto: true,
             );
             emit(
               KpiCombinedLoaded(
@@ -257,20 +311,6 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
             );
           }
 
-          for (final shop in shops) {
-            final docNoResult = await _fetchDocNoMapForSelectedShop(shop);
-            docNoToTaskGuid.addAll(docNoResult.docNoToTaskGuid);
-            _mergeTaskUploaderCounts(
-              taskUploaderCounts,
-              docNoResult.taskUploaderCounts,
-            );
-            docNoMapTotalItemsSeen += docNoResult.totalItemsSeen;
-            if (docNoResult.apiReportedTotal != null) {
-              docNoMapApiReportedTotal =
-                  (docNoMapApiReportedTotal ?? 0) +
-                  docNoResult.apiReportedTotal!;
-            }
-          }
           employees = _buildCombinedEmployees(
             raw,
             imageGroupDocCounts,
@@ -296,6 +336,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
           startDate: startDate,
           endDate: endDate,
           summaryReady: true,
+          hasSearched: true,
         ),
       );
     } catch (e) {
@@ -319,9 +360,15 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
     );
 
     try {
+      var shops = current.shops;
+      if (shops.isEmpty && AuthRepository.isAuthenticated) {
+        final shopList = await MultiShopService.listShops();
+        shops = shopList.map(_parseShopItem).toList();
+      }
+
       final targetShops = event.shopIds.isEmpty
-          ? current.shops
-          : current.shops
+          ? shops
+          : shops
                 .where((s) => event.shopIds.contains(s.shopId))
                 .toList();
 
@@ -332,32 +379,15 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
         targetShops,
         startDate: startDate,
         endDate: endDate,
-        includeDocNoMap: false,
+        includeDocNoMap: true,
       );
-      final docNoToTaskGuid = <String, String>{};
-      final taskUploaderCounts = <String, Map<String, int>>{};
-      var docNoMapTotalItemsSeen = 0;
-      int? docNoMapApiReportedTotal;
-      for (final shop in targetShops) {
-        final docNoResult = await _fetchDocNoMapForSelectedShop(shop);
-        docNoToTaskGuid.addAll(docNoResult.docNoToTaskGuid);
-        _mergeTaskUploaderCounts(
-          taskUploaderCounts,
-          docNoResult.taskUploaderCounts,
-        );
-        docNoMapTotalItemsSeen += docNoResult.totalItemsSeen;
-        if (docNoResult.apiReportedTotal != null) {
-          docNoMapApiReportedTotal =
-              (docNoMapApiReportedTotal ?? 0) + docNoResult.apiReportedTotal!;
-        }
-      }
       final employees = _buildCombinedEmployees(
         fetched.raw,
         fetched.imageGroupDocCounts,
-        docNoToTaskGuid,
-        taskUploaderCounts: taskUploaderCounts,
-        docNoMapTotalItemsSeen: docNoMapTotalItemsSeen,
-        docNoMapApiReportedTotal: docNoMapApiReportedTotal,
+        fetched.docNoToTaskGuid,
+        taskUploaderCounts: fetched.taskUploaderCounts,
+        docNoMapTotalItemsSeen: fetched.docNoMapTotalItemsSeen,
+        docNoMapApiReportedTotal: fetched.docNoMapApiReportedTotal,
         startDate: startDate,
         endDate: endDate,
         includeDetails: false,
@@ -375,6 +405,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
             query,
             employeeNames,
           ),
+          shops: shops,
           selectedShopIds: event.shopIds,
           selectedShopNames: event.shopNames,
           startDate: startDate,
@@ -386,10 +417,15 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
           detailLoadingShopNames: const [],
           detailErrorShopNames: const [],
           summaryReady: true,
+          hasSearched: true,
         ),
       );
     } catch (e) {
       dLog('❌ Error fetching combined KPI data: $e');
+      if (AuthRepository.isSessionExpiredError(e.toString())) {
+        emit(KpiCombinedError('ไม่สามารถโหลดข้อมูลได้: ${e.toString()}'));
+        return;
+      }
       emit(
         current.copyWith(
           isSearching: false,
@@ -502,10 +538,14 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
     DateTime? startDate,
     DateTime? endDate,
   }) {
-    final ids = shops.map((s) => s.shopId).toList()..sort();
     final s = startDate != null ? JournalService.formatDate(startDate) : '-';
     final e = endDate != null ? JournalService.formatDate(endDate) : '-';
-    return '${ids.join(',')}|$s|$e';
+    return KpiFetchScope.cacheKey(
+      account: AuthRepository.username ?? '',
+      shopIds: shops.map((shop) => shop.shopId),
+      startDate: s,
+      endDate: e,
+    );
   }
 
   /// Fetches tasks + every GL journal page for [shops], one shop fully at a
@@ -659,8 +699,9 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
     var allComplete = true;
 
     for (final shop in shops) {
-      List<TaskItem> tasks = [];
+      final releaseShopSession = await MultiShopService.acquireShopSession();
       try {
+        List<TaskItem> tasks = [];
         final response = await TaskService.fetchTasksForShop(
           shopId: shop.shopId,
           limit: 5000,
@@ -675,11 +716,6 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
           );
           allComplete = false;
         }
-      } catch (e) {
-        dLog('⚠️ Failed to load tasks for shop ${shop.shopName}: $e');
-        allComplete = false;
-      }
-
       // Kicked off CONCURRENTLY (not one `await` after another) —
       // performance fix requested 2026-07. All three of these are pure
       // reads against whichever shop TaskService.fetchTasksForShop just
@@ -702,6 +738,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
               page: 1,
               perPage: 9999,
             ).catchError((e) {
+              allComplete = false;
               dLog(
                 '⚠️ Failed to fetch docNo→taskGuid map for shop ${shop.shopName}: $e',
               );
@@ -727,6 +764,7 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
             fromDate: startStr,
             toDate: endStr,
           ).catchError((e) {
+            allComplete = false;
             dLog(
               '⚠️ Failed to fetch documentimagegroup bill count for shop '
               '${shop.shopName}: $e',
@@ -759,6 +797,12 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
       final billCount = await billCountFuture;
       imageGroupDocCounts[shop.shopId] = billCount;
       dLog('📄 [${shop.shopName}] ต้องบันทึก(รูปภาพ): $billCount');
+      } catch (e) {
+        dLog('⚠️ Failed to load complete KPI data for ${shop.shopName}: $e');
+        allComplete = false;
+      } finally {
+        releaseShopSession();
+      }
     }
 
     // apiReportedTotal vs totalItemsSeen (now summed across every shop)
@@ -893,41 +937,6 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
       complete = false;
     }
     return (journals: allJournals, complete: complete);
-  }
-
-  Future<
-    ({
-      Map<String, String> docNoToTaskGuid,
-      Map<String, Map<String, int>> taskUploaderCounts,
-      int totalItemsSeen,
-      int? apiReportedTotal,
-    })
-  >
-  _fetchDocNoMapForSelectedShop(KpiCombinedShopItem shop) async {
-    try {
-      final selected = await MultiShopService.selectShop(shopId: shop.shopId);
-      if (!selected) {
-        dLog('⚠️ Failed to select shop before docNo map: ${shop.shopName}');
-        return (
-          docNoToTaskGuid: <String, String>{},
-          taskUploaderCounts: <String, Map<String, int>>{},
-          totalItemsSeen: 0,
-          apiReportedTotal: null,
-        );
-      }
-      return await DocumentImageService.fetchDocNoToTaskGuidMap(
-        page: 1,
-        perPage: 9999,
-      );
-    } catch (e) {
-      dLog('⚠️ Failed to fetch docNo map for ${shop.shopName}: $e');
-      return (
-        docNoToTaskGuid: <String, String>{},
-        taskUploaderCounts: <String, Map<String, int>>{},
-        totalItemsSeen: 0,
-        apiReportedTotal: null,
-      );
-    }
   }
 
   /// The core merge: for each shop's raw (tasks, journals), replays
@@ -1162,12 +1171,18 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
             ...inRangeJournalsForGuid(task.taskChild!.guidfixed),
         ];
 
-        final Map<String, int> combinedKeyerMap = {};
+        final Map<String, Set<String>> combinedKeyerDocKeys = {};
         for (final j in mergedJournals) {
           final creator = (j.createdBy ?? '').trim();
           if (creator.isEmpty) continue;
-          combinedKeyerMap.update(creator, (c) => c + 1, ifAbsent: () => 1);
+          combinedKeyerDocKeys
+              .putIfAbsent(creator, () => <String>{})
+              .add(_ShopAcc.journalCountKey(j));
         }
+        final Map<String, int> combinedKeyerMap = {
+          for (final entry in combinedKeyerDocKeys.entries)
+            entry.key: entry.value.length,
+        };
 
         int totalKeyedByOthers = 0;
         combinedKeyerMap.forEach((keyer, count) {
@@ -1311,11 +1326,10 @@ class KpiCombinedBloc extends Bloc<KpiCombinedEvent, KpiCombinedState> {
 
         if (creator.isNotEmpty && _isWithinRange(j.createdAt, start, end)) {
           final acc = accFor(creator, shopName);
-          if (noPhotoAtAll && shouldResolveNoPhoto) {
-            acc.journalCountNoPhoto++;
-          } else {
-            acc.journalCount++;
-          }
+          acc.addKeyedJournal(
+            j,
+            noPhoto: noPhotoAtAll && shouldResolveNoPhoto,
+          );
           if (orphan) {
             // Requested 2026-07: an orphan journal backed by a real photo/
             // reference (jobguidfixed, documentimagegroup, OR documentRef —

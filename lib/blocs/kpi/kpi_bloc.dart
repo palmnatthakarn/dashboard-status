@@ -328,6 +328,7 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
     final Map<String, Map<String, int>> allJournalCountMap = {};
 
     for (final shop in shops) {
+      final releaseShopSession = await MultiShopService.acquireShopSession();
       try {
         final response = await TaskService.fetchTasksForShop(
           shopId: shop.shopId,
@@ -339,26 +340,25 @@ class KpiBloc extends Bloc<KpiEvent, KpiState> {
             response.tasks.map((t) => TaskWithShop(t, shop.shopName)),
           );
         }
-      } catch (e) {
-        dLog('⚠️ Failed to load tasks for shop ${shop.shopName}: $e');
-      }
-
-      // GL fetch right after this shop's task-fetch (which just selected
-      // it), scoped to [startStr, endStr] when given, while still looping
-      // through every page (fixes the previous bug of only reading page 1
-      // / the first ~1000 rows).
-      final journalMap = await _fetchAllGLJournalsForShop(
-        shop,
-        startStr: startStr,
-        endStr: endStr,
-      );
-      journalMap.forEach((guid, keyers) {
-        keyers.forEach((keyer, count) {
-          allJournalCountMap
-              .putIfAbsent(guid, () => {})
-              .update(keyer, (c) => c + count, ifAbsent: () => count);
+        // GL fetch immediately follows while the shared session lease keeps
+        // other KPI blocs from selecting a different shop.
+        final journalMap = await _fetchAllGLJournalsForShop(
+          shop,
+          startStr: startStr,
+          endStr: endStr,
+        );
+        journalMap.forEach((guid, keyers) {
+          keyers.forEach((keyer, count) {
+            allJournalCountMap
+                .putIfAbsent(guid, () => {})
+                .update(keyer, (c) => c + count, ifAbsent: () => count);
+          });
         });
-      });
+      } catch (e) {
+        dLog('⚠️ Failed to load KPI data for shop ${shop.shopName}: $e');
+      } finally {
+        releaseShopSession();
+      }
     }
 
     _fetchCache[cacheKey] =

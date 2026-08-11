@@ -139,8 +139,16 @@ class AuthRepository {
   /// unrecoverable session and force a logout instead of offering a retry
   /// button that will just fail again forever.
   static bool isSessionExpiredError(String message) {
+    final normalized = message.toLowerCase();
     return message.contains('Token หมดอายุ') ||
-        message.contains('กรุณาเข้าสู่ระบบใหม่');
+        message.contains('ไม่พบ Token') ||
+        message.contains('เซสชันหมดอายุ') ||
+        message.contains('กรุณาเข้าสู่ระบบใหม่') ||
+        normalized.contains('token expired') ||
+        normalized.contains('session expired') ||
+        normalized.contains('unauthorized') ||
+        normalized.contains('status: 401') ||
+        normalized.contains('status=401');
   }
 
   Future<void> _persistSession(

@@ -62,9 +62,9 @@ class PdfExportService {
 
     final pdfBytes = await pdf.save();
 
-    await Printing.layoutPdf(
-      onLayout: (_) async => pdfBytes,
-      name:
+    await Printing.sharePdf(
+      bytes: pdfBytes,
+      filename:
           '${title.replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.pdf',
     );
   }
@@ -115,23 +115,12 @@ class PdfExportService {
 
     final pdfBytes = await pdf.save();
 
-    await Printing.layoutPdf(
-      onLayout: (_) async => pdfBytes,
-      name:
+    await Printing.sharePdf(
+      bytes: pdfBytes,
+      filename:
           '${title.replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.pdf',
     );
   }
-
-  /// Groups with a lot of shop rows can exceed a full page's height on
-  /// their own; pw.Inseparable throws in that case ("widget won't fit into
-  /// the page"), so only atomically-glue small/medium groups together.
-  /// Oversized groups fall back to normal flowing behavior — the banner
-  /// may still get separated from its table in that rare case, but the
-  /// export won't crash.
-  // A shop name may wrap onto several lines, so row count alone
-  // underestimates a group's physical height. Keep only compact groups
-  // together; larger reports must be allowed to flow onto the next page.
-  static const int _rowsPerGroupChunk = 8;
 
   static List<pw.Widget> _buildGroupBlocks(
     int index,
@@ -140,52 +129,95 @@ class PdfExportService {
     pw.Font font,
     pw.Font fontBold,
   ) {
-    final chunks = <pw.Widget>[];
-    for (var start = 0; start < group.rows.length; start += _rowsPerGroupChunk) {
-      final end = (start + _rowsPerGroupChunk).clamp(0, group.rows.length);
-      final isLastChunk = end == group.rows.length;
-      final contextRowIndexes = group.contextRowIndexes
-          .where((rowIndex) => rowIndex >= start && rowIndex < end)
-          .map((rowIndex) => rowIndex - start)
-          .toSet();
-      chunks.add(
+    if (group.rows.isEmpty) {
+      return [_buildGroupBanner(index + 1, group, font, fontBold)];
+    }
+
+    if (group.rows.length == 1) {
+      return [
         pw.Inseparable(
-          child: pw.Padding(
-            padding: pw.EdgeInsets.only(bottom: 12, top: index == 0 ? 0 : 3),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                _buildGroupBanner(index + 1, group, font, fontBold),
-                pw.SizedBox(height: 4),
-                pw.Padding(
-                  padding: const pw.EdgeInsets.only(left: 12),
-                  child: _buildGroupTable(
-                    subHeaders,
-                    group.rows.sublist(start, end),
-                    font,
-                    fontBold,
-                    group.showColumnTotals && isLastChunk,
-                    totalRows: group.totalRows ?? group.rows,
-                    contextRowIndexes: contextRowIndexes,
-                  ),
-                ),
-              ],
-            ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              _buildGroupBanner(index + 1, group, font, fontBold),
+              pw.SizedBox(height: 4),
+              _buildGroupTable(
+                subHeaders,
+                group.rows,
+                font,
+                fontBold,
+                group.showColumnTotals,
+                totalRows: group.totalRows ?? group.rows,
+                contextRowIndexes: group.contextRowIndexes,
+              ),
+            ],
           ),
+        ),
+        pw.SizedBox(height: 12),
+      ];
+    }
+
+    final widgets = <pw.Widget>[
+      // Keep the employee banner, column headings, and first data row
+      // together so a banner can never be orphaned at the bottom of a page.
+      pw.Inseparable(
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            _buildGroupBanner(index + 1, group, font, fontBold),
+            pw.SizedBox(height: 4),
+            _buildGroupTable(
+              subHeaders,
+              group.rows.sublist(0, 1),
+              font,
+              fontBold,
+              false,
+              contextRowIndexes: group.contextRowIndexes.contains(0)
+                  ? const {0}
+                  : const {},
+            ),
+          ],
+        ),
+      ),
+    ];
+
+    if (group.rows.length > 2) {
+      widgets.add(
+        _buildGroupTable(
+          subHeaders,
+          group.rows.sublist(1, group.rows.length - 1),
+          font,
+          fontBold,
+          false,
+          includeHeader: false,
+          contextRowIndexes: group.contextRowIndexes
+              .where((rowIndex) => rowIndex > 0 && rowIndex < group.rows.length - 1)
+              .map((rowIndex) => rowIndex - 1)
+              .toSet(),
         ),
       );
     }
-    if (chunks.isEmpty) {
-      chunks.add(_buildGroupBanner(index + 1, group, font, fontBold));
-    }
 
-    // pw.Column spans across pages by default in this package, which was
-    // splitting the employee banner from its own shop table whenever the
-    // table didn't fit the remaining page — leaving the banner orphaned
-    // above a page break with a big blank gap below it. pw.Inseparable
-    // forces the whole group (banner + table) to move to the next page
-    // together instead of breaking mid-group.
-    return chunks;
+    // Keep the final data row and grand total together so the total can
+    // never appear alone at the top of the following page.
+    widgets.add(
+      pw.Inseparable(
+        child: _buildGroupTable(
+          subHeaders,
+          group.rows.sublist(group.rows.length - 1),
+          font,
+          fontBold,
+          group.showColumnTotals,
+          includeHeader: false,
+          totalRows: group.totalRows ?? group.rows,
+          contextRowIndexes: group.contextRowIndexes.contains(group.rows.length - 1)
+              ? const {0}
+              : const {},
+        ),
+      ),
+    );
+    widgets.add(pw.SizedBox(height: 12));
+    return widgets;
   }
 
   static pw.Widget _buildGroupBanner(
@@ -306,6 +338,7 @@ class PdfExportService {
     pw.Font font,
     pw.Font fontBold,
     bool showColumnTotals, {
+    bool includeHeader = true,
     List<List<String>>? totalRows,
     Set<int> contextRowIndexes = const {},
   }) {
@@ -352,7 +385,8 @@ class PdfExportService {
         for (var i = 1; i < headers.length; i++) i: const pw.FlexColumnWidth(1),
       },
       children: [
-        pw.TableRow(
+        if (includeHeader)
+          pw.TableRow(
           decoration: const pw.BoxDecoration(color: PdfColors.grey200),
           children: headers.asMap().entries
               .map(

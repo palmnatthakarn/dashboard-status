@@ -38,6 +38,7 @@ class KpiCombinedLoaded extends KpiCombinedState {
   final List<String> detailLoadingShopNames;
   final List<String> detailErrorShopNames;
   final bool summaryReady;
+  final bool hasSearched;
 
   const KpiCombinedLoaded({
     required this.employees,
@@ -54,6 +55,7 @@ class KpiCombinedLoaded extends KpiCombinedState {
     this.detailLoadingShopNames = const [],
     this.detailErrorShopNames = const [],
     this.summaryReady = true,
+    this.hasSearched = true,
   });
 
   /// Aggregate totals across ALL fetched employees (not just filtered) —
@@ -85,6 +87,7 @@ class KpiCombinedLoaded extends KpiCombinedState {
     List<String>? detailLoadingShopNames,
     List<String>? detailErrorShopNames,
     bool? summaryReady,
+    bool? hasSearched,
   }) {
     return KpiCombinedLoaded(
       employees: employees ?? this.employees,
@@ -104,6 +107,7 @@ class KpiCombinedLoaded extends KpiCombinedState {
           detailLoadingShopNames ?? this.detailLoadingShopNames,
       detailErrorShopNames: detailErrorShopNames ?? this.detailErrorShopNames,
       summaryReady: summaryReady ?? this.summaryReady,
+      hasSearched: hasSearched ?? this.hasSearched,
     );
   }
 
@@ -123,5 +127,6 @@ class KpiCombinedLoaded extends KpiCombinedState {
     detailLoadingShopNames,
     detailErrorShopNames,
     summaryReady,
+    hasSearched,
   ];
 }

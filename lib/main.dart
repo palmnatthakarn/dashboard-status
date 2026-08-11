@@ -80,6 +80,9 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  static final GlobalKey<NavigatorState> _navigatorKey =
+      GlobalKey<NavigatorState>();
+
   @override
   Widget build(BuildContext context) {
     return RepositoryProvider(
@@ -89,6 +92,7 @@ class MyApp extends StatelessWidget {
             AuthBloc(authRepository: context.read<AuthRepository>())
               ..add(AppStarted()),
         child: MaterialApp(
+          navigatorKey: _navigatorKey,
           title: 'Monitor',
           //theme: AppTheme.lightTheme,
           localizationsDelegates: const [
@@ -98,11 +102,18 @@ class MyApp extends StatelessWidget {
           ],
           supportedLocales: const [Locale('th', 'TH'), Locale('en', 'US')],
           locale: const Locale('th', 'TH'),
-          home: BlocBuilder<AuthBloc, AuthState>(
+          home: BlocConsumer<AuthBloc, AuthState>(
+            listenWhen: (previous, current) =>
+                previous is AuthSuccess &&
+                (current is AuthInitial || current is AuthFailure),
+            listener: (context, state) {
+              _navigatorKey.currentState?.pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginPage()),
+                (route) => false,
+              );
+            },
             builder: (context, state) {
-              if (state is AuthSuccess) {
-                return const DashboardScreen();
-              }
+              if (state is AuthSuccess) return const DashboardScreen();
               return const LoginPage();
             },
           ),

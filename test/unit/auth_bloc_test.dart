@@ -55,6 +55,29 @@ Future<List<AuthState>> collectStates(
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 void main() {
+  group('AuthRepository session-expired detection', () {
+    test('recognizes token expiry and unauthorized variants', () {
+      const messages = [
+        'Exception: Token หมดอายุ กรุณาเข้าสู่ระบบใหม่',
+        'Exception: ไม่พบ Token กรุณาเข้าสู่ระบบใหม่',
+        'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่',
+        'Token expired',
+        'Session expired',
+        'Unauthorized',
+        'Failed to load - Status: 401',
+        'status=401',
+      ];
+
+      for (final message in messages) {
+        expect(
+          AuthRepository.isSessionExpiredError(message),
+          isTrue,
+          reason: message,
+        );
+      }
+    });
+  });
+
   group('AuthBloc — AppStarted', () {
     test('emits [AuthLoading, AuthSuccess] when session exists', () async {
       final bloc = AuthBloc(

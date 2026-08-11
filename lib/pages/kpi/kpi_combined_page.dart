@@ -16,6 +16,7 @@ import '../../models/kpi_combined_employee.dart';
 import '../../services/auth_repository.dart';
 import '../../services/employee_mapping_service.dart';
 import '../../services/pdf_export_service.dart';
+import 'kpi_pdf_data_builder.dart';
 import 'kpi_constants.dart';
 
 /// Merged KPI page — combines what used to be two separate pages (KPI and
@@ -31,7 +32,7 @@ class KpiCombinedPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => KpiCombinedBloc()..add(const LoadKpiCombinedData()),
+      create: (context) => KpiCombinedBloc(),
       child: const _KpiCombinedPageContent(),
     );
   }
@@ -212,25 +213,27 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
                         setState(() {
                           _selectedShopIds = [];
                           _selectedShopNames = [];
+                          _selectedEmployeeIds = [];
                           final now = DateTime.now();
                           _startDate = DateTime(now.year, now.month, 1);
                           _endDate = DateTime(now.year, now.month + 1, 0);
                         });
-                        ctx.read<KpiCombinedBloc>().add(
-                          const LoadKpiCombinedData(forceRefresh: true),
-                        );
+                        if (state.hasSearched) _search(ctx);
                       },
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.all(20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildSummaryCards(state),
-                            const SizedBox(height: 16),
                             _buildFilterBar(ctx, state),
                             _buildActiveFilterSummary(),
                             const SizedBox(height: 16),
-                            _buildTable(state),
+                            if (state.hasSearched) ...[
+                              _buildSummaryCards(state),
+                              const SizedBox(height: 16),
+                              _buildTable(state),
+                            ] else
+                              _buildSearchPrompt(),
                           ],
                         ),
                       ),
@@ -396,7 +399,7 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
                       .map(
                         (e) => SearchableDropdownItem(
                           id: e.name,
-                          label: _nameMappings[e.name] ?? e.name,
+                          label: _employeeDisplayName(e.name),
                         ),
                       )
                       .toList(),
@@ -472,9 +475,6 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
                         _startDate = DateTime(now.year, now.month, 1);
                         _endDate = DateTime(now.year, now.month + 1, 0);
                       });
-                      ctx.read<KpiCombinedBloc>().add(
-                        const LoadKpiCombinedData(forceRefresh: true),
-                      );
                     },
                     icon: const Icon(Icons.refresh_rounded),
                   ),
@@ -482,7 +482,9 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
                 Tooltip(
                   message: 'ดาวน์โหลด PDF',
                   child: IconButton(
-                    onPressed: () => _exportPdf(state),
+                    onPressed: state.hasSearched
+                        ? () => _exportPdf(state)
+                        : null,
                     icon: const Icon(Icons.picture_as_pdf_rounded),
                   ),
                 ),
@@ -581,6 +583,52 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
   // Icon-badge stat cards — back to the softer, shadowed card style (per
   // reference screenshot) instead of the flat bordered strip.
 
+  Widget _buildSearchPrompt() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 42),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(KpiDimensions.cardBorderRadius),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: const BoxDecoration(
+              color: Color(0xFFEFF6FF),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.manage_search_rounded,
+              color: Color(0xFF3B82F6),
+              size: 30,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'เลือกช่วงวันที่แล้วกดค้นหาเพื่อดู KPI',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: KpiColors.primaryText,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'ระบบจะโหลดข้อมูลตามช่วงวันที่ที่เลือก ทำให้เปิดหน้าได้เร็วขึ้นและลดข้อมูลที่ไม่เกี่ยวข้อง',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSummaryCards(KpiCombinedLoaded state) {
     final employees = state.filteredEmployees;
     int sum(int Function(KpiCombinedEmployee) f) =>
@@ -595,7 +643,7 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
         icon: Icons.priority_high_rounded,
       ),
       _SummaryCardData(
-        label: 'จำนวนบิลทั้งหมด',
+        label: 'บิลที่รับผิดชอบ',
         value: sum((e) => e.totalDocuments),
         bg: KpiColors.section1Background,
         accent: const Color(0xFF0EA5E9),
@@ -644,7 +692,7 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
         icon: Icons.functions_rounded,
       ),
       _SummaryCardData(
-        // Deliberately a SEPARATE card from "จำนวนบิลทั้งหมด" (cards[1]),
+        // Deliberately a SEPARATE card from "บิลที่รับผิดชอบ" (cards[1]),
         // not a replacement — totalUploaded (who personally uploaded the
         // photo) and totalDocuments (documents in tasks this
         // employee/shop OWNS) answer different questions and aren't
@@ -654,10 +702,10 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
         // no per-uploader breakdown in the underlying data (/task's
         // totalDocumentStatus is per-task, not per-image-uploader), so
         // they stay task-based regardless of which employee is filtered —
-        // replacing "จำนวนบิลทั้งหมด" with an upload count would make
+        // replacing "บิลที่รับผิดชอบ" with an upload count would make
         // those cards visually disagree with the top card for no real
         // reason. 2026-08.
-        label: 'รูปที่อัปโหลด',
+        label: 'อัปโหลดโดยคนนี้',
         value: sum((e) => e.totalUploaded),
         bg: const Color(0xFFE0F2FE),
         accent: const Color(0xFF0369A1),
@@ -665,8 +713,8 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
       ),
     ];
     final visibleCards = [
-      cards[1], // จำนวนบิลทั้งหมด
-      cards[8], // รูปที่อัปโหลด
+      cards[1], // บิลที่รับผิดชอบ
+      cards[8], // อัปโหลดโดยคนนี้
       cards[0], // คงเหลือ
       cards[2], // รอตรวจ
       cards[3], // ต้องบันทึกทั้งหมด
@@ -820,8 +868,8 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
 
     const subHeaders = [
       'ร้าน',
-      'จำนวน',
-      'รูปที่อัปโหลด',
+      'บิลที่รับผิดชอบ',
+      'อัปโหลดโดยคนนี้',
       'รอตรวจสอบ',
       'ผ่าน',
       'ไม่ผ่าน',
@@ -838,51 +886,11 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
       'แก้ไข',
     ];
 
-    final groups = state.filteredEmployees.map((emp) {
-      final displayName = _nameMappings[emp.name] ?? emp.name;
-      final shopRows = emp.shopStats
-          .map((s) => _pdfShopRow(state, s))
-          .toList();
-      final rows = <List<String>>[];
-      final contextRowIndexes = <int>{};
-      final employeeExpanded = _expandedIds.contains(emp.name);
-
-      for (var si = 0; si < emp.shopStats.length; si++) {
-        final shop = emp.shopStats[si];
-        rows.add(shopRows[si]);
-
-        final shopKey = _shopKey(emp.name, shop.shopName);
-        final shopExpanded = _expandedShopKeys.contains(shopKey);
-        final detailReady = state.detailLoadedShopNames.contains(shop.shopName);
-        if (!employeeExpanded || !shopExpanded || !detailReady) continue;
-
-        for (var ti = 0; ti < shop.tasks.length; ti++) {
-          final task = shop.tasks[ti];
-          if (!task.isOwner) contextRowIndexes.add(rows.length);
-          rows.add(_pdfTaskRow(task));
-
-          final taskKey = '$shopKey#$ti';
-          if (_expandedTaskKeys.contains(taskKey)) {
-            rows.addAll(task.journalEntries.map(_pdfJournalRow));
-          }
-        }
-        rows.addAll(
-          shop.orphanJournalEntries.map(
-            (journal) => _pdfJournalRow(journal, orphan: true),
-          ),
-        );
-      }
-
-      return KpiPdfGroup(
-        name: displayName,
-        summary:
-            'เอกสาร ${emp.totalDocuments} · คีย์บัญชี ${emp.totalJournals} รายการ',
-        rows: rows,
-        totalRows: shopRows,
-        contextRowIndexes: contextRowIndexes,
-        showColumnTotals: true,
-      );
-    }).toList();
+    final groups = KpiPdfDataBuilder.buildGroups(
+      employees: state.filteredEmployees,
+      summaryReady: state.summaryReady,
+      nameMappings: _nameMappings,
+    );
 
     try {
       await PdfExportService.exportGroupedTableToPdf(
@@ -1059,7 +1067,7 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
             padding: const EdgeInsets.only(left: 20, bottom: 10),
             child: Row(
               children: [
-                _legendDot(KpiColors.section1Background, 'เอกสาร'),
+                _legendDot(KpiColors.section1Background, 'บิลที่รับผิดชอบ'),
                 const SizedBox(width: 8),
                 _legendDot(_journalGroupColor, 'บันทึกบัญชี'),
               ],
@@ -1167,7 +1175,8 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
       child: Column(
         children: employees.map((emp) {
           final isExpanded = _expandedIds.contains(emp.name);
-          final displayName = _nameMappings[emp.name] ?? emp.name;
+          final displayName = _employeeDisplayName(emp.name);
+          final rawEmail = _employeeRawEmail(emp.name);
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
@@ -1208,6 +1217,18 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
                                 ),
                                 maxLines: 2,
                               ),
+                              if (rawEmail != null) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  rawEmail,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                               const SizedBox(height: 4),
                               Text(
                                 '${emp.shopStats.length} ร้าน · ${_totalTaskCount(emp)} งาน',
@@ -1236,7 +1257,7 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
                     runSpacing: 8,
                     children: [
                       _compactMetric(
-                        'เอกสาร',
+                        'บิลที่รับผิดชอบ',
                         emp.totalDocuments,
                         KpiColors.section1Background,
                       ),
@@ -1340,7 +1361,7 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
             spacing: 8,
             runSpacing: 6,
             children: [
-              _compactPill('เอกสาร ${shop.totalDocuments}'),
+              _compactPill('บิลที่รับผิดชอบ ${shop.totalDocuments}'),
               _compactPill('รอ ${shop.waitingVerify}'),
               _compactPill('คงเหลืองาน ${shop.remaining}'),
               _compactPill('คีย์รวม ${shop.journalCountTotal}'),
@@ -1629,7 +1650,7 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
         minWidth: _nameColWidth,
       ),
       // เอกสาร (task workflow) — "จำนวน" stands alone, no group banner.
-      col('จำนวน', KpiColors.section1Background),
+      col('บิลที่รับผิดชอบ', KpiColors.section1Background),
       // สถานะการตรวจสอบ (5 cols).
       col(
         'รอตรวจสอบ',
@@ -1707,6 +1728,30 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
   }
 
   String _shopKey(String empName, String shopName) => '$empName $shopName';
+
+  String _employeeDisplayName(String rawName) {
+    final mappedName = _nameMappings[rawName]?.trim();
+    if (mappedName == null || mappedName.isEmpty) return rawName;
+    return mappedName;
+  }
+
+  String? _employeeRawEmail(String rawName) {
+    final trimmedRawName = rawName.trim();
+    final mappedName = _nameMappings[rawName]?.trim();
+    if (trimmedRawName.isEmpty ||
+        mappedName == null ||
+        mappedName.isEmpty ||
+        mappedName == trimmedRawName) {
+      return null;
+    }
+    return trimmedRawName;
+  }
+
+  String _employeeDisplayWithEmail(String rawName) {
+    final displayName = _employeeDisplayName(rawName);
+    final rawEmail = _employeeRawEmail(rawName);
+    return rawEmail == null ? displayName : '$displayName\n$rawEmail';
+  }
 
   List<DataRow> _buildDataRows(
     KpiCombinedLoaded state,
@@ -1819,7 +1864,8 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
     int index,
     bool isExpanded,
   ) {
-    final displayName = _nameMappings[emp.name] ?? emp.name;
+    final displayName = _employeeDisplayName(emp.name);
+    final rawEmail = _employeeRawEmail(emp.name);
     final context = _employeeContributorContext(emp);
     return DataRow(
       color: WidgetStateProperty.resolveWith<Color?>((s) {
@@ -1853,13 +1899,30 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    displayName,
-                    style: TextStyle(
-                      fontSize: 12 * _fontScale,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    maxLines: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        displayName,
+                        style: TextStyle(
+                          fontSize: 12 * _fontScale,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: rawEmail == null ? 2 : 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (rawEmail != null)
+                        Text(
+                          rawEmail,
+                          style: TextStyle(
+                            fontSize: 10 * _fontScale,
+                            color: const Color(0xFF64748B),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
                   ),
                 ),
                 if (_totalTaskCount(emp) > 0) ...[
@@ -2066,7 +2129,7 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
     // was invisible without expanding all the way to the task row. Now
     // every task row states its ownership status explicitly instead of
     // only flagging the contributor case.
-    final ownerDisplay = _nameMappings[t.ownerBy] ?? t.ownerBy;
+    final ownerDisplay = _employeeDisplayWithEmail(t.ownerBy);
     // 16 columns total: name + 14 numeric metric columns + 1 trailing
     // expand-arrow column. จำนวน/สถานะการตรวจสอบ/สถานะการบันทึกบัญชี (10
     // columns) come straight from the task item. The 3 GL action columns
@@ -2076,11 +2139,13 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
     // ต้องบันทึก(รูปภาพ) is left blank: that figure is a shop-wide total
     // (broadcast the same to every task in the shop), not something that
     // can be meaningfully attributed to a single task.
-    final glKeyedCount = t.journalEntries.where((j) {
-      if (j.createdBy.isEmpty) return false;
-      if (!t.isOwner) return true;
-      return j.createdBy.trim() == t.ownerBy.trim();
-    }).length;
+    final glKeyedCount = _uniqueJournalCount(
+      t.journalEntries.where((j) {
+        if (j.createdBy.isEmpty) return false;
+        if (!t.isOwner) return true;
+        return j.createdBy.trim() == t.ownerBy.trim();
+      }),
+    );
     final glCheckedCount = t.journalEntries
         .where((j) => j.checkedBy.isNotEmpty)
         .length;
@@ -2297,7 +2362,7 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
         ? 'เดบิต'
         : (g.credit != 0 ? 'เครดิต' : '');
     final fmt = NumberFormat('#,##0.00');
-    final createdDisplay = _nameMappings[g.createdBy] ?? g.createdBy;
+    final createdDisplay = _employeeDisplayWithEmail(g.createdBy);
 
     // Amount / keyer / date used to each be their own un-constrained Text
     // sitting next to the doc/account Text — with a long email in "คีย์โดย
@@ -2444,6 +2509,16 @@ class _KpiCombinedPageContentState extends State<_KpiCombinedPageContent> {
         const DataCell(SizedBox()), // trailing expand-arrow column
       ],
     );
+  }
+
+  int _uniqueJournalCount(Iterable<KpiCombinedJournalItem> journals) =>
+      journals.map(_journalCountKey).toSet().length;
+
+  String _journalCountKey(KpiCombinedJournalItem journal) {
+    final docNo = journal.docNo.trim();
+    if (docNo.isNotEmpty) return 'doc:$docNo';
+    final keyedAt = journal.keyedAt?.toIso8601String() ?? '';
+    return 'row:$keyedAt|${journal.accountName}';
   }
 
   Widget _taskStatusChip(int status) {

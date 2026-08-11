@@ -1,4 +1,6 @@
 ﻿import 'dart:convert';
+import 'dart:async';
+
 import '../utils/app_logger.dart';
 import 'package:http/http.dart' as http;
 import 'auth_repository.dart';
@@ -121,6 +123,23 @@ class MultiShopService {
 
   // Store available shops
   static List<Map<String, dynamic>> _availableShops = [];
+
+  static Future<void> _shopSessionTail = Future<void>.value();
+
+  /// Acquires exclusive access to APIs scoped by the selected shop.
+  /// Invoke the returned callback in a `finally` block.
+  static Future<void Function()> acquireShopSession() async {
+    final previous = _shopSessionTail;
+    final released = Completer<void>();
+    _shopSessionTail = previous.catchError((_) {}).then((_) => released.future);
+    await previous.catchError((_) {});
+    var didRelease = false;
+    return () {
+      if (didRelease) return;
+      didRelease = true;
+      released.complete();
+    };
+  }
 
   /// Get list of available shops
   static Future<List<Map<String, dynamic>>> listShops() async {

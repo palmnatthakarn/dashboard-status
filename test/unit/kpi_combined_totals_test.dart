@@ -1,9 +1,22 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moniter/blocs/kpi_combined/kpi_combined_bloc.dart';
 import 'package:moniter/blocs/kpi_combined/kpi_combined_state.dart';
 import 'package:moniter/models/kpi_combined_employee.dart';
 
 void main() {
   group('KpiCombined totals', () {
+    test('combined KPI starts on filter-first state before searching', () {
+      final bloc = KpiCombinedBloc();
+      addTearDown(bloc.close);
+
+      final state = bloc.state;
+
+      expect(state, isA<KpiCombinedLoaded>());
+      expect((state as KpiCombinedLoaded).hasSearched, isFalse);
+      expect(state.employees, isEmpty);
+      expect(state.filteredEmployees, isEmpty);
+    });
+
     test('shop GL totals keep no-photo keying separate from remaining', () {
       const shop = KpiCombinedShopStat(
         shopName: 'ร้านทดสอบ',
